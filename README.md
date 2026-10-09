@@ -148,6 +148,18 @@ Manual Android checks:
 
 The automated finance/storage tests cover the underlying writes and calculations. Form taps, confirmation dialogs, navigation, notification timing, and Expo's native binding still require phone verification.
 
+### Faster entry and form input protections
+
+Home has Expense and Income shortcuts that preselect the shared form's type and initial category. Selected type/category buttons have a visible border, check mark, and accessibility selected state. Save continues to return to the originating screen through stack navigation.
+
+Transaction amounts use a decimal keypad and accept only digits and one decimal point, with up to two fractional digits. Opening balance uses the same input rule plus an optional leading minus sign; a Make negative/Make positive button makes the sign accessible on mobile keypads. Invalid typing/paste is rejected with an explanation and preserves the previous input. It is never silently converted by removing letters. Correct or re-enter the field before saving after a rejected input.
+
+Date/time fields use numeric keypads and insert separators automatically: `20261009` becomes `2026-10-09`, and `143500` becomes `14:35:00`. Correctly separated pasted values are accepted too. Final validation still checks real calendar dates, clock times, positive amounts, and safe integer ranges. Notes remain ordinary text. Field-specific errors appear beside amount/date/time; keyboard Next actions move between inputs where supported by the device keyboard.
+
+Success feedback is a compact, dismissible notification. Creation feedback retains the 10-second Undo window; other success messages disappear after four seconds. Database schema and dependencies are unchanged.
+
+Phone checks for this increment: open both Home shortcuts; verify selected type/category; paste `12abc34`, extra decimals, and letters into every numeric field; enter date/time as digits; try impossible dates and times; test negative opening balance through the sign toggle; verify keyboard navigation, failed-input correction, Save return navigation, and Undo.
+
 ### Acceptance checks
 
 Verify that opening balances are excluded from monthly income, expenses reduce balances, edits/deletions recalculate results, and backdated records appear in the correct month. Invalid amounts and missing required fields must not save. Repeated taps must not duplicate records. Preserve exact centavos and verify records survive closing and reopening the app.

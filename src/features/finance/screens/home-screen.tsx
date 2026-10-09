@@ -17,7 +17,8 @@ export default function HomeScreen() {
     <ThemedText type="smallBold">This month · {month} (Philippine time)</ThemedText>
     <ThemedText>Income: {formatMoney(summary.monthlyIncome)}</ThemedText>
     <ThemedText>Expenses: {formatMoney(summary.monthlyExpenses)}</ThemedText>
-    <ActionButton label="Add transaction" disabled={busy} onPress={() => router.push('/transaction')} />
+    <ActionButton label="Expense" disabled={busy} onPress={() => router.push({ pathname: '/transaction', params: { type: 'EXPENSE' } })} />
+    <ActionButton label="Income" disabled={busy} onPress={() => router.push({ pathname: '/transaction', params: { type: 'INCOME' } })} />
     <ActionButton label="View transactions" onPress={() => router.navigate('/transactions')} />
     <ActionButton label="Set opening balance" disabled={busy} onPress={() => router.navigate('/settings')} />
     <ThemedText type="smallBold">Recent transactions</ThemedText>

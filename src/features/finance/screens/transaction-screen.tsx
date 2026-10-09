@@ -11,7 +11,8 @@ import { formatMoney } from '../money';
 import type { TransactionDraft } from '../types';
 
 export default function TransactionScreen() {
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; type?: string }>();
+  const initialType = params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const id = typeof params.id === 'string' ? params.id : undefined;
   const finance = useFinance();
   const original = id ? finance.transactions.find((row) => row.id === id) : undefined;
@@ -54,7 +55,7 @@ export default function TransactionScreen() {
   if (id && !original) return <FinanceScreen title="Transaction unavailable"><ThemedText>This transaction no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <FinanceScreen title={id ? 'Edit transaction' : 'Add transaction'}>
-      <TransactionForm key={id ?? 'new'} original={original} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={leave} />
+      <TransactionForm key={id ?? 'new'} original={original} initialType={initialType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={leave} />
     </FinanceScreen>
   </KeyboardAvoidingView>;
 }

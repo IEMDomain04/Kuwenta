@@ -1,5 +1,6 @@
-﻿import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, AppState } from 'react-native';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, AppState, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -30,8 +31,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const actions = useRef<Actions | null>(null);
   const undoPending = useRef(false);
   useEffect(() => {
-    if (!notice?.undoId || !notice.expiresAt) return;
-    const timer = setTimeout(() => setNotice((current) => current === notice ? { message: notice.message } : current), Math.max(0, notice.expiresAt - Date.now()));
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice((current) => current === notice ? null : current), Math.max(0, (notice.expiresAt ?? Date.now() + 4000) - Date.now()));
     return () => clearTimeout(timer);
   }, [notice]);
   useEffect(() => {
@@ -62,7 +63,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       locked = true; setBusy(true);
       const pending = (async () => {
         await operation(connection!);
-        if (active) setNotice({ message, undoId, expiresAt: undoId ? Date.now() + 10_000 : undefined });
+        if (active) setNotice({ message, undoId, expiresAt: Date.now() + (undoId ? 10_000 : 4000) });
         try { await load(); }
         catch { if (active) setError('Change saved, but records could not refresh. Tap Retry.'); }
       })();
@@ -114,11 +115,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }}><ThemedView style={{ flex: 1 }}>
     {error ? <ThemedView style={{ padding: 16, gap: 8 }}><ThemedText accessibilityRole="alert">{error}</ThemedText>
       <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} /></ThemedView> : null}
-    {notice ? <ThemedView type="backgroundElement" style={{ padding: 16, gap: 8 }}>
-      <ThemedText accessibilityLiveRegion="polite">{notice.message}</ThemedText>
-      {notice.undoId ? <ActionButton label="Undo" disabled={busy} onPress={() => { void undo(); }} /> : null}
-      <ActionButton label="Dismiss" onPress={() => setNotice(null)} />
-    </ThemedView> : null}
+    {notice ? <SafeAreaView edges={['top', 'left', 'right']}>
+      <ThemedView type="backgroundElement" style={{ paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <ThemedText style={{ flex: 1 }} accessibilityLiveRegion="polite">{notice.message}</ThemedText>
+        {notice.undoId ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy}
+          onPress={() => { void undo(); }} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}><ThemedText type="smallBold">Undo</ThemedText></Pressable> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notification" onPress={() => setNotice(null)}
+          style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}><ThemedText>×</ThemedText></Pressable>
+      </ThemedView>
+    </SafeAreaView> : null}
     {children}
   </ThemedView></Context.Provider>;
 }

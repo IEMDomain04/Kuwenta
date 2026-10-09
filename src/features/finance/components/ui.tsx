@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
@@ -16,11 +16,11 @@ export function FinanceScreen({ title, children, scroll = true }: { title: strin
       : <ThemedView style={[styles.content, styles.fill]}>{content}</ThemedView>}
   </SafeAreaView>;
 }
-export function ActionButton({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
+export function ActionButton({ label, onPress, disabled = false, selected }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean }) {
   const theme = useTheme();
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, { backgroundColor: theme.backgroundSelected }, (pressed || disabled) && { opacity: 0.5 }]}>
-    <ThemedText type="smallBold">{label}</ThemedText>
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
+    style={({ pressed }) => [styles.button, { backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.text : 'transparent' }, (pressed || disabled) && { opacity: 0.5 }]}>
+    <ThemedText type="smallBold">{selected ? '✓ ' : ''}{label}</ThemedText>
   </Pressable>;
 }
 export function TransactionRow({ transaction }: { transaction: Transaction }) {
