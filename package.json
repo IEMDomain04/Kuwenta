@@ -38,7 +38,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:finance": "tsc -p tests/finance/tsconfig.json && node --test tests/finance/*.test.cjs"
   },
   "private": true
 }

@@ -46,10 +46,10 @@ Create only Cash, with a user-defined opening balance defaulting to PHP 0. Do no
 - Parse monetary input exactly, validate safe integer ranges, and avoid floating-point monetary arithmetic.
 - Treat opening balance as a starting adjustment, not income. Store it on the account and exclude it from monthly income and expenses.
 - Derive Cash balance from opening balance plus recorded income minus recorded expenses. Do not store a manually maintained running balance.
-- Keep `transactionDate`, `createdAt`, and `updatedAt` separate. Monthly reports use `transactionDate`.
-- Default the transaction date to the device's local calendar date; allow valid backdated entries. Audit timestamps remain separate.
+- Keep `transactionDate`, `transactionTime`, `createdAt`, and `updatedAt` separate. Transaction date/time always use Philippine time (UTC+8). Monthly reports use `transactionDate`; audit timestamps are stored in UTC.
+- Default transaction date/time to the current Philippine date/time regardless of device timezone. Allow valid backdated entries. Use YYYY-MM-DD and HH:mm:ss; timezone selection and full change history are deferred.
 - Allow negative account balances and display a visible warning.
-- Require a valid transaction type, positive amount, category, account, and date. Notes are optional.
+- Require a valid transaction type, positive amount, category, account, date, and time. Notes are optional.
 - Prevent duplicate records from repeated Save actions or retries of the same submission. Separate legitimate records with identical details must still be possible.
 
 ### Account and transaction models
@@ -59,7 +59,7 @@ These are conceptual fields; finalize the SQLite schema during the persistence s
 | Entity | Fields |
 | --- | --- |
 | Account | `id`, `name`, `currency`, `openingBalance`, `purpose` (`spending` or `savings`), `includedInAvailable`, `archived` |
-| Transaction | `id`, `type`, `amount`, `accountId`, `categoryId`, `transactionDate`, `createdAt`, `updatedAt`, `notes?`, `destinationAccountId?`, `adjustmentDirection?` |
+| Transaction | `id`, `type`, `amount`, `accountId`, `category`, `transactionDate`, `transactionTime`, `createdAt`, `updatedAt`, `notes?`, `destinationAccountId?`, `adjustmentDirection?` |
 
 Cash starts with purpose `spending`, included in Available Money, and not archived. Enable only `INCOME` and `EXPENSE` operations in the MVP. Prepare the structure for future `TRANSFER` and `ADJUSTMENT` types without building their functionality. Future adjustments need an explicit direction because amounts remain positive.
 
@@ -84,6 +84,19 @@ Future transfers move money between accounts without counting as income or expen
 | Goals | Initially, one savings goal can link to one dedicated savings account. |
 
 Do not implement these aggregate metrics or goals yet. Display Cash balance and monthly income/expenses in the MVP.
+
+### Implemented finance foundation
+
+Pure TypeScript logic lives in `src/features/finance/`: `types.ts`, `money.ts`, `dates.ts`, `validation.ts`, and `calculations.ts`. It is independent of React and SQLite. Amounts must fit safe integer centavos, dates must be between 1900 and 9999, and unsupported future transaction types are rejected by MVP validation/calculations. Negative account balances remain valid.
+
+Run the focused tests with the existing TypeScript compiler and Node's built-in test runner (verified with Node 24):
+
+```sh
+npm run test:finance
+npx tsc --noEmit
+```
+
+Tests live in `tests/finance/`. The test command compiles only the finance modules into ignored `.expo/finance-tests/` output before running the tests. No additional test dependencies are required. These tests cover calculations and input validation; persistence, duplicate-save workflow, and Android UI tests belong to later milestones. The foundation is not yet connected to screens or storage.
 
 ### Acceptance checks
 
