@@ -96,7 +96,7 @@ npm run test:finance
 npx tsc --noEmit
 ```
 
-Tests live in `tests/finance/`. The test command compiles only the finance modules into ignored `.expo/finance-tests/` output before running the tests. No additional test dependencies are required. Tests cover the finance foundation and the storage operations described below. The modules are not yet connected to app screens.
+Tests live in `tests/finance/`. The test command compiles only the finance modules into ignored `.expo/finance-tests/` output before running the tests. No additional test dependencies are required. Tests cover the finance foundation and the storage operations described below. The native app now loads these modules through the finance provider and basic screens.
 
 ### Implemented SQLite persistence
 
@@ -113,7 +113,21 @@ The schema includes optional transfer/adjustment fields, but constraints and sto
 
 `npm run test:finance` also runs `storage.test.cjs` against real SQLite using Node 24's built-in `node:sqlite` module and a small test adapter for Expo's async methods. Tests cover persisted records after reopening, repeated initialization/submissions, updates/deletion, backdating/sorting, constraints, and rollback. The adapter serializes transactions; it does not validate Expo's native connection behavior or Android concurrent-write locking. Test that integration on the phone when wiring up the app. Exclusive SQLite transactions target native mobile; web integration is outside this MVP.
 
-No additional dependencies were installed. Screens and app lifecycle integration remain the next milestone.
+No additional dependencies were installed. App lifecycle integration and the basic screens are described below.
+
+### Basic screens and app integration
+
+The native root layout mounts `FinanceProvider`, which owns a dedicated SQLite connection, loads Cash/history, and derives the dashboard summary. It closes its connection on unmount, refreshes when the app returns to the foreground, and checks for a Philippine reporting-month change while active. Loading/error states provide Retry. Opening-balance writes refresh all screens, and a failed refresh after a committed write is reported separately from a failed save.
+
+Expo Router now has Home (`src/app/index.tsx`), Transactions, and Settings routes. Screen code lives in `src/features/finance/screens/`; shared screen/button/transaction-row UI lives in `components/ui.tsx` within that feature. Existing light/dark theme components are reused.
+
+- Home: Cash balance, monthly income/expenses, a negative-balance warning, recent records, and navigation to Transactions/Settings.
+- Transactions: date/time-sorted history with amounts, categories, optional notes, empty state, and pull-to-refresh.
+- Settings: PHP and Philippine-time information, an editable opening balance, confirmation before changing it, validation, and save feedback. Opening balance does not create income.
+
+Transaction creation/forms, Undo, editing, and deletion UI are the next increment. There is no inactive Add button in this increment. Web shows a native-app notice; financial SQLite workflows target Android and are not simulated in the browser.
+
+For Android verification, run `npx expo start`, open the app on your phone, switch between the three tabs, set an opening balance of 1000, and verify Home shows PHP 1,000 with zero monthly income/expenses. Cancel an opening-balance change to verify the stored value stays unchanged. Restart the app to check persistence, and try a negative opening balance to check the warning. Invalid monetary input must not save. These manual checks need to be performed on the phone; automated storage tests do not validate the native UI.
 
 ### Acceptance checks
 
