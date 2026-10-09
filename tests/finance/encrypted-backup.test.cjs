@@ -14,7 +14,20 @@ let writingFails = false;
 let encryptionFails = false;
 let cryptoCalls = 0;
 let importedKey;
+let picked = null;
+let exportedEnvelope;
+let decryptedBytes;
 const expoCrypto = {
+  AESSealedData: { fromCombined: (base64) => Buffer.from(base64, 'base64') },
+  aesDecryptAsync: async (combined, key, options) => {
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, combined.subarray(0, 12));
+    decipher.setAAD(Buffer.from(options.additionalData));
+    decipher.setAuthTag(combined.subarray(-16));
+    decryptedBytes = new Uint8Array(Buffer.concat([
+      decipher.update(combined.subarray(12, -16)), decipher.final(),
+    ]));
+    return decryptedBytes;
+  },
   getRandomBytesAsync: async (size) => { cryptoCalls++; return crypto.randomBytes(size); },
   randomUUID: crypto.randomUUID,
   AESEncryptionKey: {
@@ -36,6 +49,7 @@ const expoCrypto = {
   },
 };
 class File {
+  static async pickFileAsync() { return picked ? { canceled: false, result: picked } : { canceled: true, result: null }; }
   constructor(directory, filename) {
     this.uri = directory + '/' + filename;
     this.exists = false;
@@ -51,7 +65,7 @@ class File {
 }
 Module._load = function(name, ...args) {
   if (name === 'expo-crypto') return expoCrypto;
-  if (name === 'expo-file-system') return { File, Paths: { cache: 'cache' } };
+  if (name === 'expo-file-system') return { File, FileMode: { ReadOnly: 'r' }, Paths: { cache: 'cache' } };
   if (name === 'expo-sharing') return {
     isAvailableAsync: async () => available,
     shareAsync: async (uri, options) => {
@@ -65,7 +79,8 @@ Module._load = function(name, ...args) {
   return originalLoad.call(this, name, ...args);
 };
 after(() => { Module._load = originalLoad; });
-const { encryptBackup, shareEncryptedBackup, validateBackupPassword, BACKUP_KEY_ITERATIONS } =
+const { encryptBackup, shareEncryptedBackup, validateBackupPassword, BACKUP_KEY_ITERATIONS,
+  decryptBackup, parseEncryptedBackup, pickBackupFile, MAX_BACKUP_FILE_BYTES } =
   require('../../.expo/finance-tests/encrypted-backup.js');
 const password = 'A long test passphrase 🔑';
 const json = serializeBackup(cash, [record({ notes: 'Lunch ₱120 🍜' })], '2026-10-09T06:35:00.000Z');
@@ -83,6 +98,7 @@ function decrypt(envelope, enteredPassword) {
 test('encrypted envelope interoperates with standard AES-GCM and preserves Unicode financial data', async () => {
   const encrypted = await encryptBackup(json, password);
   const envelope = JSON.parse(encrypted);
+  exportedEnvelope = envelope;
   assert.equal(envelope.version, 1);
   assert.equal(envelope.iterations, 600000);
   assert.equal(BACKUP_KEY_ITERATIONS, 600000);
@@ -164,4 +180,112 @@ test('encryption failure clears derived key bytes and never creates a file', asy
     assert.equal(files.length, beforeFiles);
     assert.ok(importedKey.every((value) => value === 0));
   } finally { encryptionFails = false; }
+});
+
+function sealedPayload(plaintext) {
+  const { header } = parseEncryptedBackup(JSON.stringify(exportedEnvelope));
+  const key = crypto.pbkdf2Sync(password, Buffer.from(header.salt, 'hex'), header.iterations, 32, 'sha256');
+  const nonce = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
+  cipher.setAAD(Buffer.from(JSON.stringify(header)));
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  return JSON.stringify({ ...header, sealedData: Buffer.concat([nonce, encrypted, cipher.getAuthTag()]).toString('base64') });
+}
+
+function selectedFile(text, reportedSize = Buffer.byteLength(text)) {
+  const bytes = Buffer.from(text);
+  const file = {
+    name: 'example.kuwenta', size: reportedSize, closed: false, opened: false, deleted: false,
+    open: () => {
+      file.opened = true;
+      let offset = 0;
+      return {
+        readBytes: (count) => {
+          const result = new Uint8Array(bytes.subarray(offset, offset + count));
+          offset += result.length;
+          return result;
+        },
+        close: () => { file.closed = true; },
+      };
+    },
+  };
+  return file;
+}
+
+test('import decrypts an exported file, preserves records and wipes temporary key/plaintext bytes', async () => {
+  const result = await decryptBackup(JSON.stringify(exportedEnvelope), password);
+  assert.deepEqual(result, parseBackup(json));
+  assert.ok(importedKey.every((byte) => byte === 0));
+  assert.ok(decryptedBytes.every((byte) => byte === 0));
+});
+
+test('reordered envelope keys still authenticate using canonical export metadata', async () => {
+  const reversed = Object.fromEntries(Object.entries(exportedEnvelope).reverse());
+  assert.deepEqual(await decryptBackup(JSON.stringify(reversed), password), parseBackup(json));
+});
+
+test('import rejects wrong passwords and modified ciphertext without exposing financial data', async () => {
+  await assert.rejects(() => decryptBackup(JSON.stringify(exportedEnvelope), 'Wrong long passphrase'), /incorrect or the file has been altered/);
+  const bytes = Buffer.from(exportedEnvelope.sealedData, 'base64');
+  bytes[12] ^= 1;
+  await assert.rejects(() => decryptBackup(JSON.stringify({
+    ...exportedEnvelope, sealedData: bytes.toString('base64'),
+  }), password), /incorrect or the file has been altered/);
+});
+
+test('invalid envelope settings and oversized content fail before password derivation', async () => {
+  const before = importedKey;
+  for (const patch of [
+    { version: 2 }, { format: 'other' }, { cipher: 'AES-CBC' }, { kdf: 'other' },
+    { iterations: 1 }, { iterations: 1e12 }, { salt: '00' },
+    { sealedData: 'abc' }, { sealedData: '?'.repeat(40) }, { unexpected: true },
+  ]) {
+    const invalid = JSON.stringify({ ...exportedEnvelope, ...patch });
+    assert.throws(() => parseEncryptedBackup(invalid));
+    await assert.rejects(() => decryptBackup(invalid, password));
+  }
+  for (const invalid of ['null', '[]', '{', '{}']) assert.throws(() => parseEncryptedBackup(invalid));
+  assert.throws(() => parseEncryptedBackup(' '.repeat(MAX_BACKUP_FILE_BYTES + 1)), /10 MB/);
+  assert.equal(importedKey, before);
+});
+
+test('authenticated but invalid financial records cannot produce a preview', async () => {
+  const invalid = JSON.parse(json);
+  invalid.transactions[0].amount = -1;
+  await assert.rejects(() => decryptBackup(sealedPayload(JSON.stringify(invalid)), password), /positive safe integer/);
+});
+
+test('empty backups and negative balances decrypt and produce accurate previews', async () => {
+  const { previewBackup } = require('../../.expo/finance-tests/backup.js');
+  const empty = serializeBackup({ ...cash, openingBalance: -100 }, [], '2026-10-09T06:35:00.000Z');
+  const result = await decryptBackup(sealedPayload(empty), password);
+  assert.equal(previewBackup(result).transactionCount, 0);
+  assert.equal(previewBackup(result).cashBalance, -100);
+});
+
+test('picker cancellation returns no selection; valid file closes its handle without deletion', async () => {
+  picked = null;
+  assert.equal(await pickBackupFile(), null);
+  picked = selectedFile(JSON.stringify(exportedEnvelope));
+  try {
+    const result = await pickBackupFile();
+    assert.equal(result.name, 'example.kuwenta');
+    assert.equal(result.json, JSON.stringify(exportedEnvelope));
+    assert.equal(picked.closed, true);
+    assert.equal(picked.deleted, false);
+  } finally { picked = null; }
+});
+
+test('picker checks size before reading and validates contents while always closing its handle', async () => {
+  picked = selectedFile('{}', MAX_BACKUP_FILE_BYTES + 1);
+  try {
+    await assert.rejects(() => pickBackupFile(), /10 MB/);
+    assert.equal(picked.opened, false);
+    picked = selectedFile('{}');
+    await assert.rejects(() => pickBackupFile(), /Unsupported/);
+    assert.equal(picked.closed, true);
+    picked = selectedFile(' '.repeat(MAX_BACKUP_FILE_BYTES + 1), 1);
+    await assert.rejects(() => pickBackupFile(), /10 MB/);
+    assert.equal(picked.closed, true);
+  } finally { picked = null; }
 });

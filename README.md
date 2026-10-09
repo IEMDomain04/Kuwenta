@@ -697,3 +697,39 @@ Phone checks:
 4. Save the .kuwenta file using the share sheet and verify it exists at the chosen destination.
 5. Export again, then cancel sharing; financial records should remain unchanged.
 6. Check that Home totals and transaction history remain correct after reopening the app.
+
+## Backup import preview
+
+Settings now includes Choose backup file and Unlock and preview. File selection
+reuses expo-file-system's SDK 57 picker; no additional dependency is needed.
+Supported encrypted files are limited to 10 MiB. Both file metadata and bounded
+reads enforce the limit. Export sharing enforces the same limit so files produced
+by this app can be selected for preview.
+
+The encrypted envelope must use the existing version-1 AES-256-GCM format and
+exactly 600,000 PBKDF2-HMAC-SHA256 iterations. Unsupported versions, algorithms,
+salt/base64 data, and unknown fields are rejected before password derivation.
+Authenticated decryption rejects incorrect passwords or altered files; all
+decrypted financial records then pass the existing backup validation.
+
+The preview shows account name, opening balance, total/income/expense record
+counts, recalculated Cash balance, and export date/time in Philippine time.
+Negative balances display a warning. Preview is read-only and does not call
+SQLite write operations. No restore control is provided in this increment.
+
+Password fields clear when unlocking begins or the preview is canceled.
+Canceling during processing discards the eventual result; it does not interrupt
+the underlying crypto operation. Repeated taps are blocked while processing.
+Decrypted transaction details are used to calculate the summary and are not
+retained by the preview component. The selected source file is never deleted.
+
+Phone checks:
+1. Export a backup, then select the saved .kuwenta file from Settings.
+2. Enter a wrong password; verify the error and that Home/history stay unchanged.
+3. Enter the correct password; verify counts, opening balance, and Cash balance.
+4. Check the export timestamp is labeled Philippine time.
+5. Close the preview and cancel file selection; no records should change.
+6. Try a damaged/unsupported file and repeat unlock taps.
+7. Check empty and negative-balance backups; confirm the negative warning appears.
+
+Confirmed, atomic database restore is the next increment.

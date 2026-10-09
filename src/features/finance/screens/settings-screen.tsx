@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { ActionButton, FinanceScreen } from '../components/ui';
 import { BackupExport } from '../components/backup-export';
+import { BackupImportPreview } from '../components/backup-import-preview';
 import { formatMoney, moneyInput, parseMoney } from '../money';
 import { acceptsMoneyInput } from '../inputs';
 import { calculateAccountSummary } from '../calculations';
@@ -54,5 +55,6 @@ export default function SettingsScreen() {
     {message ? <ThemedText accessibilityLiveRegion="polite">{message}</ThemedText> : null}
     <ThemedText type="small" themeColor="textSecondary">Your financial records are stored on this device.</ThemedText>
     <BackupExport disabled={saving} />
+    <BackupImportPreview disabled={busy || saving} />
   </FinanceScreen>;
 }
