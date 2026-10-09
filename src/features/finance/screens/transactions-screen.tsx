@@ -3,13 +3,17 @@ import { Alert, FlatList, View } from 'react-native';
 import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ActionButton, FinanceScreen, TransactionRow } from '../components/ui';
+import { MonthSelector } from '../components/month-selector';
+import { filterTransactions } from '../reporting';
 import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 import type { Transaction } from '../types';
 
 export default function TransactionsScreen() {
-  const { transactions, refresh, busy, removeTransaction } = useFinance();
+  const { transactions, month, refresh, busy, removeTransaction } = useFinance();
   const [error, setError] = useState('');
+  const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
+  const visible = filterTransactions(transactions, month, filter);
   const deleting = useRef(false);
   function confirmDelete(transaction: Transaction) {
     if (busy || deleting.current) return;
@@ -23,15 +27,17 @@ export default function TransactionsScreen() {
     ], { cancelable: false });
   }
   return <FinanceScreen title="Transactions" scroll={false}>
+    <MonthSelector />
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{(['ALL', 'INCOME', 'EXPENSE'] as const).map((value) => <ActionButton key={value} selected={filter === value} label={value === 'ALL' ? 'All' : value === 'INCOME' ? 'Income' : 'Expenses'} onPress={() => setFilter(value)} />)}</View>
     <ActionButton label="Add transaction" disabled={busy} onPress={() => router.push('/transaction')} />
     <ThemedText type="small" themeColor="textSecondary">Cash · Dates and times are Philippine time</ThemedText>
     {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
-    <FlatList data={transactions} keyExtractor={(item) => item.id} refreshing={busy} onRefresh={() => { void refresh(); }}
+    <FlatList data={visible} keyExtractor={(item) => item.id} refreshing={busy} onRefresh={() => { void refresh(); }}
       renderItem={({ item }) => <View style={{ gap: 8 }}><TransactionRow transaction={item} />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <ActionButton label="Edit" disabled={busy} onPress={() => router.push({ pathname: '/transaction', params: { id: item.id } })} />
           <ActionButton label="Delete" disabled={busy} onPress={() => confirmDelete(item)} />
         </View></View>}
-      contentContainerStyle={{ gap: 20, paddingBottom: 16 }} ListEmptyComponent={<ThemedText themeColor="textSecondary">No transactions yet. Add your first income or expense.</ThemedText>} />
+      contentContainerStyle={{ gap: 20, paddingBottom: 16 }} ListEmptyComponent={<ThemedText themeColor="textSecondary">No {filter === 'ALL' ? 'transactions' : filter === 'INCOME' ? 'income records' : 'expenses'} in {month}.</ThemedText>} />
   </FinanceScreen>;
 }

@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, AppState, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { calculateAccountSummary } from './calculations';
-import { philippineDateTime } from './dates';
+import { isValidMonth, philippineDateTime } from './dates';
 import { openFinanceDatabase } from './storage/database';
 import { getCashAccount, updateOpeningBalance } from './storage/accounts';
 import { createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
@@ -20,12 +20,19 @@ type Actions = {
   saveTransaction: (id: string, draft: TransactionDraft, editing: boolean) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
 };
-export type FinanceState = Snapshot & Actions & { busy: boolean };
+export type FinanceState = Snapshot & Actions & { busy: boolean; currentMonth: string; setMonth: (month: string) => void };
 const Context = createContext<FinanceState | null>(null);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  // null follows the current PH month; explicit selections survive refreshes.
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const report = useMemo(() => {
+    if (!snapshot) return null;
+    try { return { summary: calculateAccountSummary(snapshot.account, snapshot.transactions, selectedMonth ?? snapshot.month), error: '' }; }
+    catch (cause) { return { summary: null, error: cause instanceof Error ? cause.message : 'Could not calculate this month.' }; }
+  }, [snapshot, selectedMonth]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<{ message: string; undoId?: string; expiresAt?: number } | null>(null);
   const actions = useRef<Actions | null>(null);
@@ -79,7 +86,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         return createTransactionId(connection);
       },
       saveTransaction: (id, draft, editing) => write((db) => editing ? updateTransaction(db, id, draft) : createTransaction(db, id, draft),
-        editing ? 'Transaction updated.' : 'Transaction saved.', editing ? undefined : id),
+        editing ? 'Transaction updated.' : 'Transaction saved for ' + draft.transactionDate + '.', editing ? undefined : id),
       removeTransaction: (id) => write((db) => deleteTransaction(db, id), 'Transaction removed.'),
     };
     void refresh();
@@ -105,8 +112,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       : <><ThemedText accessibilityRole="alert">{error || 'Preparing records…'}</ThemedText>
         <ActionButton label="Retry" onPress={() => { void actions.current?.refresh(); }} /></>}
   </FinanceScreen>;
+  if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
-  return <Context.Provider value={{ ...snapshot, busy,
+  return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
+    setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
     refresh: () => actions.current?.refresh() ?? Promise.resolve(),
     saveOpeningBalance: (amount) => actions.current?.saveOpeningBalance(amount) ?? unavailable(),
     newSubmissionId: () => actions.current?.newSubmissionId() ?? unavailable(),

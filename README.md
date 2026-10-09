@@ -160,6 +160,16 @@ Success feedback is a compact, dismissible notification. Creation feedback retai
 
 Phone checks for this increment: open both Home shortcuts; verify selected type/category; paste `12abc34`, extra decimals, and letters into every numeric field; enter date/time as digits; try impossible dates and times; test negative opening balance through the sign toggle; verify keyboard navigation, failed-input correction, Save return navigation, and Undo.
 
+### Reporting months and history filters
+
+Home and Transactions share a reporting-month selector with Previous, Next, and Current month controls. Selection defaults to the current Philippine month, survives tab changes and record refreshes, and resets to current month when the app restarts. While following current month, the selector updates at a Philippine month boundary; explicitly selected historical months stay selected. Supported navigation range is 1900-01 through 9999-12.
+
+Home income/expense totals and recent records use the selected month. Current Cash balance always includes the opening balance and all transactions regardless of month. Transactions additionally offers All, Income, and Expenses filters; these affect only displayed history, not dashboard totals. Filtering preserves the Philippine date/time order from storage and shows a month/type-specific empty state.
+
+New transaction forms still default to Philippine today, even when browsing a historical month. Saving does not silently change the selected report; creation feedback includes the saved date. Editing a transaction date moves its history/report membership after refresh.
+
+Added `reporting.ts`, `components/month-selector.tsx`, and focused reporting tests. Database schema and dependencies are unchanged. Phone checks: change month on Home and switch to Transactions; toggle all three filters; navigate December/January; backdate and edit records across months; verify current Cash balance stays the same between reports; create a new entry while viewing a past month and confirm its default date remains today.
+
 ### Acceptance checks
 
 Verify that opening balances are excluded from monthly income, expenses reduce balances, edits/deletions recalculate results, and backdated records appear in the correct month. Invalid amounts and missing required fields must not save. Repeated taps must not duplicate records. Preserve exact centavos and verify records survive closing and reopening the app.
@@ -635,3 +645,20 @@ Success means the app becomes useful enough to use regularly. After one month, a
 7. Am I opening it voluntarily?
 
 Use these answers to guide further development.
+
+## Backup foundation (first increment)
+
+The internal version-1 backup payload is implemented in src/features/finance/backup.ts.
+It preserves the Cash account, opening balance, integer-centavo income/expense records,
+Philippine transaction dates/times, IDs, notes, and UTC creation/update timestamps.
+Metadata identifies the Kuwenta format, version, PHP currency, Asia/Manila timezone,
+and export timestamp. Balances are recalculated rather than stored.
+
+Serialization, parsing, and a summary preview share validation. Invalid shapes,
+unsupported versions/fields, duplicate IDs, unknown account references, invalid
+financial records, and unsafe totals are rejected. The MVP format supports exactly
+one Cash account. The test suite covers round trips and rejected payloads.
+
+This is an internal plaintext JSON format, not an encrypted backup file.
+File export/import, encryption, Settings controls, and atomic database restore
+are subsequent increments. No database schema or screen behavior changes here.
