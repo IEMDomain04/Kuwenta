@@ -96,7 +96,24 @@ npm run test:finance
 npx tsc --noEmit
 ```
 
-Tests live in `tests/finance/`. The test command compiles only the finance modules into ignored `.expo/finance-tests/` output before running the tests. No additional test dependencies are required. These tests cover calculations and input validation; persistence, duplicate-save workflow, and Android UI tests belong to later milestones. The foundation is not yet connected to screens or storage.
+Tests live in `tests/finance/`. The test command compiles only the finance modules into ignored `.expo/finance-tests/` output before running the tests. No additional test dependencies are required. Tests cover the finance foundation and the storage operations described below. The modules are not yet connected to app screens.
+
+### Implemented SQLite persistence
+
+`src/features/finance/storage/` contains:
+
+- `database.ts`: opens `kuwenta.db` through `expo-sqlite`, enables foreign keys and WAL, initializes the schema, and closes failed connections. Callers own the returned connection and close it when finished.
+- `migrations.ts`: atomically creates schema version 1 and one Cash account with zero opening balance. Reopening preserves data; databases from newer schema versions are rejected.
+- `accounts.ts`: retrieves Cash and updates its separate opening balance without recording income. Archived accounts reject changes.
+- `transactions.ts`: creates submission IDs and provides validated create, read, edit, and delete operations. History sorts by Philippine transaction date/time with stable tie-breakers. Edits preserve creation timestamps. Writes bind user input as SQL parameters.
+
+Create a submission ID once with `createTransactionId`, then reuse it for every retry of `createTransaction`. The unique database ID prevents duplicate records. Retrying an already saved ID returns its current record without overwriting it. Separate IDs allow legitimate identical expenses. A deleted record is not a durable submission tombstone; the later UI must retire that submission after deletion or Undo.
+
+The schema includes optional transfer/adjustment fields, but constraints and storage validation allow only income/expense records. A future migration is required to enable the deferred types. No running balance is stored; feed retrieved records to the existing calculation functions. Call edit/delete operations only after UI confirmation (or explicit creation Undo).
+
+`npm run test:finance` also runs `storage.test.cjs` against real SQLite using Node 24's built-in `node:sqlite` module and a small test adapter for Expo's async methods. Tests cover persisted records after reopening, repeated initialization/submissions, updates/deletion, backdating/sorting, constraints, and rollback. The adapter serializes transactions; it does not validate Expo's native connection behavior or Android concurrent-write locking. Test that integration on the phone when wiring up the app. Exclusive SQLite transactions target native mobile; web integration is outside this MVP.
+
+No additional dependencies were installed. Screens and app lifecycle integration remain the next milestone.
 
 ### Acceptance checks
 
