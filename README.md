@@ -117,17 +117,36 @@ No additional dependencies were installed. App lifecycle integration and the bas
 
 ### Basic screens and app integration
 
-The native root layout mounts `FinanceProvider`, which owns a dedicated SQLite connection, loads Cash/history, and derives the dashboard summary. It closes its connection on unmount, refreshes when the app returns to the foreground, and checks for a Philippine reporting-month change while active. Loading/error states provide Retry. Opening-balance writes refresh all screens, and a failed refresh after a committed write is reported separately from a failed save.
+The native root stack wraps the `(tabs)` group and the separate `/transaction` form route in `FinanceProvider`, which owns a dedicated SQLite connection, loads Cash/history, and derives the dashboard summary. It closes its connection on unmount, refreshes when the app returns to the foreground, and checks for a Philippine reporting-month change while active. Loading/error states provide Retry. Opening-balance writes refresh all screens, and a failed refresh after a committed write is reported separately from a failed save.
 
-Expo Router now has Home (`src/app/index.tsx`), Transactions, and Settings routes. Screen code lives in `src/features/finance/screens/`; shared screen/button/transaction-row UI lives in `components/ui.tsx` within that feature. Existing light/dark theme components are reused.
+Expo Router now has Home (`src/app/(tabs)/index.tsx`), Transactions, and Settings routes. Screen code lives in `src/features/finance/screens/`; shared screen/button/transaction-row UI lives in `components/ui.tsx` within that feature. Existing light/dark theme components are reused.
 
 - Home: Cash balance, monthly income/expenses, a negative-balance warning, recent records, and navigation to Transactions/Settings.
 - Transactions: date/time-sorted history with amounts, categories, optional notes, empty state, and pull-to-refresh.
 - Settings: PHP and Philippine-time information, an editable opening balance, confirmation before changing it, validation, and save feedback. Opening balance does not create income.
 
-Transaction creation/forms, Undo, editing, and deletion UI are the next increment. There is no inactive Add button in this increment. Web shows a native-app notice; financial SQLite workflows target Android and are not simulated in the browser.
+Manual transaction creation, Undo, editing, and deletion are implemented as described below. Web shows a native-app notice; financial SQLite workflows target Android and are not simulated in the browser.
 
 For Android verification, run `npx expo start`, open the app on your phone, switch between the three tabs, set an opening balance of 1000, and verify Home shows PHP 1,000 with zero monthly income/expenses. Cancel an opening-balance change to verify the stored value stays unchanged. Restart the app to check persistence, and try a negative opening balance to check the warning. Invalid monetary input must not save. These manual checks need to be performed on the phone; automated storage tests do not validate the native UI.
+
+### Manual transaction management
+
+Home and Transactions have an Add transaction shortcut. `/transaction` opens outside the tabs with a shared income/expense form (`components/transaction-form.tsx`) and workflow screen (`screens/transaction-screen.tsx`). The form includes positive peso amount, matching category, fixed Cash account, editable Philippine date/time, and optional notes. Validation and failed writes preserve the draft. Creation uses Save without a separate confirmation dialog.
+
+The provider exposes transaction actions, refreshes summaries after committed writes, and displays success feedback. Saves use a stable submission ID and disable repeated actions while pending. Successful drafts retire their IDs. Undo is available for 10 seconds after creation and removes only that new record; starting another write replaces the previous notification. Edit and Delete actions are available in transaction history and require confirmation. Cancel leaves records unchanged. Edits preserve the creation timestamp. A committed write followed by a read failure shows a separate refresh error with Retry and does not report the save as failed.
+
+The existing Home, Transactions, and Settings routes now live under `src/app/(tabs)/` while keeping their URLs. No dependency or database migration was added for this increment. Full change-history tracking remains deferred.
+
+Manual Android checks:
+
+1. Set opening Cash to PHP 1,000, save PHP 500 income and PHP 120 expense, and verify balance 1,380 with monthly income 500 and expenses 120.
+2. Tap Save repeatedly and verify one record. Try invalid amount/date/time and confirm no record is saved and the draft is preserved.
+3. Save an expense, tap Undo, and verify only that record disappears and totals return to their previous values.
+4. Edit amount, type/category, date/time, and notes; cancel first, then confirm, and check the resulting reports.
+5. Cancel a deletion, then confirm it, and verify history and balances.
+6. Add a backdated record, create a negative balance, restart the app, and verify reporting and persistence.
+
+The automated finance/storage tests cover the underlying writes and calculations. Form taps, confirmation dialogs, navigation, notification timing, and Expo's native binding still require phone verification.
 
 ### Acceptance checks
 

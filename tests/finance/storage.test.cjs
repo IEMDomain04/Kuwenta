@@ -193,3 +193,27 @@ test('a failure after an edit write rolls back the original transaction', async 
   await assert.rejects(updateTransaction(db, 'expense', record({ amount: 20000 })), /Simulated write failure/);
   assert.deepEqual(await getTransaction(db, 'expense'), original);
 });
+
+test('creation Undo removes only its record and keeps another identical expense', async (t) => {
+  const db = await setup(t);
+  await updateOpeningBalance(db, 100000);
+  await createTransaction(db, 'first', expense());
+  await createTransaction(db, 'second', expense());
+  await deleteTransaction(db, 'second');
+  assert.deepEqual((await listTransactions(db)).map((row) => row.id), ['first']);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 88000);
+  await createTransaction(db, 'fresh-submission', expense());
+  assert.equal((await listTransactions(db)).length, 2);
+});
+
+test('editing type/category/date/time and clearing notes updates the right report', async (t) => {
+  const db = await setup(t);
+  const original = await createTransaction(db, 'edited', record({ notes: 'Lunch' }));
+  const edited = await updateTransaction(db, 'edited', record({ type: 'INCOME', category: 'Gift', amount: 50000,
+    transactionDate: '2026-09-30', transactionTime: '23:59:59', notes: undefined }));
+  assert.equal(edited.createdAt, original.createdAt);
+  assert.equal(edited.notes, undefined);
+  const rows = await listTransactions(db);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-10').monthlyExpenses, 0);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-09').monthlyIncome, 50000);
+});
