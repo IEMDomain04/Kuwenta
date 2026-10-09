@@ -1,5 +1,5 @@
-﻿import { useEffect, useRef, useState } from 'react';
-import { Keyboard, TextInput } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Keyboard, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { decryptBackup, pickBackupFile } from '../encrypted-backup';
@@ -7,13 +7,17 @@ import { previewBackup, type FinanceBackup } from '../backup';
 import { formatMoney } from '../money';
 import { philippineDateTime } from '../dates';
 import { ActionButton } from './ui';
+import { useFinance } from '../provider';
 
 export function BackupImportPreview({ disabled = false }: { disabled?: boolean }) {
   const theme = useTheme();
+  const { busy, restoreBackup } = useFinance();
+  const confirming = useRef(false);
+  const [restoring, setRestoring] = useState(false);
   const [selected, setSelected] = useState<{ name: string; json: string } | null>(null);
   const [password, setPassword] = useState('');
   const [preview, setPreview] = useState<{
-    summary: ReturnType<typeof previewBackup>; account: FinanceBackup['accounts'][number]; exported: string;
+    backup: FinanceBackup; summary: ReturnType<typeof previewBackup>; account: FinanceBackup['accounts'][number]; exported: string;
   } | null>(null);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState('');
@@ -52,7 +56,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       const backup = await decryptBackup(selected.json, enteredPassword);
       const time = philippineDateTime(new Date(backup.exportedAt));
       const result = {
-        summary: previewBackup(backup), account: backup.accounts[0],
+        backup, summary: previewBackup(backup), account: backup.accounts[0],
         exported: time.transactionDate + ' ' + time.transactionTime + ' PH (UTC+8)',
       };
       if (mounted.current && token === generation.current) {
@@ -65,7 +69,30 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       if (mounted.current) setWorking(false);
     }
   }
-  const locked = disabled || working;
+  function reviewRestore() {
+    if (!preview || pending.current || confirming.current || disabled || busy) return;
+    const backup = preview.backup;
+    confirming.current = true;
+    Keyboard.dismiss();
+    Alert.alert('Replace your financial records?',
+      'This replaces your current Cash account details and ALL transactions with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; } },
+        { text: 'Restore backup', style: 'destructive', onPress: () => {
+          if (!mounted.current) { confirming.current = false; return; }
+          pending.current = true; setRestoring(true); setMessage('Restoring backup...');
+          void restoreBackup(backup).then(() => {
+            if (mounted.current) { clear(); setMessage('Backup restored.'); }
+          }).catch((error: unknown) => {
+            if (mounted.current) setMessage(error instanceof Error ? error.message : 'Restore failed. Your original records are unchanged.');
+          }).finally(() => {
+            confirming.current = false; pending.current = false;
+            if (mounted.current) setRestoring(false);
+          });
+        } },
+      ], { cancelable: false });
+  }
+  const locked = disabled || busy || working || restoring;
   return <>
     <ThemedText type="smallBold">Preview a backup</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Open an encrypted .kuwenta file to check its contents. This does not restore or change your current records.</ThemedText>
@@ -89,8 +116,9 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       <ThemedText>Cash balance: {formatMoney(preview.summary.cashBalance)}</ThemedText>
       {preview.summary.cashBalance < 0 ? <ThemedText accessibilityRole="alert">Warning: this backup has a negative Cash balance.</ThemedText> : null}
       <ThemedText>Your current records have not changed.</ThemedText>
+      <ActionButton label={restoring ? "Restoring backup..." : "Restore this backup"} disabled={locked} onPress={reviewRestore} />
     </> : null}
-    {selected || preview || working ? <ActionButton label={working ? 'Cancel preview' : 'Close preview'} onPress={clear} /> : null}
+    {selected || preview || working ? <ActionButton label={working ? 'Cancel preview' : 'Close preview'} disabled={restoring} onPress={clear} /> : null}
     {message ? <ThemedText accessibilityLiveRegion="polite">{message}</ThemedText> : null}
   </>;
 }

@@ -733,3 +733,43 @@ Phone checks:
 7. Check empty and negative-balance backups; confirm the negative warning appears.
 
 Confirmed, atomic database restore is the next increment.
+
+## Confirmed backup restore
+
+After unlocking and reviewing a backup, Settings offers Restore this backup.
+Confirmation explains that the current Cash account details and ALL transactions
+will be replaced, recommends exporting the current records first, and states
+that restore cannot be undone. Cancel leaves the database and preview unchanged.
+
+Restore revalidates and detaches the backup before writing. One exclusive SQLite
+transaction deletes old transactions, updates the existing Cash account row,
+and inserts backup records with their original IDs, integer centavos, Philippine
+transaction dates/times, notes, and audit timestamps. No account row is deleted.
+Any failure rolls back all changes. Unsupported multi-account databases are
+rejected before deletion. Repeating a restore replaces records without duplicates.
+
+The provider locks financial operations during restore, clears stale Undo
+notifications after commit, resets reports to the current Philippine month, and
+reloads all screens. Existing forms/previews reset when the restored snapshot
+loads. If restore commits but refresh fails, the app explicitly reports that the
+backup was restored and offers Retry; stale records are not displayed for editing.
+
+The unlocked backup is now held in memory while the preview is open so Restore
+can use exactly the previewed data. Closing the preview clears it. No password
+is retained, and no dependency or database schema change was added.
+
+Phone checks:
+1. Export current records before testing replacement.
+2. Unlock a backup, choose Restore this backup, then Cancel: records must stay unchanged.
+3. Confirm restore of opening PHP 1,000 + PHP 500 income - PHP 120 expense:
+   Cash balance should be PHP 1,380, income PHP 500, and expenses PHP 120.
+4. Confirm old transactions are gone and PH date/time, notes, and counts match the backup.
+5. Restore the same file again: transaction counts must not increase.
+6. Check an empty backup, negative balance warning, and a backdated reporting month.
+7. Close/reopen Expo Go: restored records should remain.
+8. Create a transaction before restoring and verify its old Undo option disappears after restore.
+
+Automated SQLite tests cover replacement, invalid payloads, mid-write rollback,
+repeated/concurrent storage restores, empty/archived records, backdating, and
+persistence. Confirmation, provider locking/refresh, and screen reset still need
+native phone verification.

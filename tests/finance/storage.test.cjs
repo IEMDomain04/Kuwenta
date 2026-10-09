@@ -241,3 +241,133 @@ test('backup reads a validated SQLite snapshot without changing stored records',
   assert.equal(calculateAccountSummary(backup.accounts[0], backup.transactions, '2026-10').balance, 138000);
   assert.deepEqual(await listTransactions(db), before);
 });
+
+function backupFixture(accountOverrides = {}, rows = [
+  record({ id: 'restored-income', type: 'INCOME', category: 'Salary', amount: 50000 }),
+  record({ id: 'restored-expense', notes: 'Lunch ₱120', updatedAt: '2026-10-09T07:00:00.000Z' }),
+]) {
+  const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { cash } = require('./fixtures.cjs');
+  return parseBackup(serializeBackup({ ...cash, ...accountOverrides }, rows, '2026-10-09T06:35:00.000Z'));
+}
+
+test('restore replaces old records and preserves centavos, IDs, PH time, notes and audit timestamps', async (t) => {
+  const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const db = await setup(t);
+  await createTransaction(db, 'old-record', expense());
+  const backup = backupFixture();
+  await restoreBackup(db, backup);
+  assert.equal(await getTransaction(db, 'old-record'), null);
+  assert.deepEqual(await getCashAccount(db), backup.accounts[0]);
+  const rows = await listTransactions(db);
+  assert.deepEqual(JSON.parse(JSON.stringify(rows)).sort((a, b) => a.id.localeCompare(b.id)),
+    [...backup.transactions].sort((a, b) => a.id.localeCompare(b.id)));
+  assert.deepEqual(calculateAccountSummary(await getCashAccount(db), rows, '2026-10'), {
+    balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
+  });
+});
+
+test('invalid restore payloads fail before opening a write transaction and preserve original data', async (t) => {
+  const { restoreBackup, readBackupJson } = require('../../.expo/finance-tests/storage/backup.js');
+  const db = await setup(t);
+  await createTransaction(db, 'old-record', expense());
+  const before = await readBackupJson(db);
+  let writes = 0;
+  const wrapped = { ...db, withExclusiveTransactionAsync: async () => { writes++; } };
+  for (const mutate of [
+    (v) => { v.transactions[0].amount = -1; },
+    (v) => { v.transactions.push({ ...v.transactions[0] }); },
+    (v) => { v.transactions[0].accountId = 'missing'; },
+    (v) => { v.version = 2; },
+  ]) {
+    const backup = backupFixture();
+    mutate(backup);
+    await assert.rejects(() => restoreBackup(wrapped, backup));
+  }
+  assert.equal(writes, 0);
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const after = parseBackup(await readBackupJson(db));
+  const original = parseBackup(before);
+  assert.deepEqual(after.accounts, original.accounts);
+  assert.deepEqual(after.transactions, original.transactions);
+});
+
+test('a failure after deletion, account update and one insert rolls back the entire restore', async (t) => {
+  const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const db = await setup(t);
+  await updateOpeningBalance(db, 123);
+  await createTransaction(db, 'old-record', expense());
+  const beforeAccount = await getCashAccount(db);
+  const beforeRows = await listTransactions(db);
+  let inserts = 0;
+  const wrapped = { ...db, withExclusiveTransactionAsync: (operation) =>
+    db.withExclusiveTransactionAsync((transaction) => operation({
+      ...transaction,
+      runAsync: async (sql, ...params) => {
+        if (sql.startsWith('INSERT INTO transactions') && ++inserts === 2) throw new Error('Injected insert failure');
+        return transaction.runAsync(sql, ...params);
+      },
+    })),
+  };
+  await assert.rejects(() => restoreBackup(wrapped, backupFixture()), /Injected insert failure/);
+  assert.equal(inserts, 2);
+  assert.deepEqual(await getCashAccount(db), beforeAccount);
+  assert.deepEqual(await listTransactions(db), beforeRows);
+});
+
+test('restoring the same backup repeatedly or concurrently replaces records without duplication', async (t) => {
+  const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const db = await setup(t);
+  const backup = backupFixture();
+  await restoreBackup(db, backup);
+  await Promise.all([restoreBackup(db, backup), restoreBackup(db, backup)]);
+  assert.equal((await listTransactions(db)).length, 2);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 138000);
+});
+
+test('restore supports empty history, signed openings, archived flags and backdated reports', async (t) => {
+  const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const db = await setup(t);
+  await createTransaction(db, 'old-record', expense());
+  await restoreBackup(db, backupFixture({ openingBalance: -100, archived: true, includedInAvailable: false }, []));
+  assert.equal((await listTransactions(db)).length, 0);
+  assert.equal((await getCashAccount(db)).archived, true);
+  assert.equal((await getCashAccount(db)).includedInAvailable, false);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), [], '2026-10').balance, -100);
+  await restoreBackup(db, backupFixture({}, [record({ transactionDate: '2026-09-30', transactionTime: '23:59:59' })]));
+  const rows = await listTransactions(db);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-09').monthlyExpenses, 12000);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-10').monthlyExpenses, 0);
+});
+
+test('restore refuses an unsupported multi-account database before deleting records', async (t) => {
+  const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const db = await setup(t);
+  await createTransaction(db, 'old-record', expense());
+  await db.runAsync("INSERT INTO accounts VALUES ('other', 'Other', 'PHP', 0, 'spending', 1, 0)");
+  const before = await listTransactions(db);
+  await assert.rejects(() => restoreBackup(db, backupFixture()), /only the Cash account/);
+  assert.deepEqual(await listTransactions(db), before);
+  assert.equal((await db.getAllAsync('SELECT id FROM accounts')).length, 2);
+});
+
+test('restored records persist after closing and reopening the disk database', async () => {
+  const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const directory = mkdtempSync(join(tmpdir(), 'kuwenta-restore-'));
+  const filename = join(directory, 'finance.db');
+  let db = connect(filename);
+  try {
+    await initializeDatabase(db);
+    await restoreBackup(db, backupFixture());
+    db.close(); db = connect(filename);
+    await initializeDatabase(db);
+    const rows = await listTransactions(db);
+    assert.equal(rows.length, 2);
+    assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-10').balance, 138000);
+    assert.equal((await getTransaction(db, 'restored-expense')).notes, 'Lunch ₱120');
+  } finally {
+    db.close();
+    for (const name of readdirSync(directory)) unlinkSync(join(directory, name));
+    rmdirSync(directory);
+  }
+});

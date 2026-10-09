@@ -8,13 +8,15 @@ import { calculateAccountSummary } from './calculations';
 import { isValidMonth, philippineDateTime } from './dates';
 import { openFinanceDatabase } from './storage/database';
 import { getCashAccount, updateOpeningBalance } from './storage/accounts';
-import { readBackupJson } from './storage/backup';
+import { readBackupJson, restoreBackup as restoreBackupRecords } from './storage/backup';
+import type { FinanceBackup } from './backup';
 import { createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
 import type { Account, Transaction, TransactionDraft } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
 type Snapshot = { account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateAccountSummary> };
 type Actions = {
+  restoreBackup: (backup: FinanceBackup) => Promise<void>;
   getBackupJson: () => Promise<string>;
   refresh: () => Promise<void>;
   saveOpeningBalance: (amount: number) => Promise<void>;
@@ -28,6 +30,7 @@ const Context = createContext<FinanceState | null>(null);
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  const [restoreVersion, setRestoreVersion] = useState(0);
   // null follows the current PH month; explicit selections survive refreshes.
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const report = useMemo(() => {
@@ -67,14 +70,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       }).finally(() => { locked = false; if (active) setBusy(false); });
       await running;
     }
-    async function write(operation: (db: SQLiteDatabase) => Promise<unknown>, message: string, undoId?: string) {
+    async function write(operation: (db: SQLiteDatabase) => Promise<unknown>, message: string, undoId?: string, restoring = false) {
       if (locked || !active || !connection) throw new Error('Please wait for records to finish loading.');
       locked = true; setBusy(true);
       const pending = (async () => {
         await operation(connection!);
+        if (active && restoring) { setSnapshot(null); setSelectedMonth(null); setRestoreVersion((version) => version + 1); }
         if (active) setNotice({ message, undoId, expiresAt: Date.now() + (undoId ? 10_000 : 4000) });
         try { await load(); }
-        catch { if (active) setError('Change saved, but records could not refresh. Tap Retry.'); }
+        catch { if (active) setError(restoring ? 'Backup restored, but records could not refresh. Tap Retry.' : 'Change saved, but records could not refresh. Tap Retry.'); }
       })();
       running = pending.catch(() => {});
       try { await pending; }
@@ -82,6 +86,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     actions.current = {
       refresh,
+      restoreBackup: (backup) => write((db) => restoreBackupRecords(db, backup), 'Backup restored.', undefined, true),
       getBackupJson: async () => {
         if (locked || !active || !connection) throw new Error('Please wait for records to finish loading.');
         locked = true; setBusy(true);
@@ -127,12 +132,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
     refresh: () => actions.current?.refresh() ?? Promise.resolve(),
+    restoreBackup: (backup) => actions.current?.restoreBackup(backup) ?? unavailable(),
     getBackupJson: () => actions.current?.getBackupJson() ?? unavailable(),
     saveOpeningBalance: (amount) => actions.current?.saveOpeningBalance(amount) ?? unavailable(),
     newSubmissionId: () => actions.current?.newSubmissionId() ?? unavailable(),
     saveTransaction: (id, draft, editing) => actions.current?.saveTransaction(id, draft, editing) ?? unavailable(),
     removeTransaction: (id) => actions.current?.removeTransaction(id) ?? unavailable(),
-  }}><ThemedView style={{ flex: 1 }}>
+  }}><ThemedView key={restoreVersion} style={{ flex: 1 }}>
     {error ? <ThemedView style={{ padding: 16, gap: 8 }}><ThemedText accessibilityRole="alert">{error}</ThemedText>
       <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} /></ThemedView> : null}
     {notice ? <SafeAreaView edges={['top', 'left', 'right']}>
