@@ -8,12 +8,14 @@ import { calculateAccountSummary } from './calculations';
 import { isValidMonth, philippineDateTime } from './dates';
 import { openFinanceDatabase } from './storage/database';
 import { getCashAccount, updateOpeningBalance } from './storage/accounts';
+import { readBackupJson } from './storage/backup';
 import { createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
 import type { Account, Transaction, TransactionDraft } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
 type Snapshot = { account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateAccountSummary> };
 type Actions = {
+  getBackupJson: () => Promise<string>;
   refresh: () => Promise<void>;
   saveOpeningBalance: (amount: number) => Promise<void>;
   newSubmissionId: () => Promise<string>;
@@ -80,6 +82,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     actions.current = {
       refresh,
+      getBackupJson: async () => {
+        if (locked || !active || !connection) throw new Error('Please wait for records to finish loading.');
+        locked = true; setBusy(true);
+        const pending = readBackupJson(connection);
+        running = pending.catch(() => {});
+        try { return await pending; }
+        finally { locked = false; if (active) setBusy(false); }
+      },
       saveOpeningBalance: (amount) => write((db) => updateOpeningBalance(db, amount), 'Opening balance saved.'),
       newSubmissionId: async () => {
         if (locked || !active || !connection) throw new Error('Please wait for records to finish loading.');
@@ -117,6 +127,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
     refresh: () => actions.current?.refresh() ?? Promise.resolve(),
+    getBackupJson: () => actions.current?.getBackupJson() ?? unavailable(),
     saveOpeningBalance: (amount) => actions.current?.saveOpeningBalance(amount) ?? unavailable(),
     newSubmissionId: () => actions.current?.newSubmissionId() ?? unavailable(),
     saveTransaction: (id, draft, editing) => actions.current?.saveTransaction(id, draft, editing) ?? unavailable(),

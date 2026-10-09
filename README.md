@@ -662,3 +662,38 @@ one Cash account. The test suite covers round trips and rejected payloads.
 This is an internal plaintext JSON format, not an encrypted backup file.
 File export/import, encryption, Settings controls, and atomic database restore
 are subsequent increments. No database schema or screen behavior changes here.
+
+## Encrypted backup export
+
+Settings now offers Export backup on the native app. Enter and confirm a strong
+12-128 character password/passphrase, then choose Encrypt and share backup.
+The complete Cash account and transaction history are read from SQLite in one
+transaction. Only encrypted data is written to a temporary cache file; the file
+is removed when sharing completes or fails. Save the shared .kuwenta file to
+your chosen location. Closing the share sheet cannot prove that a file was saved.
+
+The version-1 encrypted envelope uses AES-256-GCM, PBKDF2-HMAC-SHA256 with
+600,000 iterations, a fresh random 16-byte salt, a 12-byte nonce, and a 16-byte
+authentication tag. Envelope metadata is authenticated as additional data.
+The sealedData field is base64 containing nonce, ciphertext, and tag in that order.
+Passwords are used exactly as entered (UTF-8, without normalization).
+The password is never written to the database or backup. Keep it safe: forgotten
+passwords cannot be recovered. Password fields clear when export begins or is canceled.
+
+Dependencies: expo-crypto for native encryption/randomness, expo-file-system for
+the encrypted temporary file, expo-sharing for the system share sheet, and
+@noble/hashes 2.4.0 for asynchronous password key derivation that yields to the
+event loop. The finance test setup uses Node 24, which supports this ESM library.
+The Expo modules are included in SDK 57 Expo Go. Reference: [Expo Crypto](https://docs.expo.dev/versions/v57.0.0/sdk/crypto/), [FileSystem](https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/), and [Sharing](https://docs.expo.dev/versions/v57.0.0/sdk/sharing/).
+
+Import, password entry for decryption, preview, and confirmed atomic restore
+remain the next increments. Automated tests use standard Node AES-GCM at the
+Expo boundary; native crypto and sharing still need phone verification.
+
+Phone checks:
+1. Restart Expo after installing the new packages and open the app in Expo Go.
+2. In Settings, try a short password and mismatched confirmation; no file should be shared.
+3. Enter matching strong passphrases and export; repeated taps should start one export.
+4. Save the .kuwenta file using the share sheet and verify it exists at the chosen destination.
+5. Export again, then cancel sharing; financial records should remain unchanged.
+6. Check that Home totals and transaction history remain correct after reopening the app.

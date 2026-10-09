@@ -1,4 +1,4 @@
-﻿const { test } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { DatabaseSync } = require('node:sqlite');
 const { mkdtempSync, readdirSync, unlinkSync, rmdirSync } = require('node:fs');
@@ -216,4 +216,28 @@ test('editing type/category/date/time and clearing notes updates the right repor
   const rows = await listTransactions(db);
   assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-10').monthlyExpenses, 0);
   assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-09').monthlyIncome, 50000);
+});
+
+test('backup reads a validated SQLite snapshot without changing stored records', async (t) => {
+  const { readBackupJson } = require('../../.expo/finance-tests/storage/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const db = await setup(t);
+  await updateOpeningBalance(db, 100000);
+  await createTransaction(db, 'income', income());
+  await createTransaction(db, 'expense', expense());
+  let transactionsStarted = 0;
+  const wrapped = {
+    ...db,
+    withExclusiveTransactionAsync: (operation) => {
+      transactionsStarted++;
+      return db.withExclusiveTransactionAsync(operation);
+    },
+  };
+  const before = await listTransactions(db);
+  const backup = parseBackup(await readBackupJson(wrapped));
+  assert.equal(transactionsStarted, 1);
+  assert.deepEqual(backup.transactions, JSON.parse(JSON.stringify(before)));
+  assert.equal(backup.accounts[0].openingBalance, 100000);
+  assert.equal(calculateAccountSummary(backup.accounts[0], backup.transactions, '2026-10').balance, 138000);
+  assert.deepEqual(await listTransactions(db), before);
 });
