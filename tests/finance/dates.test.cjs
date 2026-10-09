@@ -46,3 +46,18 @@ test('audit timestamps use UTC and invalid instants are rejected', () => {
   assert.equal(isUtcTimestamp('2026-10-09T14:35:00+08:00'), false);
   assert.throws(() => philippineDateTime(new Date('invalid')));
 });
+
+test('picker values represent Philippine wall time independently of the host timezone', () => {
+  const { transactionPickerValue, readableTransactionDate } = require('../../.expo/finance-tests/dates.js');
+  assert.equal(transactionPickerValue('2026-10-10', '00:05:37').toISOString(), '2026-10-09T16:05:37.000Z');
+  assert.equal(readableTransactionDate('2026-10-10'), 'October 10, 2026');
+  assert.throws(() => transactionPickerValue('2026-02-30', '12:00:00'));
+  assert.throws(() => transactionPickerValue('2026-10-10', '25:00:00'));
+});
+
+test('time selections preserve seconds when minutes are unchanged and reset them when changed', () => {
+  const { pickedTransactionTime } = require('../../.expo/finance-tests/dates.js');
+  assert.equal(pickedTransactionTime(new Date('2026-10-10T06:35:00Z'), '14:35:37'), '14:35:37');
+  assert.equal(pickedTransactionTime(new Date('2026-10-10T06:36:59Z'), '14:35:37'), '14:36:00');
+  assert.equal(pickedTransactionTime(new Date('2026-10-09T16:00:00Z'), '23:59:37'), '00:00:00');
+});

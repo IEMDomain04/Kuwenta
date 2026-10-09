@@ -1,31 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, TextInput } from 'react-native';
+import { Alert, Keyboard } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { ActionButton, FinanceScreen } from '../components/ui';
 import { BackupExport } from '../components/backup-export';
 import { BackupImportPreview } from '../components/backup-import-preview';
 import { formatMoney, moneyInput, parseMoney } from '../money';
-import { acceptsMoneyInput } from '../inputs';
+import { formatEditableMoney } from '../inputs';
+import { MoneyField } from '../components/money-field';
 import { calculateAccountSummary } from '../calculations';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
   const { account, transactions, month, busy, saveOpeningBalance } = useFinance();
   const theme = useTheme();
-  const [input, setInput] = useState(moneyInput(account.openingBalance));
+  const [input, setInput] = useState(formatEditableMoney(moneyInput(account.openingBalance), true)!);
   const [message, setMessage] = useState('');
   const [inputRejected, setInputRejected] = useState(false);
   const [saving, setSaving] = useState(false);
   const confirming = useRef(false);
-  useEffect(() => { setInput(moneyInput(account.openingBalance)); }, [account.openingBalance]);
+  useEffect(() => { setInput(formatEditableMoney(moneyInput(account.openingBalance), true)!); }, [account.openingBalance]);
 
   function review() {
     if (confirming.current || busy || saving || inputRejected) return;
     setMessage('');
     let amount: number;
     try {
-      amount = parseMoney(input, { allowNegative: true, allowZero: true });
+      amount = parseMoney(input.replace(/,/g, ''), { allowNegative: true, allowZero: true });
       calculateAccountSummary({ ...account, openingBalance: amount }, transactions, month);
       if (amount === account.openingBalance) { setMessage('Opening balance is unchanged.'); return; }
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Invalid opening balance.'); return; }
@@ -46,8 +47,10 @@ export default function SettingsScreen() {
     <ThemedText>Currency: PHP (Philippine peso)</ThemedText>
     <ThemedText>Transaction time: Philippine time (UTC+8)</ThemedText>
     <ThemedText type="smallBold">Opening balance</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">The money you started tracking with. This is separate from recorded income. Enter pesos without commas.</ThemedText>
-    <TextInput accessibilityLabel="Cash opening balance in pesos" value={input} onChangeText={(value) => { if (!acceptsMoneyInput(value, true)) { setInputRejected(true); setMessage('Only digits, one decimal point, and an optional leading minus sign are allowed. Input was not accepted.'); return; } setInput(value); setInputRejected(false); setMessage(''); }}
+    <ThemedText type="small" themeColor="textSecondary">The money you started tracking with. This is separate from recorded income. Thousands separators are added as you type.</ThemedText>
+    <MoneyField signed accessibilityLabel="Cash opening balance in pesos" value={input}
+      onValueChange={(value) => { setInput(value); setInputRejected(false); setMessage(''); }}
+      onRejected={() => { setInputRejected(true); setMessage('Use digits, up to two decimal places, and an optional leading minus sign. Input was not accepted.'); }}
       editable={!busy && !saving} keyboardType="decimal-pad" returnKeyType="done" onSubmitEditing={review} placeholder="0.00" placeholderTextColor={theme.textSecondary}
       style={{ color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 18 }} />
     <ActionButton label={input.startsWith('-') ? 'Make positive' : 'Make negative'} disabled={busy || saving} onPress={() => { setInput(input.startsWith('-') ? input.slice(1) : '-' + input); setInputRejected(false); setMessage(''); }} />

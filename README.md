@@ -773,3 +773,47 @@ Automated SQLite tests cover replacement, invalid payloads, mid-write rollback,
 repeated/concurrent storage restores, empty/archived records, backdating, and
 persistence. Confirmation, provider locking/refresh, and screen reset still need
 native phone verification.
+
+## Home and transaction interface improvements
+
+Home emphasizes the Cash balance and explains that it includes all months.
+Add Expense and Add Income appear immediately below it. The monthly selector,
+income, and expenses are grouped into a monthly overview. Recent transactions
+follow, with View all transactions beneath them. Opening balance remains in Settings.
+Transaction rows now emphasize signed amounts before category and PH date/time.
+
+The transaction form has a larger amount field, compact category choices with
+selected indicators, and shorter date/time hints. Fields scroll independently of
+Save/Review changes and Cancel, which remain below the scrolling area.
+Non-tab form screens use their bottom safe area instead of tab-bar spacing.
+The current theme, validation, PH defaults, confirmations, and persistence are reused.
+No dependencies, financial rules, or database changes were added.
+
+Phone checks: verify light/dark appearance, narrow screens and larger text,
+both quick-entry types, category selection, invalid numeric input, and reaching
+Save with the keyboard open. Verify date/time and notes remain reachable by
+scrolling. Check edit confirmation, canceled edits, and failed-save draft preservation.
+
+## Calendar, time picker, and live money formatting
+
+Transaction date and time are selected through native pickers instead of typing.
+Android uses a calendar dialog and clock dialog; iOS uses an inline calendar/time
+wheel with explicit Confirm/Cancel controls. Pickers are configured for Asia/Manila,
+and stored values remain YYYY-MM-DD and HH:mm:ss. Existing seconds survive date
+changes and unchanged hour/minute selections. Changing the time sets seconds to 00.
+
+Transaction amounts and opening balances now group thousands while typing:
+1000 becomes 1,000, and 12345.67 becomes 12,345.67. Partial decimal entries remain
+editable, and letters, extra decimals, and malformed grouped pastes are rejected.
+Cursor mapping supports insertion, selected-range replacement, and deletion
+beside a separator. Only display commas are removed before the existing exact
+centavo parser; database and financial calculations remain unchanged.
+
+One dependency was added through expo install: @react-native-community/datetimepicker.
+It is included in Expo Go: https://docs.expo.dev/versions/v57.0.0/sdk/date-time-picker/
+
+Phone checks: restart Expo; open each picker, confirm and cancel selections, edit
+a backdated transaction, and verify unchanged seconds. Try a phone timezone outside
+the Philippines. Type 1000, 12345.67, and 1000.; edit the middle of a grouped number,
+delete beside commas, replace a selected range, and paste grouped/invalid amounts.
+Check negative opening balance sign changes and verify saved centavos and totals.

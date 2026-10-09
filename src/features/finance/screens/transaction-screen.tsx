@@ -54,7 +54,7 @@ export default function TransactionScreen() {
   }
   if (id && !original) return <FinanceScreen title="Transaction unavailable"><ThemedText>This transaction no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <FinanceScreen title={id ? 'Edit transaction' : 'Add transaction'}>
+    <FinanceScreen scroll={false} tabScreen={false} title={id ? 'Edit transaction' : 'Add transaction'}>
       <TransactionForm key={id ?? 'new'} original={original} initialType={initialType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={leave} />
     </FinanceScreen>
   </KeyboardAvoidingView>;

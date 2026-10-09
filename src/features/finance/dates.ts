@@ -35,3 +35,19 @@ export function isUtcTimestamp(value: string): boolean {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
 }
+
+/** Picker values represent Philippine wall time, never device-local time. */
+export function transactionPickerValue(date: string, time: string): Date {
+  if (!isValidDate(date) || !isValidTime(time)) throw new Error('Invalid transaction date/time.');
+  return new Date(date + 'T' + time + '+08:00');
+}
+export function pickedTransactionTime(value: Date, previous: string): string {
+  if (!isValidTime(previous)) throw new Error('Invalid transaction time.');
+  const minutes = philippineDateTime(value).transactionTime.slice(0, 5);
+  return minutes === previous.slice(0, 5) ? previous : minutes + ':00';
+}
+export function readableTransactionDate(date: string): string {
+  if (!isValidDate(date)) throw new Error('Invalid transaction date.');
+  return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' })
+    .format(transactionPickerValue(date, '12:00:00'));
+}
