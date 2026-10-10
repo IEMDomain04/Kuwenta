@@ -33,7 +33,7 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
   const [defaults] = useState(() => philippineDateTime());
   const [type, setType] = useState<ManualTransactionType>(original?.type === 'TRANSFER' ? 'TRANSFER' : original?.type === 'INCOME' ? 'INCOME' : original ? 'EXPENSE' : initialDraft?.type ?? initialType);
   const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.amount))! : initialDraft ? formatEditableMoney(moneyInput(initialDraft.amount))! : '');
-  const amountFontSize = amountWidth > 0 ? Math.max(20, Math.min(36, Math.floor(amountWidth / ((Math.max(amount.length, 1) + 1) * 0.65 * fontScale)))) : 36;
+  const amountFontSize = amountWidth > 0 ? Math.max(20, Math.min(30, Math.floor(amountWidth / ((Math.max(amount.length, 1) + 1) * 0.65 * fontScale)))) : 30;
   const [category, setCategory] = useState(original?.category ?? initialDraft?.category ?? (initialType === 'TRANSFER' ? 'Transfer' : CATEGORIES[initialType][0]));
   const [date, setDate] = useState(original?.transactionDate ?? initialDraft?.transactionDate ?? defaults.transactionDate);
   const [time, setTime] = useState(original?.transactionTime ?? initialDraft?.transactionTime ?? defaults.transactionTime);
@@ -46,7 +46,7 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
     try { transferPreview = previewTransfer(accounts, transactions, { type, accountId, destinationAccountId, category: 'Transfer', amount: parseMoney(amount.replace(/,/g, '')), transactionDate: date, transactionTime: time }, original); }
     catch (cause) { previewError = cause instanceof Error ? cause.message : 'Could not preview balances.'; }
   }
-  const inputStyle = { color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 };
+  const inputStyle = { color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 14 };
   function submit() {
     const issues = { ...errors };
     let cents = 0;
@@ -79,7 +79,7 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}
           onPress={() => { Keyboard.dismiss(); setCategoryOpen(true); }} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-          <ThemedText numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, fontSize: 16, lineHeight: 22, textAlign: 'right' }}>{category}</ThemedText>
+          <ThemedText numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>{category}</ThemedText>
           {type !== "TRANSFER" && <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />}
         </Pressable>
       </View>

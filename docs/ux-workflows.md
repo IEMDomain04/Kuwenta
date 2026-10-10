@@ -63,3 +63,9 @@ Phone checks: airplane mode, examples above, missing amounts, duplicate account 
 Completed focused fixes: Quick Entry scrolls on smaller screens, review avoids reopening the amount keyboard, and transaction back/cancel actions respect pending operations. Unavailable transaction screens now use the same back navigation as other detail screens.
 
 Next usability pass: test Home section density, discoverability of Accounts/Goals/Budgets, long names and large values, category/account picker sizing, budget editing with the keyboard, and Settings reset/restore clarity on a phone. Existing three tabs, light design, and financial workflows are retained. Broader layout changes and AI model selection should follow these checks.
+
+## Product walkthrough and smaller typography
+
+Fresh users and full resets see Welcome, optional name, PHP currency, starting Cash, and a short guide. Back preserves entered values during setup. Skip introduction bypasses the welcome text, while Start with zero bypasses amount entry. Completion saves name, Cash opening balance, and the existing setup flag atomically. Existing users skip onboarding. The name stays in local preferences, is excluded from financial backups, and is cleared by reset or restore. Restarting before completion starts onboarding again without partial financial writes.
+
+Shared typography is smaller, with 20-22px titles, 14px body text, 12px supporting text, and a 30px main Home balance. Touch sizes and system font scaling remain supported. Phone verification: step navigation, skipped name, PHP explanation, zero/decimal Cash, repeated finish taps, failed-save retry, restart, reset, greeting, keyboard visibility and large-text layouts. The previously reported APK post-save crash remains a separate unresolved issue; this change does not claim to fix it.

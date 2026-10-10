@@ -102,7 +102,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       <TextInput accessibilityLabel="Password for selected backup" placeholder="Backup password"
         placeholderTextColor={theme.textSecondary} value={password} onChangeText={setPassword}
         secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={128} editable={!locked}
-        style={{ color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 16 }} />
+        style={{ color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 }} />
       <ActionButton label="Unlock and preview" disabled={locked} onPress={() => { void unlock(); }} />
     </> : null}
     {preview ? <>

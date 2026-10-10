@@ -1023,3 +1023,28 @@ test('copying budgets is atomic and deletion recalculates spending', async (t) =
   await deleteTransaction(db, 'delete-budget-expense');
   assert.equal(budgetReport(await listBudgets(db), await listTransactions(db), '2026-10').budgetedSpent, 0);
 });
+
+
+test('onboarding saves optional name and Cash atomically and never overwrites existing users', async (t) => {
+  const db = await setup(t);
+  const { completeCashSetup } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { resetFinancialData, restoreBackup, readBackupJson } = require('../../.expo/finance-tests/storage/backup.js');
+  await assert.rejects(completeCashSetup(db, 100000, 'a'.repeat(51)));
+  const run = db.runAsync;
+  db.runAsync = async (sql, ...params) => { if (sql.startsWith('UPDATE preferences')) throw new Error('onboarding failure'); return run(sql, ...params); };
+  await assert.rejects(completeCashSetup(db, 100000, 'Ana'), /onboarding failure/);
+  db.runAsync = run;
+  assert.equal((await getCashAccount(db)).openingBalance, 0);
+  assert.equal(await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'displayName'"), null);
+  await completeCashSetup(db, 100000, ' Ana ');
+  await completeCashSetup(db, 500000, 'Other');
+  assert.equal((await getCashAccount(db)).openingBalance, 100000);
+  assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'displayName'")).value, 'Ana');
+  const backup = JSON.parse(await readBackupJson(db));
+  assert.equal(backup.displayName, undefined);
+  await restoreBackup(db, backup);
+  assert.equal(await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'displayName'"), null);
+  await resetFinancialData(db);
+  await completeCashSetup(db, 0, '');
+  assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'displayName'")).value, '');
+});

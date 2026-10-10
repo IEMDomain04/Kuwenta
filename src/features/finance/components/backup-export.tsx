@@ -53,7 +53,7 @@ export function BackupExport({ disabled = false }: { disabled?: boolean }) {
   }
 
   const locked = busy || disabled || exporting;
-  const inputStyle = { color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 16 };
+  const inputStyle = { color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 };
   return <>
     <ThemedText type="smallBold">Backup</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Save a password-protected copy of all your financial records. Keep the password safe: a forgotten password cannot be recovered.</ThemedText>

@@ -21,7 +21,7 @@ export function QuickEntry({ disabled, accountId, onReview, onCancel }: { disabl
     <ThemedText type="smallBold">Quick Entry - offline</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">One income or expense. Try Lunch 120, Pamasahe 30 kahapon, or Salary 25,000. Put an account last: Groceries 1,500 from Cash.</ThemedText>
     <TextInput autoFocus accessibilityLabel="Quick transaction phrase" value={text} maxLength={250} onChangeText={(value) => { setText(value); setError(''); }} editable={!disabled} placeholder="Lunch 120" placeholderTextColor={theme.textSecondary} returnKeyType="done" onSubmitEditing={review}
-      style={{ padding: 14, color: theme.text, fontSize: 16, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
+      style={{ padding: 14, color: theme.text, fontSize: 14, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
     {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
     <ActionButton primary label="Review transaction" disabled={disabled || !text.trim()} onPress={review} />
     <ActionButton label="Use regular form" disabled={disabled} onPress={onCancel} />

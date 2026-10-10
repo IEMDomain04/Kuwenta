@@ -19,7 +19,7 @@ import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 
 export default function HomeScreen() {
-  const { accounts, transactions, summary, month, busy } = useFinance();
+  const { displayName, accounts, transactions, summary, month, busy } = useFinance();
   const theme = useTheme();
   const currentMoney = useMemo(() => {
     try { return { values: calculateCurrentMoney(accounts, transactions), error: '' }; }
@@ -29,6 +29,7 @@ export default function HomeScreen() {
   const spending = spendingByCategory(transactions, month);
   return <FinanceScreen title="Kuwenta" headerAccessory={<HomeMonthPicker />} floatingAction={<AddTransactionButton disabled={busy} />}>
 
+    {displayName ? <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">Hello, {displayName}</ThemedText> : null}
     <View style={[styles.balance, { backgroundColor: '#096A7C', overflow: 'hidden' }]}>
       <Image accessible={false} source={svgSource('<defs><linearGradient id="g"><stop stop-color="#087C91"/><stop offset="1" stop-color="' + theme.balanceEnd + '"/></linearGradient></defs><rect width="400" height="200" fill="url(#g)"/><path d="M170 200Q250 70 400 145V200z" fill="#FFFFFF" opacity=".08"/>', '0 0 400 200')} style={StyleSheet.absoluteFill} contentFit="cover" />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="wallet" size={22} color="#FFFFFF" /><ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>Available Money</ThemedText></View>
@@ -101,13 +102,13 @@ export default function HomeScreen() {
 }
 const styles = StyleSheet.create({
   balance: { padding: 18, borderRadius: 20, gap: 8 },
-  balanceAmount: { fontSize: 38, lineHeight: 48, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  balanceAmount: { fontSize: 30, lineHeight: 40, fontWeight: '700', fontVariant: ['tabular-nums'] },
   section: { gap: 12 },
   panel: { padding: 14, borderRadius: 18, gap: 12 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   fab: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', elevation: 4 },
   total: { flexGrow: 1, flexBasis: 140, gap: 8, padding: 16, borderRadius: 16, borderWidth: 1 },
-  totalAmount: { fontSize: 22, lineHeight: 30, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  totalAmount: { fontSize: 20, lineHeight: 28, fontWeight: '600', fontVariant: ['tabular-nums'] },
   categoryRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
   figures: { fontVariant: ['tabular-nums'] },
   track: { height: 6, borderRadius: 3, overflow: 'hidden' },

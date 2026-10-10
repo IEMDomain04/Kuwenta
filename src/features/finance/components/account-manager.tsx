@@ -71,7 +71,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
         { text: account.archived ? 'Unarchive' : 'Archive', onPress: () => { void commit({ ...account, archived: !account.archived }, false); } }], { cancelable: false });
   }
   const savedAccount = accounts.find((account) => account.id === editor?.id);
-  const inputStyle = { color: theme.text, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 12, fontSize: 16 };
+  const inputStyle = { color: theme.text, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 12, fontSize: 14 };
   return <View style={{ gap: 12 }}>
     <ThemedText type="smallBold" accessibilityRole="header">Accounts · PHP</ThemedText>
     {editor ? <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
