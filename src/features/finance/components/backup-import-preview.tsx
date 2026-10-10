@@ -56,7 +56,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       const backup = await decryptBackup(selected.json, enteredPassword);
       const time = philippineDateTime(new Date(backup.exportedAt));
       const result = {
-        backup, summary: previewBackup(backup), account: backup.accounts[0],
+        backup, summary: previewBackup(backup), account: backup.accounts.find((account) => account.id === 'cash')!,
         exported: time.transactionDate + ' ' + time.transactionTime + ' PH (UTC+8)',
       };
       if (mounted.current && token === generation.current) {
@@ -75,7 +75,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
     confirming.current = true;
     Keyboard.dismiss();
     Alert.alert('Replace your financial records?',
-      'This replaces your current Cash account details and ALL transactions with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
+      'This replaces ALL your current accounts, transactions, and savings goals with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: 'Restore backup', style: 'destructive', onPress: () => {
@@ -108,14 +108,18 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
     {preview ? <>
       <ThemedText type="smallBold">Backup contents</ThemedText>
       <ThemedText>Exported: {preview.exported}</ThemedText>
-      <ThemedText>Account: {preview.account.name} (PHP)</ThemedText>
+      <ThemedText>Accounts: {preview.summary.accountCount} (PHP)</ThemedText>
+      {preview.backup.accounts.map((account) => <ThemedText key={account.id} type="small">{account.name} · {account.purpose}{account.archived ? ' · Archived' : ''}</ThemedText>)}
       <ThemedText>Opening balance: {formatMoney(preview.account.openingBalance)}</ThemedText>
       <ThemedText>Transactions: {preview.summary.transactionCount}</ThemedText>
       <ThemedText>Income records: {preview.summary.incomeCount}</ThemedText>
+      <ThemedText>Savings goals: {preview.summary.goalCount}</ThemedText>
+      <ThemedText>Transfers: {preview.summary.transferCount}</ThemedText>
+      <ThemedText>Balance adjustments: {preview.summary.adjustmentCount}</ThemedText>
       <ThemedText>Expense records: {preview.summary.expenseCount}</ThemedText>
       <ThemedText>Cash balance: {formatMoney(preview.summary.cashBalance)}</ThemedText>
       {preview.summary.cashBalance < 0 ? <ThemedText accessibilityRole="alert">Warning: this backup has a negative Cash balance.</ThemedText> : null}
-      <ThemedText>Your current records have not changed.</ThemedText>
+      <ThemedText>Your current records have not changed. Restoring also replaces savings goals.</ThemedText>
       <ActionButton label={restoring ? "Restoring backup..." : "Restore this backup"} disabled={locked} onPress={reviewRestore} />
     </> : null}
     {selected || preview || working ? <ActionButton label={working ? 'Cancel preview' : 'Close preview'} disabled={restoring} onPress={clear} /> : null}

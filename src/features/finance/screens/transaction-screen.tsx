@@ -9,17 +9,17 @@ import { TransactionForm } from '../components/transaction-form';
 import { FinanceScreen, ActionButton } from '../components/ui';
 import { useFinance } from '../provider';
 import { validateDraft } from '../validation';
-import { calculateAccountSummary } from '../calculations';
+import { calculateFinanceSummary } from '../calculations';
 import { formatMoney } from '../money';
-import type { TransactionDraft } from '../types';
+import type { TransactionDraft, ManualTransactionType } from '../types';
 
 export default function TransactionScreen() {
-  const params = useLocalSearchParams<{ id?: string; type?: string }>();
-  const initialType = params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+  const params = useLocalSearchParams<{ id?: string; type?: string; accountId?: string; destinationAccountId?: string }>();
+  const initialType = params.type === 'TRANSFER' ? 'TRANSFER' : params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const id = typeof params.id === 'string' ? params.id : undefined;
   const finance = useFinance();
   const theme = useTheme();
-  const [entryType, setEntryType] = useState(initialType);
+  const [entryType, setEntryType] = useState<ManualTransactionType>(initialType);
   const original = id ? finance.transactions.find((row) => row.id === id) : undefined;
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -46,21 +46,31 @@ export default function TransactionScreen() {
     if (pending.current || finished.current || finance.busy) return;
     setError('');
     try {
-      validateDraft(draft, finance.account);
+      const account = finance.accounts.find((account) => account.id === draft.accountId);
+      if (!account) throw new Error('Choose an account.');
+      validateDraft(draft, account, finance.accounts.find((account) => account.id === draft.destinationAccountId));
+      if (original && finance.accounts.find((account) => account.id === original.accountId)?.archived) throw new Error('Unarchive the original account before editing its transactions.');
+      if (original?.type === 'TRANSFER' && finance.accounts.find((account) => account.id === original.destinationAccountId)?.archived) throw new Error('Unarchive the original destination before editing this transfer.');
       const candidate = { ...draft, id: id ?? 'pending', createdAt: original?.createdAt ?? new Date().toISOString(), updatedAt: [new Date().toISOString(), original?.updatedAt ?? ''].sort().at(-1)! };
-      calculateAccountSummary(finance.account, [...finance.transactions.filter((row) => row.id !== id), candidate], finance.month);
+      calculateFinanceSummary(finance.accounts, [...finance.transactions.filter((row) => row.id !== id), candidate], draft.transactionDate.slice(0, 7));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid input.'); return; }
     Keyboard.dismiss(); pending.current = true;
     if (!original) { void save(draft); return; }
-    Alert.alert('Save transaction changes?', `${original.category} ${formatMoney(original.amount)} → ${draft.category} ${formatMoney(draft.amount)}\n${draft.type} · ${formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}\n${draft.notes ?? ''}`, [
+    const accountLabel = (row: TransactionDraft | typeof original) => {
+      const source = finance.accounts.find((account) => account.id === row.accountId)?.name ?? '';
+      return row.type === 'TRANSFER' ? source + ' to ' + (finance.accounts.find((account) => account.id === row.destinationAccountId)?.name ?? '') : source;
+    };
+    const accountChange = accountLabel(original) + ' -> ' + accountLabel(draft) + '\n';
+    Alert.alert('Save transaction changes?', accountChange + `${original.category} ${formatMoney(original.amount)} → ${draft.category} ${formatMoney(draft.amount)}\n${draft.type} · ${formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}\n${draft.notes ?? ''}`, [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Confirm', onPress: () => { void save(draft); } },
     ], { cancelable: false });
   }
+  if (original?.type === "ADJUSTMENT") return <FinanceScreen title="Balance adjustment" tabScreen={false}><ThemedText>Balance corrections are managed from the account.</ThemedText><ActionButton label="View account" onPress={() => router.replace({ pathname: "/account", params: { id: original.accountId } })} /><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   if (id && !original) return <FinanceScreen title="Transaction unavailable"><ThemedText>This transaction no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <FinanceScreen scroll={false} tabScreen={false} title={id ? 'Edit transaction' : entryType === 'INCOME' ? 'Add Income' : 'Add Expense'} headerLeading={<Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving || finance.busy} onPress={leave} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="arrow-back" size={24} color={theme.text} /></Pressable>}>
-      <TransactionForm key={id ?? 'new'} original={original} initialType={initialType} onTypeChange={setEntryType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={leave} />
+    <FinanceScreen scroll={false} tabScreen={false} title={id ? 'Edit transaction' : entryType === 'TRANSFER' ? 'Add Transfer' : entryType === 'INCOME' ? 'Add Income' : 'Add Expense'} headerLeading={<Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving || finance.busy} onPress={leave} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="arrow-back" size={24} color={theme.text} /></Pressable>}>
+      <TransactionForm key={id ?? 'new'} original={original} initialType={initialType} initialAccountId={params.accountId} initialDestinationAccountId={params.destinationAccountId} onTypeChange={setEntryType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={leave} />
     </FinanceScreen>
   </KeyboardAvoidingView>;
 }

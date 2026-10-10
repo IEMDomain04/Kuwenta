@@ -18,6 +18,8 @@ export default function RootLayout() {
     <FinanceProvider><Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="transaction" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="goal" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="account" options={{ gestureEnabled: false }} />
     </Stack></FinanceProvider>
   </ThemeProvider>;
 }

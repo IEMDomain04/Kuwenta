@@ -58,7 +58,7 @@ export function formatTransactionDateTime(date: string, time: string): string {
   const [year, month, day] = date.split('-').map(Number);
   const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const hour = Number(time.slice(0, 2));
-  return names[month - 1] + ' ' + day + ', ' + year + ' · ' + (hour % 12 || 12) + ':' + time.slice(3, 5) + (hour < 12 ? ' AM' : ' PM') + ' · PH time';
+  return names[month - 1] + ' ' + day + ', ' + year + ' · ' + (hour % 12 || 12) + ':' + time.slice(3, 5) + (hour < 12 ? ' AM' : ' PM');
 }
 export function readableReportingMonth(month: string): string {
   if (!isValidMonth(month)) throw new Error('Invalid reporting month.');

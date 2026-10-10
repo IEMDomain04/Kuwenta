@@ -1,6 +1,6 @@
 import type { FinanceDatabase } from './database';
 
-const VERSION = 1;
+const VERSION = 5;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -38,5 +38,27 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
     const version = row?.user_version ?? 0;
     if (version > VERSION) throw new Error('This database requires a newer version of Kuwenta.');
     if (version === 0) await transaction.execAsync(schema);
+    if (version < 2) await transaction.execAsync('CREATE INDEX IF NOT EXISTS transactions_all_history ON transactions(transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); PRAGMA user_version = 2;');
+    if (version < 3) {
+      const table = schema.slice(schema.indexOf('CREATE TABLE transactions ('), schema.indexOf('CREATE INDEX transactions_history'))
+        .replace('CREATE TABLE transactions (', 'CREATE TABLE transactions_new (')
+        .replace("type IN ('INCOME', 'EXPENSE')", "type IN ('INCOME', 'EXPENSE', 'ADJUSTMENT')")
+        .replace('CHECK(destinationAccountId IS NULL AND adjustmentDirection IS NULL)',
+          "CHECK(destinationAccountId IS NULL AND ((type IN ('INCOME', 'EXPENSE') AND adjustmentDirection IS NULL) OR (type = 'ADJUSTMENT' AND category = 'Balance adjustment' AND adjustmentDirection IS NOT NULL AND adjustmentDirection IN ('increase', 'decrease'))))");
+      await transaction.execAsync(table);
+      await transaction.execAsync('INSERT INTO transactions_new (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, destinationAccountId, adjustmentDirection) SELECT id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, destinationAccountId, adjustmentDirection FROM transactions; DROP TABLE transactions; ALTER TABLE transactions_new RENAME TO transactions; CREATE INDEX transactions_history ON transactions(accountId, transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_all_history ON transactions(transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); PRAGMA user_version = 3;');
+    }
+
+    if (version < 4) {
+      const table = schema.slice(schema.indexOf('CREATE TABLE transactions ('), schema.indexOf('CREATE INDEX transactions_history'))
+        .replace('CREATE TABLE transactions (', 'CREATE TABLE transactions_new (')
+        .replace("type IN ('INCOME', 'EXPENSE')", "type IN ('INCOME', 'EXPENSE', 'ADJUSTMENT', 'TRANSFER')")
+        .replace('CHECK(destinationAccountId IS NULL AND adjustmentDirection IS NULL)',
+          "CHECK((type IN ('INCOME', 'EXPENSE') AND destinationAccountId IS NULL AND adjustmentDirection IS NULL) OR (type = 'ADJUSTMENT' AND destinationAccountId IS NULL AND category = 'Balance adjustment' AND adjustmentDirection IS NOT NULL) OR (type = 'TRANSFER' AND category = 'Transfer' AND destinationAccountId IS NOT NULL AND destinationAccountId <> accountId AND adjustmentDirection IS NULL))");
+      await transaction.execAsync(table);
+      await transaction.execAsync('INSERT INTO transactions_new (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, destinationAccountId, adjustmentDirection) SELECT id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, destinationAccountId, adjustmentDirection FROM transactions; DROP TABLE transactions; ALTER TABLE transactions_new RENAME TO transactions; CREATE INDEX transactions_history ON transactions(accountId, transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_all_history ON transactions(transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_destination ON transactions(destinationAccountId); PRAGMA user_version = 4;');
+    }
+    if (version < 5) await transaction.execAsync(
+      "ALTER TABLE transactions ADD COLUMN sourcePurpose TEXT CHECK(sourcePurpose IN ('spending', 'savings')); ALTER TABLE transactions ADD COLUMN destinationPurpose TEXT CHECK(destinationPurpose IN ('spending', 'savings')); CREATE TABLE IF NOT EXISTS goals (id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0), name TEXT NOT NULL CHECK(length(trim(name)) > 0), accountId TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE RESTRICT, targetAmount INTEGER NOT NULL CHECK(typeof(targetAmount) = 'integer' AND targetAmount BETWEEN 1 AND 9007199254740991), targetDate TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL CHECK(updatedAt >= createdAt)); PRAGMA user_version = 5;");
   });
 }

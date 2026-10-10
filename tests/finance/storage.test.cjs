@@ -56,7 +56,7 @@ test('initialization creates Cash exactly once and preserves records/opening bal
   await createTransaction(db, 'expense', expense());
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync('SELECT count(*) AS total FROM accounts')).total, 1);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 1);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 5);
   assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
@@ -176,9 +176,9 @@ test('migration failure rolls back schema and version; newer schema is rejected'
   assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'accounts'"), null);
   fail = false;
   await initializeDatabase(db);
-  await db.execAsync('PRAGMA user_version = 2');
+  await db.execAsync('PRAGMA user_version = 6');
   await assert.rejects(initializeDatabase(db), /newer version/);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 2);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 6);
 });
 
 test('a failure after an edit write rolls back the original transaction', async (t) => {
@@ -278,7 +278,7 @@ test('invalid restore payloads fail before opening a write transaction and prese
     (v) => { v.transactions[0].amount = -1; },
     (v) => { v.transactions.push({ ...v.transactions[0] }); },
     (v) => { v.transactions[0].accountId = 'missing'; },
-    (v) => { v.version = 2; },
+    (v) => { v.version = 6; },
   ]) {
     const backup = backupFixture();
     mutate(backup);
@@ -340,17 +340,19 @@ test('restore supports empty history, signed openings, archived flags and backda
   assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-10').monthlyExpenses, 0);
 });
 
-test('restore refuses an unsupported multi-account database before deleting records', async (t) => {
+test('confirmed restore replaces all accounts and history, including when restoring a legacy Cash-only payload', async (t) => {
   const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
   const db = await setup(t);
   await createTransaction(db, 'old-record', expense());
   await db.runAsync("INSERT INTO accounts VALUES ('other', 'Other', 'PHP', 0, 'spending', 1, 0)");
-  const before = await listTransactions(db);
-  await assert.rejects(() => restoreBackup(db, backupFixture()), /only the Cash account/);
-  assert.deepEqual(await listTransactions(db), before);
-  assert.equal((await db.getAllAsync('SELECT id FROM accounts')).length, 2);
+  await createTransaction(db, 'other-record', record({ accountId: 'other' }));
+  const backup = backupFixture();
+  backup.version = 1; delete backup.goals;
+  await restoreBackup(db, backup);
+  assert.equal((await db.getAllAsync('SELECT id FROM accounts')).length, 1);
+  assert.equal(await getTransaction(db, 'other-record'), null);
+  assert.equal((await listTransactions(db)).length, backup.transactions.length);
 });
-
 test('restored records persist after closing and reopening the disk database', async () => {
   const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
   const directory = mkdtempSync(join(tmpdir(), 'kuwenta-restore-'));
@@ -368,6 +370,397 @@ test('restored records persist after closing and reopening the disk database', a
   } finally {
     db.close();
     for (const name of readdirSync(directory)) unlinkSync(join(directory, name));
+    rmdirSync(directory);
+  }
+});
+
+test('version 1 migration preserves Cash amounts, IDs and timestamps and is repeatable', async (t) => {
+  const db = await setup(t);
+  await updateOpeningBalance(db, 100000);
+  await createTransaction(db, 'old-income', income());
+  const before = await listTransactions(db);
+  await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
+  await initializeDatabase(db);
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 5);
+  assert.equal((await getCashAccount(db)).openingBalance, 100000);
+  assert.deepEqual(await listTransactions(db), before);
+  assert.ok(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"));
+});
+test('version 2 migration failure preserves the old database and version', async (t) => {
+  const db = await setup(t);
+  await createTransaction(db, 'old', expense());
+  await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
+  const exec = db.execAsync;
+  db.execAsync = async (sql) => {
+    await exec(sql);
+    if (sql.includes('CREATE INDEX IF NOT EXISTS transactions_all_history')) throw new Error('Migration failure');
+  };
+  await assert.rejects(initializeDatabase(db), /Migration failure/);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 1);
+  assert.equal((await getTransaction(db, 'old')).amount, 12000);
+  assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"), null);
+});
+test('multiple accounts isolate balances; moving and deleting records recalculate both accounts', async (t) => {
+  const { saveAccount, getAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { calculateFinanceSummary } = require('../../.expo/finance-tests/calculations.js');
+  const { cash } = require('./fixtures.cjs');
+  const db = await setup(t);
+  const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: 200000, purpose: 'savings', includedInAvailable: false };
+  await saveAccount(db, bank, true);
+  await updateOpeningBalance(db, 100000);
+  await createTransaction(db, 'cash-expense', expense());
+  await createTransaction(db, 'bank-income', record({ accountId: 'bank', type: 'INCOME', category: 'Salary', amount: 50000 }));
+  assert.equal(calculateAccountSummary(await getAccount(db, 'bank'), await listTransactions(db), '2026-10').balance, 250000);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 88000);
+  assert.equal(calculateFinanceSummary(await listAccounts(db), await listTransactions(db), '2026-10').monthlyIncome, 50000);
+  await updateTransaction(db, 'cash-expense', record({ accountId: 'bank' }));
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 100000);
+  assert.equal(calculateAccountSummary(await getAccount(db, 'bank'), await listTransactions(db), '2026-10').balance, 238000);
+  await deleteTransaction(db, 'cash-expense');
+  assert.equal(calculateAccountSummary(await getAccount(db, 'bank'), await listTransactions(db), '2026-10').balance, 250000);
+  await saveAccount(db, { ...bank, archived: true }, false);
+  assert.equal((await getAccount(db, 'bank')).archived, true);
+  assert.equal((await listTransactions(db)).length, 1);
+  await assert.rejects(createTransaction(db, 'blocked', record({ accountId: 'bank' })), /archived/);
+  await assert.rejects(updateTransaction(db, 'bank-income', income()), /Unarchive/);
+  await saveAccount(db, bank, false);
+  await createTransaction(db, 'after-unarchive', record({ accountId: 'bank' }));
+  assert.equal((await listTransactions(db)).length, 2);
+});
+test('unsafe account or transaction edits roll back and repeat IDs cannot overwrite other accounts', async (t) => {
+  const { saveAccount, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { cash } = require('./fixtures.cjs');
+  const db = await setup(t);
+  const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: Number.MAX_SAFE_INTEGER };
+  await saveAccount(db, bank, true);
+  await createTransaction(db, 'cash-income', income());
+  await assert.rejects(updateTransaction(db, 'cash-income', record({ accountId: 'bank', type: 'INCOME', category: 'Salary', amount: 1 })), /supported range/);
+  assert.equal((await getTransaction(db, 'cash-income')).accountId, 'cash');
+  await createTransaction(db, 'bank-expense', record({ accountId: 'bank', amount: 1 }));
+  await assert.rejects(deleteTransaction(db, 'bank-expense').then(async () => {
+    await createTransaction(db, 'overflow', record({ accountId: 'bank', type: 'INCOME', category: 'Salary', amount: 1 }));
+  }), /supported range/);
+  assert.equal(await getTransaction(db, 'overflow'), null);
+  const retry = await createTransaction(db, 'cash-income', record({ accountId: 'bank' }));
+  assert.equal(retry.accountId, 'cash');
+  await assert.rejects(saveAccount(db, { ...bank, openingBalance: 1.5 }, false));
+  assert.equal((await getAccount(db, 'bank')).openingBalance, Number.MAX_SAFE_INTEGER);
+});
+test('multi-account backups restore archived settings and records and survive atomic failure', async (t) => {
+  const { saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { cash } = require('./fixtures.cjs');
+  const db = await setup(t);
+  const bank = { ...cash, id: 'bank', name: 'Savings Bank', purpose: 'savings', includedInAvailable: false };
+  await saveAccount(db, bank, true);
+  await createTransaction(db, 'bank-record', record({ accountId: 'bank' }));
+  await saveAccount(db, { ...bank, archived: true }, false);
+  const backup = parseBackup(await readBackupJson(db));
+  await restoreBackup(db, backup);
+  assert.equal((await listAccounts(db)).length, 2);
+  assert.deepEqual(await listAccounts(db), backup.accounts);
+  assert.equal((await getTransaction(db, 'bank-record')).accountId, 'bank');
+  const wrapped = { ...db, withExclusiveTransactionAsync: (operation) => db.withExclusiveTransactionAsync((transaction) => operation({
+    ...transaction, runAsync: async (sql, ...params) => {
+      if (sql.startsWith('INSERT INTO accounts') && params[0] === 'bank') throw new Error('Account insert failure');
+      return transaction.runAsync(sql, ...params);
+    },
+  })) };
+  await assert.rejects(restoreBackup(wrapped, backup), /Account insert failure/);
+  assert.deepEqual(await listAccounts(db), backup.accounts);
+  assert.equal((await getTransaction(db, 'bank-record')).amount, 12000);
+});
+test('balance corrections preserve openings, exclude reports, are idempotent and support deletion', async (t) => {
+  const db = await setup(t);
+  const { adjustAccountBalance } = require('../../.expo/finance-tests/storage/transactions.js');
+  await updateOpeningBalance(db, 100000);
+  await createTransaction(db, 'spent', record({ amount: 38200 }));
+  await adjustAccountBalance(db, 'adjust-up', 'cash', 80000, 61800);
+  await adjustAccountBalance(db, 'adjust-up', 'cash', 80000, 61800);
+  const up = await getTransaction(db, 'adjust-up');
+  assert.equal(up.amount, 18200);
+  assert.equal(up.adjustmentDirection, 'increase');
+  assert.equal((await getCashAccount(db)).openingBalance, 100000);
+  assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
+    balance: 80000, monthlyIncome: 0, monthlyExpenses: 38200, hasNegativeBalance: false,
+  });
+  await assert.rejects(adjustAccountBalance(db, 'stale', 'cash', 90000, 61800), /changed/);
+  await adjustAccountBalance(db, 'unchanged', 'cash', 80000, 80000);
+  assert.equal(await getTransaction(db, 'unchanged'), null);
+  await adjustAccountBalance(db, 'adjust-down', 'cash', -100, 80000);
+  assert.equal((await getTransaction(db, 'adjust-down')).amount, 80100);
+  assert.equal((await getTransaction(db, 'adjust-down')).adjustmentDirection, 'decrease');
+  await assert.rejects(updateTransaction(db, 'adjust-down', expense()), /Adjust balance/);
+  await deleteTransaction(db, 'adjust-down');
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 80000);
+});
+
+test('adjustment write failures roll back and archived accounts reject corrections', async (t) => {
+  const db = await setup(t);
+  const { adjustAccountBalance } = require('../../.expo/finance-tests/storage/transactions.js');
+  const run = db.runAsync;
+  db.runAsync = async (...args) => { const result = await run(...args); if(args[0].startsWith('INSERT INTO transactions')) throw new Error('write failure'); return result; };
+  await assert.rejects(adjustAccountBalance(db, 'failed', 'cash', 100, 0), /write failure/);
+  assert.equal(await getTransaction(db, 'failed'), null);
+  db.runAsync = run;
+  await db.runAsync('UPDATE accounts SET archived = 1 WHERE id = ?', 'cash');
+  await assert.rejects(adjustAccountBalance(db, 'archived', 'cash', 100, 0), /Unarchive/);
+  await assert.rejects(adjustAccountBalance(db, 'unsafe', 'cash', Number.MAX_SAFE_INTEGER + 1, 0), /safe integer/);
+});
+
+test('version 3 table migration preserves records and rolls back failures', async (t) => {
+  const db = await setup(t);
+  await createTransaction(db, 'kept', expense());
+  await db.execAsync('PRAGMA user_version = 2');
+  const exec = db.execAsync;
+  db.execAsync = async (sql) => { await exec(sql); if(sql.includes('DROP TABLE transactions')) throw new Error('migration failure'); };
+  await assert.rejects(initializeDatabase(db), /migration failure/);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 2);
+  assert.equal((await getTransaction(db, 'kept')).amount, 12000);
+  db.execAsync = exec;
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 5);
+  assert.equal((await getTransaction(db, 'kept')).amount, 12000);
+});
+
+test('adjustments survive backup restore with direction and account balance intact', async (t) => {
+  const db = await setup(t);
+  const { adjustAccountBalance } = require('../../.expo/finance-tests/storage/transactions.js');
+  const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { restoreBackup: restoreBackupRecords } = require('../../.expo/finance-tests/storage/backup.js');
+  await adjustAccountBalance(db, 'correction', 'cash', 12345, 0);
+  const backup = parseBackup(serializeBackup(await getCashAccount(db), await listTransactions(db)));
+  await restoreBackupRecords(db, backup);
+  assert.equal((await getTransaction(db, 'correction')).adjustmentDirection, 'increase');
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 12345);
+});
+
+test('transfers debit and credit exactly once and exclude financial reports', async (t) => {
+  const db = await setup(t);
+  const { saveAccount, listAccounts, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { calculateCurrentMoney, calculateFinanceSummary } = require('../../.expo/finance-tests/calculations.js');
+  const { spendingByCategory, filterTransactions } = require('../../.expo/finance-tests/reporting.js');
+  await updateOpeningBalance(db, 61800);
+  await saveAccount(db, { ...await getCashAccount(db), id: 'savings', name: 'Savings', openingBalance: 0, purpose: 'savings', includedInAvailable: false }, true);
+  const draft = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'savings', amount: 20000 });
+  await Promise.all([createTransaction(db, 'transfer', draft), createTransaction(db, 'transfer', draft)]);
+  let rows = await listTransactions(db);
+  assert.equal(rows.length, 1);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-10').balance, 41800);
+  assert.equal(calculateAccountSummary(await getAccount(db, 'savings'), rows, '2026-10').balance, 20000);
+  assert.deepEqual(calculateCurrentMoney(await listAccounts(db), rows), { totalMoney: 61800, availableMoney: 41800, hasNegativeAccount: false });
+  assert.equal(calculateFinanceSummary(await listAccounts(db), rows, '2026-10').monthlyIncome, 0);
+  assert.equal(calculateFinanceSummary(await listAccounts(db), rows, '2026-10').monthlyExpenses, 0);
+  assert.deepEqual(spendingByCategory(rows, '2026-10'), []);
+  assert.equal(filterTransactions(rows, '2026-10', 'TRANSFER').length, 1);
+  await updateTransaction(db, 'transfer', { ...draft, accountId: 'savings', destinationAccountId: 'cash', amount: 500, transactionDate: '2026-09-30' });
+  rows = await listTransactions(db);
+  assert.equal(calculateAccountSummary(await getCashAccount(db), rows, '2026-10').balance, 62300);
+  assert.equal(calculateAccountSummary(await getAccount(db, 'savings'), rows, '2026-10').balance, -500);
+  assert.equal(filterTransactions(rows, '2026-09', 'TRANSFER').length, 1);
+  await deleteTransaction(db, 'transfer');
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 61800);
+});
+
+test('transfer validation, overflow and failed writes preserve both balances', async (t) => {
+  const db = await setup(t);
+  const { saveAccount, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  await saveAccount(db, { ...await getCashAccount(db), id: 'bank', name: 'Bank', openingBalance: Number.MAX_SAFE_INTEGER }, true);
+  const draft = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 1 });
+  for (const patch of [{}, { destinationAccountId: 'cash' }, { destinationAccountId: 'missing' }, { destinationAccountId: undefined }, { amount: 0 }, { amount: 1.5 }]) {
+    await assert.rejects(createTransaction(db, 'invalid', { ...draft, ...patch }));
+    assert.equal(await getTransaction(db, 'invalid'), null);
+  }
+  await saveAccount(db, { ...await getAccount(db, 'bank'), openingBalance: 0 }, false);
+  const run = db.runAsync;
+  db.runAsync = async (...args) => { const result = await run(...args); if(args[0].startsWith('INSERT INTO transactions')) throw new Error('transfer failure'); return result; };
+  await assert.rejects(createTransaction(db, 'failed-transfer', draft), /transfer failure/);
+  db.runAsync = run;
+  assert.equal((await listTransactions(db)).length, 0);
+  await saveAccount(db, { ...await getAccount(db, 'bank'), archived: true }, false);
+  await assert.rejects(createTransaction(db, 'archived-transfer', draft), /archived/);
+});
+
+test('transfer backups preserve both endpoints, restore atomically, and old payloads remain readable', async (t) => {
+  const db = await setup(t);
+  const { saveAccount, listAccounts, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup.js');
+  const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  await saveAccount(db, { ...await getCashAccount(db), id: 'bank', name: 'Bank', openingBalance: 0 }, true);
+  await createTransaction(db, 'transfer-backup', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 123 }));
+  const backup = parseBackup(serializeBackup(await listAccounts(db), await listTransactions(db)));
+  assert.equal(backup.version, 5);
+  assert.equal(previewBackup(backup).transferCount, 1);
+  for (const version of [1, 2, 3]) assert.throws(() => parseBackup(JSON.stringify({ ...backup, version })));
+  await restoreBackup(db, backup);
+  const rows = await listTransactions(db);
+  assert.equal(rows[0].destinationAccountId, 'bank');
+  assert.equal(calculateAccountSummary(await getAccount(db, 'bank'), rows, '2026-10').balance, 123);
+  const legacy = { ...backup, version: 3, transactions: [], goals: undefined };
+  assert.equal(parseBackup(JSON.stringify(legacy)).version, 3);
+});
+
+test('version 4 migration preserves existing adjustment and expense records', async (t) => {
+  const db = await setup(t);
+  const { adjustAccountBalance } = require('../../.expo/finance-tests/storage/transactions.js');
+  await createTransaction(db, 'expense-kept', expense());
+  await adjustAccountBalance(db, 'adjustment-kept', 'cash', 100, -12000);
+  await db.execAsync('PRAGMA user_version = 3');
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 5);
+  assert.equal((await getTransaction(db, 'adjustment-kept')).adjustmentDirection, 'increase');
+  assert.equal((await getTransaction(db, 'expense-kept')).amount, 12000);
+});
+
+test('transfer edits clear the destination when converted and protect archived original endpoints', async (t) => {
+  const db = await setup(t);
+  const { saveAccount, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  await saveAccount(db, { ...await getCashAccount(db), id: 'bank', name: 'Bank', openingBalance: 0 }, true);
+  const draft = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 100 });
+  await createTransaction(db, 'editable-transfer', draft);
+  await saveAccount(db, { ...await getAccount(db, 'bank'), archived: true }, false);
+  await assert.rejects(updateTransaction(db, 'editable-transfer', expense()), /Unarchive/);
+  assert.equal((await getTransaction(db, 'editable-transfer')).destinationAccountId, 'bank');
+  await saveAccount(db, { ...await getAccount(db, 'bank'), archived: false }, false);
+  await updateTransaction(db, 'editable-transfer', expense());
+  assert.equal((await getTransaction(db, 'editable-transfer')).destinationAccountId, undefined);
+  assert.equal(calculateAccountSummary(await getAccount(db, 'bank'), await listTransactions(db), '2026-10').balance, 0);
+});
+
+test('transfer records survive a disk restart', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'kuwenta-transfer-'));
+  const filename = join(directory, 'finance.db');
+  const { saveAccount, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  let db = connect(filename);
+  try {
+    await initializeDatabase(db);
+    await saveAccount(db, { ...await getCashAccount(db), id: 'bank', name: 'Bank', openingBalance: 0 }, true);
+    await createTransaction(db, 'disk-transfer', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 321 }));
+    db.close(); db = connect(filename);
+    await initializeDatabase(db);
+    assert.equal((await getTransaction(db, 'disk-transfer')).destinationAccountId, 'bank');
+    assert.equal(calculateAccountSummary(await getAccount(db, 'bank'), await listTransactions(db), '2026-10').balance, 321);
+  } finally {
+    db.close();
+    for (const name of readdirSync(directory)) unlinkSync(join(directory, name));
+    rmdirSync(directory);
+  }
+});
+
+test('version 4 migration failure rolls back the table and schema version', async (t) => {
+  const db = await setup(t);
+  await createTransaction(db, 'preserved', expense());
+  await db.execAsync('PRAGMA user_version = 3');
+  const exec = db.execAsync;
+  db.execAsync = async (sql) => { await exec(sql); if(sql.includes('PRAGMA user_version = 4')) throw new Error('transfer migration failure'); };
+  await assert.rejects(initializeDatabase(db), /transfer migration failure/);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 3);
+  assert.equal((await getTransaction(db, 'preserved')).amount, 12000);
+});
+
+const goalDraft = () => ({ id: 'emergency', name: 'Emergency fund', accountId: 'goal-savings', targetAmount: 50000, createdAt: '2026-10-10T00:00:00.000Z', updatedAt: '2026-10-10T00:00:00.000Z' });
+async function addSavings(db, id = 'goal-savings') {
+  const { saveAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  await saveAccount(db, { ...await getCashAccount(db), id, name: id, purpose: 'savings', openingBalance: 0, includedInAvailable: false }, true);
+}
+test('goal creation retries, editing and deletion preserve funds and enforce dedicated savings accounts', async (t) => {
+  const db = await setup(t);
+  const { saveGoal, listGoals, deleteGoal } = require('../../.expo/finance-tests/storage/goals.js');
+  const { getAccount, saveAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  await addSavings(db);
+  await Promise.all([saveGoal(db, goalDraft(), true), saveGoal(db, goalDraft(), true)]);
+  assert.equal((await listGoals(db)).length, 1);
+  await assert.rejects(saveGoal(db, { ...goalDraft(), id: 'second' }, true), /already has a goal/);
+  await assert.rejects(saveGoal(db, { ...goalDraft(), accountId: 'cash' }, false), /savings account/);
+  await saveGoal(db, { ...goalDraft(), name: 'Updated', targetAmount: 60000 }, false);
+  assert.equal((await listGoals(db))[0].targetAmount, 60000);
+  await createTransaction(db, 'fund-goal', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'goal-savings', amount: 20000 }));
+  const account = await getAccount(db, 'goal-savings');
+  await assert.rejects(saveAccount(db, { ...account, purpose: 'spending' }, false), /goal/);
+  await saveAccount(db, { ...account, archived: true }, false);
+  assert.equal((await listGoals(db)).length, 1);
+  await assert.rejects(saveGoal(db, goalDraft(), false), /Unarchive/);
+  await deleteGoal(db, 'emergency');
+  assert.equal((await listGoals(db)).length, 0);
+  assert.equal(calculateAccountSummary(await getAccount(db, 'goal-savings'), await listTransactions(db), '2026-10').balance, 20000);
+});
+
+test('transfer purpose snapshots survive account changes and edits; changed endpoints capture new purposes', async (t) => {
+  const db = await setup(t);
+  const { saveAccount, getAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { calculateSavings } = require('../../.expo/finance-tests/calculations.js');
+  await addSavings(db);
+  const draft = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'goal-savings', amount: 20000 });
+  await createTransaction(db, 'snapshot', draft);
+  assert.equal((await getTransaction(db, 'snapshot')).sourcePurpose, 'spending');
+  await saveAccount(db, { ...await getCashAccount(db), purpose: 'savings' }, false);
+  assert.equal(calculateSavings(await listAccounts(db), await listTransactions(db), '2026-10').savedThisMonth, 20000);
+  await updateTransaction(db, 'snapshot', { ...draft, amount: 10000, transactionDate: '2026-09-30' });
+  assert.equal((await getTransaction(db, 'snapshot')).sourcePurpose, 'spending');
+  assert.equal(calculateSavings(await listAccounts(db), await listTransactions(db), '2026-09').savedThisMonth, 10000);
+  await updateTransaction(db, 'snapshot', { ...draft, accountId: 'goal-savings', destinationAccountId: 'cash' });
+  assert.equal((await getTransaction(db, 'snapshot')).sourcePurpose, 'savings');
+  assert.equal((await getTransaction(db, 'snapshot')).destinationPurpose, 'savings');
+  assert.equal(calculateSavings(await listAccounts(db), await listTransactions(db), '2026-10').savedThisMonth, 0);
+});
+
+test('goal backups restore all records and roll back failure during goal insertion; legacy restore clears goals', async (t) => {
+  const db = await setup(t);
+  const { saveGoal, listGoals } = require('../../.expo/finance-tests/storage/goals.js');
+  const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  await addSavings(db);
+  await saveGoal(db, goalDraft(), true);
+  await createTransaction(db, 'goal-transfer', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'goal-savings', amount: 123 }));
+  const backup = parseBackup(await readBackupJson(db));
+  assert.equal(backup.goals.length, 1);
+  const run = db.runAsync;
+  db.runAsync = async (...args) => { const result = await run(...args); if(args[0].startsWith('INSERT INTO goals')) throw new Error('goal restore failure'); return result; };
+  await assert.rejects(restoreBackup(db, backup), /goal restore failure/);
+  assert.equal((await listGoals(db)).length, 1);
+  assert.equal((await getTransaction(db, 'goal-transfer')).sourcePurpose, 'spending');
+  db.runAsync = run;
+  await restoreBackup(db, backup);
+  assert.deepEqual(JSON.parse(JSON.stringify(await listGoals(db))), backup.goals);
+  await restoreBackup(db, { ...backup, version: 4, goals: undefined, transactions: [] });
+  assert.equal((await listGoals(db)).length, 0);
+});
+
+test('version 5 migration preserves legacy transfers and rolls back incomplete schema changes', async (t) => {
+  const db = await setup(t);
+  await addSavings(db);
+  await createTransaction(db, 'legacy', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'goal-savings' }));
+  await db.execAsync('DROP TABLE goals; ALTER TABLE transactions DROP COLUMN sourcePurpose; ALTER TABLE transactions DROP COLUMN destinationPurpose; PRAGMA user_version = 4');
+  const exec = db.execAsync;
+  db.execAsync = async (sql) => { await exec(sql); if(sql.includes('PRAGMA user_version = 5')) throw new Error('goal migration failure'); };
+  await assert.rejects(initializeDatabase(db), /goal migration failure/);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 4);
+  assert.equal((await db.getAllAsync('PRAGMA table_info(transactions)')).some((row) => row.name === 'sourcePurpose'), false);
+  db.execAsync = exec;
+  await initializeDatabase(db);
+  assert.equal((await getTransaction(db, 'legacy')).destinationAccountId, 'goal-savings');
+  assert.equal((await getTransaction(db, 'legacy')).sourcePurpose, undefined);
+});
+
+test('goals and transfer purposes survive a disk restart', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'kuwenta-goals-'));
+  const filename = join(directory, 'finance.db');
+  const { saveGoal, listGoals } = require('../../.expo/finance-tests/storage/goals.js');
+  let db = connect(filename);
+  try {
+    await initializeDatabase(db);
+    await addSavings(db);
+    await saveGoal(db, goalDraft(), true);
+    await createTransaction(db, 'fund', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'goal-savings' }));
+    db.close(); db = connect(filename);
+    await initializeDatabase(db);
+    assert.equal((await listGoals(db))[0].name, 'Emergency fund');
+    assert.equal((await getTransaction(db, 'fund')).destinationPurpose, 'savings');
+  } finally {
+    db.close();
+    for(const name of readdirSync(directory)) unlinkSync(join(directory, name));
     rmdirSync(directory);
   }
 });

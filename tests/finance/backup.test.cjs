@@ -1,4 +1,4 @@
-﻿const { test } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup.js');
 const { calculateAccountSummary } = require('../../.expo/finance-tests/calculations.js');
@@ -25,7 +25,7 @@ test('backup round trip preserves money, Philippine time, notes, IDs and audit t
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
   assert.deepEqual(previewBackup(restored), {
-    exportedAt, transactionCount: 2, incomeCount: 1, expenseCount: 1, cashBalance: 138000,
+    exportedAt, accountCount: 1, transactionCount: 2, incomeCount: 1, expenseCount: 1, adjustmentCount: 0, transferCount: 0, goalCount: 0, cashBalance: 138000,
   });
 });
 
@@ -45,7 +45,7 @@ test('backdated records retain their reporting month after round trip', () => {
 
 test('malformed JSON, metadata, unknown versions and unsupported fields are rejected', () => {
   for (const value of ['{', 'null', '[]', '1']) assert.throws(() => parseBackup(value));
-  reject((v) => { v.version = 2; });
+  reject((v) => { v.version = 6; });
   reject((v) => { v.format = 'other'; });
   reject((v) => { v.currency = 'USD'; });
   reject((v) => { v.timezone = 'UTC'; });
@@ -101,4 +101,43 @@ test('SQLite records with unset future fields serialize without enabling future 
   const row = record({ notes: undefined, destinationAccountId: undefined, adjustmentDirection: undefined });
   const restored = parseBackup(serializeBackup(cash, [row], exportedAt));
   assert.deepEqual(restored.transactions, [record()]);
+});
+
+test('multi-account backups preserve per-account balances, flags and history; v1 Cash backups remain readable', () => {
+  const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: -100, purpose: 'savings', includedInAvailable: false, archived: true };
+  const rows = [record(), record({ id: 'bank-income', accountId: 'bank', type: 'INCOME', category: 'Salary', amount: 50000 })];
+  const backup = parseBackup(serializeBackup([bank, cash], rows, exportedAt));
+  assert.equal(backup.version, 5);
+  assert.deepEqual(backup.accounts, [bank, cash]);
+  assert.deepEqual(backup.transactions, rows);
+  assert.equal(previewBackup(backup).accountCount, 2);
+  assert.equal(previewBackup(backup).cashBalance, cash.openingBalance - 12000);
+  const legacy = payload();
+  legacy.version = 1; delete legacy.goals;
+  assert.equal(parseBackup(JSON.stringify(legacy)).version, 1);
+  legacy.accounts.push(bank);
+  assert.throws(() => parseBackup(JSON.stringify(legacy)), /Version 1/);
+});
+test('multi-account backup rejects missing Cash, duplicate IDs and aggregate monthly overflow', () => {
+  const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: 0 };
+  assert.throws(() => serializeBackup([bank], []), /Cash/);
+  assert.throws(() => serializeBackup([cash, cash], []), /duplicate account/);
+  assert.throws(() => serializeBackup([{ ...cash, openingBalance: 0 }, bank], [
+    record({ id: 'cash-income', type: 'INCOME', category: 'Salary', amount: Number.MAX_SAFE_INTEGER }),
+    record({ id: 'bank-income', accountId: 'bank', type: 'INCOME', category: 'Salary', amount: 1 }),
+  ]), /supported range/);
+});
+test('version 3 adjustments round trip; legacy versions remain readable but cannot contain adjustments', () => {
+  const adjustment = record({ type: 'ADJUSTMENT', category: 'Balance adjustment', amount: 18200, adjustmentDirection: 'increase' });
+  const backup = parseBackup(serializeBackup(cash, [adjustment], exportedAt));
+  assert.equal(backup.version, 5);
+  assert.equal(previewBackup(backup).adjustmentCount, 1);
+  assert.equal(previewBackup(backup).incomeCount, 0);
+  assert.equal(previewBackup(backup).expenseCount, 0);
+  assert.equal(backup.transactions[0].adjustmentDirection, 'increase');
+  for(const version of [1, 2]) {
+    assert.throws(() => parseBackup(JSON.stringify({ ...backup, version })), /version 3/i);
+    const legacy = payload(); legacy.version = version; delete legacy.goals;
+    assert.equal(parseBackup(JSON.stringify(legacy)).version, version);
+  }
 });

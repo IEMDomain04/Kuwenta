@@ -64,10 +64,10 @@ test('time selections preserve seconds when minutes are unchanged and reset them
 
 const { formatTransactionDateTime } = require('../../.expo/finance-tests/dates.js');
 test('readable transaction timestamps preserve Philippine wall time and handle noon/midnight', () => {
-  assert.equal(formatTransactionDateTime('2026-10-10', '01:39:25'), 'Oct 10, 2026 · 1:39 AM · PH time');
-  assert.equal(formatTransactionDateTime('2026-01-01', '00:00:59'), 'Jan 1, 2026 · 12:00 AM · PH time');
-  assert.equal(formatTransactionDateTime('2026-10-10', '12:00:00'), 'Oct 10, 2026 · 12:00 PM · PH time');
-  assert.equal(formatTransactionDateTime('2026-10-10', '23:59:59'), 'Oct 10, 2026 · 11:59 PM · PH time');
+  assert.equal(formatTransactionDateTime('2026-10-10', '01:39:25'), 'Oct 10, 2026 · 1:39 AM');
+  assert.equal(formatTransactionDateTime('2026-01-01', '00:00:59'), 'Jan 1, 2026 · 12:00 AM');
+  assert.equal(formatTransactionDateTime('2026-10-10', '12:00:00'), 'Oct 10, 2026 · 12:00 PM');
+  assert.equal(formatTransactionDateTime('2026-10-10', '23:59:59'), 'Oct 10, 2026 · 11:59 PM');
   assert.throws(() => formatTransactionDateTime('2026-02-30', '12:00:00'));
   assert.throws(() => formatTransactionDateTime('2026-10-10', '24:00:00'));
 });

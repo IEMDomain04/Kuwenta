@@ -12,7 +12,7 @@ export function MonthSelector() {
   const theme = useTheme();
   const label = new Intl.DateTimeFormat('en-PH', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(month + '-01T12:00:00Z'));
   return <View style={{ gap: 8 }}>
-    <Pressable accessibilityRole="button" accessibilityLabel={'Reporting month: ' + label + ', Philippine time. Show month controls'} accessibilityState={{ expanded }}
+    <Pressable accessibilityRole="button" accessibilityLabel={'Reporting month: ' + label + '. Show month controls'} accessibilityState={{ expanded }}
       onPress={() => setExpanded(!expanded)} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <ThemedText themeColor="accent" accessibilityLiveRegion="polite">{label}</ThemedText>
       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} color={theme.accent} size={18} />

@@ -899,3 +899,41 @@ conditional native picker was removed to address the Text-component runtime erro
 Storage, category defaults, validation, native picker behavior, saving and Undo
 remain unchanged. Verify modal cancellation/selection, long labels, system text
 scaling, both themes, native picker dismissal and Save on the phone.
+### Multiple PHP accounts
+
+Settings now supports adding and editing accounts, signed opening balances, spending/savings purpose, and the future Available Money inclusion setting. Archive/unarchive preserves account records and balances; no permanent account deletion is offered. Archived accounts cannot receive new records or have existing records edited until unarchived.
+
+Income and expenses can be assigned to an active account. Editing an account assignment recalculates both balances atomically. Home retains the current Cash balance and shows monthly reports across all accounts, including archived history. Transactions can be filtered by account, including archived accounts.
+
+Opening balances retain the existing separate adjustment field; they are never income transactions. Balances derive from that opening adjustment plus the account's recorded income and expenses. No manually maintained current balance is stored.
+
+SQLite schema v2 adds a combined-history index without rewriting existing Cash records. Encrypted export now includes all accounts in finance payload v2; the encryption format is unchanged. Cash-only payload v1 backups remain importable. Confirmed restore replaces ALL accounts and transactions atomically, including when restoring an old Cash-only backup.
+
+Transfers, savings metrics, goals, and budgets remain subsequent steps. The savings purpose and Available Money flag are supported account settings, without implementing those overviews yet.
+
+Phone checks: add Bank/GCash/Savings accounts; record income and expenses in different accounts; edit a transaction's account and confirm or cancel; verify balances and all-account monthly totals; archive/unarchive and inspect filtered history; restart the app; export and restore a multi-account encrypted backup. Check old Cash-only restore only after exporting your current records, since it intentionally replaces every account.
+### Home current-money overview
+
+Home now prioritizes Available Money (balances of accounts marked included) and separately displays Total Money (all account balances), plus Cash balance for reference. These figures include opening adjustments and all transaction months; selected-month reports remain separate. Archived balances stay included according to the same inclusion flag, and negative accounts show a warning. Account rows and the Add Account shortcut on Home are the next UI increment.
+### Home account shortcuts
+
+Home now lists current balances for all accounts with spending/savings purpose, Available Money inclusion, archived status, and negative-balance warnings. Add Account and pressable account rows open a dedicated Expo Router screen that reuses the Settings account editor. Successful saves return to Home after records refresh; cancel/back leaves stored data unchanged. Archived accounts offer confirmed unarchiving before editing. Account navigation is blocked during an active save.
+### Account balance corrections
+
+Tapping an account on Home opens its current balance and account details. Adjust balance starts with that current amount and requires confirmation; the difference is stored as a dated PHP balance adjustment, excluded from income, expenses and spending charts. Repeated saves use one submission ID; stale balances are rejected. Editing account settings preserves the opening balance unless Correct opening balance is explicitly selected. That separate correction changes the historical starting amount. SQLite schema and financial backup payload are version 3; version 1 and 2 backups remain importable.
+
+### Transfers
+
+Choose Transfer in transaction entry, then choose different active source and destination accounts. One positive centavo record debits the source and credits the destination atomically. Transfers appear once in history, under either account, with a dedicated filter. They never count as income, expenses or category spending; Total Money stays unchanged while Available Money follows account inclusion flags. Negative balances remain allowed and visibly warned on Home/account details. Save feedback and 10-second Undo remain available; edits and deletions require confirmation. Archived endpoints prevent creation/editing, while existing history is preserved. SQLite and financial backup payloads now use version 4; versions 1?3 remain importable, and the encrypted envelope is unchanged.
+
+### Savings reporting and goals
+
+Home shows the current combined savings balance (including archived accounts), selected-month Saved This Month, and Savings Rate. Saved This Month counts spending-to-savings transfers minus savings-to-spending transfers; openings, adjustments, expenses, income, and savings-to-savings transfers do not count. The rate is net saved divided by monthly income, allows negative rates, and displays an em dash when income is zero. New transfers capture source/destination purposes at save time. Editing their amount/date preserves these snapshots; changing endpoints captures new purposes. Older transfers use current account purposes and display a note, since historical purposes were never recorded.
+
+One goal links to one dedicated savings account, with a positive target and optional calendar-picked target date. Progress uses the actual current account balance, including opening amounts and corrections; it clamps the bar to 0-100%, preserves signed balances, and shows the remaining amount or Target reached. Goals support confirmed edits/deletion; deleting a goal keeps account money and transactions. Linked accounts cannot become spending accounts until the goal is deleted or relinked. Archived accounts retain goals and balances but cannot receive goal funding or goal edits until unarchived or relinked.
+
+Account details includes Transfer money with the source preselected. Goal Add money preselects its destination. Add savings account in the goal form defaults to savings and exclusion from Available Money.
+
+SQLite schema and financial backup payload are version 5. Goals and transfer-purpose snapshots are included in encrypted backups; versions 1-4 remain importable. Restoring an older backup replaces and clears current goals as part of full replacement. The encryption envelope and password handling are unchanged. No new dependencies were added.
+
+Phone verification: create a savings account with zero opening, create a PHP 1,000 goal, then use Add money to transfer PHP 200 from Cash. Savings balance should be PHP 200, goal progress 20%, and remaining PHP 800. Monthly income/expenses and Total Money should not change. Test month switching, a return transfer, cancellation of goal edits/deletion, optional calendar date, restart, and encrypted backup restore. Confirm Add Account no longer crashes before entering its name.

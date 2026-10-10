@@ -1,3 +1,4 @@
+import { useFinance } from '../provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { CategoryIcon, categoryVisual } from './category-visual';
@@ -14,18 +15,24 @@ import { MoneyField } from './money-field';
 import { TransactionDateTime } from './transaction-date-time';
 import { ActionButton } from './ui';
 
-type Props = { original?: Transaction; initialType?: ManualTransactionType; disabled: boolean; error: string; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
+type Props = { original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; error: string; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
 type Field = 'amount' | 'date' | 'time';
-export function TransactionForm({ original, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
+export function TransactionForm({ original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
   const theme = useTheme();
+  const { accounts } = useFinance();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [choosingDestination, setChoosingDestination] = useState(false);
+  const [destinationAccountId, setDestinationAccountId] = useState(original?.destinationAccountId ?? initialDestinationAccountId ?? '');
+  const [accountId, setAccountId] = useState(original?.accountId ?? initialAccountId ?? accounts.find((account) => !account.archived && account.id !== initialDestinationAccountId)?.id ?? '');
+  const selectedAccount = accounts.find((account) => account.id === accountId);
   const { height, fontScale } = useWindowDimensions();
   const [amountWidth, setAmountWidth] = useState(0);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [defaults] = useState(() => philippineDateTime());
-  const [type, setType] = useState<ManualTransactionType>(original?.type === 'INCOME' ? 'INCOME' : original ? 'EXPENSE' : initialType);
+  const [type, setType] = useState<ManualTransactionType>(original?.type === 'TRANSFER' ? 'TRANSFER' : original?.type === 'INCOME' ? 'INCOME' : original ? 'EXPENSE' : initialType);
   const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.amount))! : '');
   const amountFontSize = amountWidth > 0 ? Math.max(20, Math.min(36, Math.floor(amountWidth / ((Math.max(amount.length, 1) + 1) * 0.65 * fontScale)))) : 36;
-  const [category, setCategory] = useState(original?.category ?? CATEGORIES[initialType][0]);
+  const [category, setCategory] = useState(original?.category ?? (initialType === 'TRANSFER' ? 'Transfer' : CATEGORIES[initialType][0]));
   const [date, setDate] = useState(original?.transactionDate ?? defaults.transactionDate);
   const [time, setTime] = useState(original?.transactionTime ?? defaults.transactionTime);
   const [notes, setNotes] = useState(original?.notes ?? '');
@@ -40,18 +47,18 @@ export function TransactionForm({ original, initialType = 'EXPENSE', disabled, e
     if (!isValidTime(time)) issues.time = 'Enter a valid 24-hour time as HH:mm:ss.';
     setErrors(issues);
     if (Object.values(issues).some(Boolean)) return;
-    onSubmit({ type, amount: cents, accountId: 'cash', category, transactionDate: date, transactionTime: time, notes: notes.trim() || undefined });
+    onSubmit({ type, destinationAccountId: type === 'TRANSFER' ? destinationAccountId : undefined, amount: cents, accountId, category, transactionDate: date, transactionTime: time, notes: notes.trim() || undefined });
   }
   return <View style={{ flex: 1, gap: 12 }}>
     <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ gap: 12, padding: 14, paddingBottom: 16, backgroundColor: theme.backgroundElement, borderRadius: 20 }}>
 
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-      {(['EXPENSE', 'INCOME'] as const).map((value) => <ActionButton key={value} selected={type === value}
-        compact label={value === 'INCOME' ? 'Income' : 'Expense'} disabled={disabled}
-        onPress={() => { if (type !== value) { setType(value); onTypeChange(value); setCategory(CATEGORIES[value][0]); } }} />)}
+      {(['EXPENSE', 'INCOME', 'TRANSFER'] as const).map((value) => <ActionButton key={value} selected={type === value}
+        compact label={value === 'TRANSFER' ? 'Transfer' : value === 'INCOME' ? 'Income' : 'Expense'} disabled={disabled}
+        onPress={() => { if (type !== value) { setType(value); onTypeChange(value); setCategory(value === 'TRANSFER' ? 'Transfer' : CATEGORIES[value][0]); } }} />)}
     </View>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, backgroundColor: type === 'INCOME' ? theme.incomeSurface : theme.expenseSurface, padding: 16, minHeight: 132 }}>
-      <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled}
+      <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}
         onPress={() => { Keyboard.dismiss(); setCategoryOpen(true); }} style={({ pressed }) => ({ width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: categoryVisual(category, type === 'INCOME').color + '20', opacity: pressed || disabled ? 0.5 : 1 })}>
         <Ionicons name={categoryVisual(category, type === 'INCOME').icon} size={44} color={categoryVisual(category, type === 'INCOME').color} />
       </Pressable>
@@ -62,10 +69,10 @@ export function TransactionForm({ original, initialType = 'EXPENSE', disabled, e
             keyboardType="decimal-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => notesRef.current?.focus()}
             placeholder="0" placeholderTextColor={theme.textSecondary} style={{ flex: 1, minWidth: 0, color: theme.text, paddingVertical: 4, paddingHorizontal: 0, fontSize: amountFontSize, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] }} />
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled}
+        <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}
           onPress={() => { Keyboard.dismiss(); setCategoryOpen(true); }} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
           <ThemedText numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, fontSize: 16, lineHeight: 22, textAlign: 'right' }}>{category}</ThemedText>
-          <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+          {type !== "TRANSFER" && <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />}
         </Pressable>
       </View>
     </View>
@@ -75,8 +82,21 @@ export function TransactionForm({ original, initialType = 'EXPENSE', disabled, e
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />
     {errors.date ? <ThemedText accessibilityRole="alert">{errors.date}</ThemedText> : null}
     {errors.time ? <ThemedText accessibilityRole="alert">{errors.time}</ThemedText> : null}
-    <ThemedText type="smallBold">Account</ThemedText>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}><Ionicons name="wallet-outline" size={20} color={theme.textSecondary} /><ThemedText>Cash · PHP</ThemedText></View>
+    <ThemedText type="smallBold">{type === "TRANSFER" ? "From account" : "Account"}</ThemedText>
+    <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
+      onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
+      <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
+      <ThemedText numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} · PHP{selectedAccount?.archived ? ' · Archived' : ''}</ThemedText>
+      <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+    </Pressable>
+    {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
+    {!accounts.some((account) => !account.archived) && <ThemedText accessibilityRole="alert">Add or unarchive an account in Settings to record transactions.</ThemedText>}
+    {type === 'TRANSFER' && <>
+      <ThemedText type="smallBold">To account</ThemedText>
+      <ActionButton label={accounts.find((account) => account.id === destinationAccountId)?.name ?? 'Choose destination account'} disabled={disabled}
+        onPress={() => { Keyboard.dismiss(); setChoosingDestination(true); setAccountOpen(true); }} />
+      {accounts.filter((account) => !account.archived).length < 2 && <ThemedText accessibilityRole="alert">Add or unarchive another account to make a transfer.</ThemedText>}
+    </>}
     <ThemedText type="smallBold">Notes (optional)</ThemedText>
     <TextInput ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note…" placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 80, textAlignVertical: 'top' }]} />
     {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
@@ -89,6 +109,28 @@ export function TransactionForm({ original, initialType = 'EXPENSE', disabled, e
     </Pressable>
     <ActionButton label="Cancel" disabled={disabled} onPress={onCancel} />
     </View>
+    <Modal visible={accountOpen} transparent animationType="fade" onRequestClose={() => setAccountOpen(false)}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000066' }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close account picker" onPress={() => setAccountOpen(false)} style={{ flex: 1 }} />
+        <SafeAreaView edges={['bottom', 'left', 'right']} style={{ maxHeight: height * 0.8, backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+          <View accessibilityViewIsModal style={{ padding: 16, gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <ThemedText type="smallBold">Choose account</ThemedText>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close account picker" onPress={() => setAccountOpen(false)} style={{ width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={24} color={theme.text} /></Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: height * 0.55 }}>
+              {accounts.filter((account) => !account.archived && (!choosingDestination || account.id !== accountId)).map((account) => <Pressable key={account.id} accessibilityRole="button" accessibilityLabel={account.name} accessibilityState={{ selected: account.id === (choosingDestination ? destinationAccountId : accountId), disabled }} disabled={disabled}
+                onPress={() => { if (choosingDestination) setDestinationAccountId(account.id); else setAccountId(account.id); if (!choosingDestination && destinationAccountId === account.id) setDestinationAccountId(''); setAccountOpen(false); }} style={{ minHeight: 52, padding: 12, marginBottom: 8, borderRadius: 12, backgroundColor: account.id === (choosingDestination ? destinationAccountId : accountId) ? theme.backgroundSelected : theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="wallet-outline" size={22} color={theme.accent} />
+                <ThemedText numberOfLines={1} style={{ flex: 1 }}>{account.name}</ThemedText>
+                {account.id === (choosingDestination ? destinationAccountId : accountId) && <Ionicons name="checkmark-circle" size={20} color={theme.accent} />}
+              </Pressable>)}
+              {!accounts.some((account) => !account.archived) && <ThemedText>No active accounts. Add or unarchive one in Settings.</ThemedText>}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </View>
+    </Modal>
     <Modal visible={categoryOpen} transparent animationType="fade" onRequestClose={() => setCategoryOpen(false)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000066' }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close category picker" onPress={() => setCategoryOpen(false)} style={{ flex: 1 }} />
@@ -100,7 +142,7 @@ export function TransactionForm({ original, initialType = 'EXPENSE', disabled, e
             </View>
             <ScrollView style={{ maxHeight: height * 0.55 }} keyboardShouldPersistTaps="handled">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {CATEGORIES[type].map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: value === category, disabled }} disabled={disabled}
+                {(type === 'TRANSFER' ? [] : CATEGORIES[type]).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: value === category, disabled }} disabled={disabled}
                   onPress={() => { setCategory(value); setCategoryOpen(false); }} style={({ pressed }) => ({ width: '31%', minHeight: 80, padding: 8, borderRadius: 12, borderWidth: 1.5, borderColor: value === category ? theme.accent : theme.border, backgroundColor: value === category ? theme.backgroundSelected : theme.backgroundElement, alignItems: 'center', justifyContent: 'center', gap: 5, opacity: pressed || disabled ? 0.5 : 1 })}>
                   <CategoryIcon category={value} income={type === 'INCOME'} />
                   <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ width: '100%', fontSize: 12, lineHeight: 17, textAlign: 'center' }}>{value}</ThemedText>

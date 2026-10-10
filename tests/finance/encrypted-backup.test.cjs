@@ -289,3 +289,16 @@ test('picker checks size before reading and validates contents while always clos
     assert.equal(picked.closed, true);
   } finally { picked = null; }
 });
+
+test('encrypted backups preserve goals and historical transfer purposes', async () => {
+  const saving = { ...cash, id: 'save', name: 'Savings', openingBalance: 0, purpose: 'savings', includedInAvailable: false };
+  const transfer = record({ type: 'TRANSFER', category: 'Transfer', amount: 20000, destinationAccountId: 'save', sourcePurpose: 'spending', destinationPurpose: 'savings' });
+  const goal = { id: 'goal', name: 'Emergency fund', accountId: 'save', targetAmount: 50000, createdAt: '2026-10-09T06:35:00.000Z', updatedAt: '2026-10-09T06:35:00.000Z' };
+  const payload = serializeBackup([cash, saving], [transfer], '2026-10-09T06:35:00.000Z', [goal]);
+  const encrypted = await encryptBackup(payload, password);
+  assert.equal(encrypted.includes('Emergency fund'), false);
+  const restored = await decryptBackup(encrypted, password);
+  assert.deepEqual(restored.goals, [goal]);
+  assert.equal(restored.transactions[0].sourcePurpose, 'spending');
+  assert.equal(restored.transactions[0].destinationPurpose, 'savings');
+});
