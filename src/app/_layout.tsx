@@ -20,6 +20,7 @@ export default function RootLayout() {
       <Stack.Screen name="transaction" options={{ gestureEnabled: false }} />
       <Stack.Screen name="accounts" />
       <Stack.Screen name="goals" />
+      <Stack.Screen name="budgets" options={{ gestureEnabled: false }} />
       <Stack.Screen name="goal" options={{ gestureEnabled: false }} />
       <Stack.Screen name="account" options={{ gestureEnabled: false }} />
     </Stack></FinanceProvider>

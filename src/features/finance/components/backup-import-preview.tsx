@@ -75,7 +75,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
     confirming.current = true;
     Keyboard.dismiss();
     Alert.alert('Replace your financial records?',
-      'This replaces ALL your current accounts, transactions, and savings goals with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
+      'This replaces ALL your current accounts, transactions, savings goals, and budgets with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: 'Restore backup', style: 'destructive', onPress: () => {
@@ -114,12 +114,13 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       <ThemedText>Transactions: {preview.summary.transactionCount}</ThemedText>
       <ThemedText>Income records: {preview.summary.incomeCount}</ThemedText>
       <ThemedText>Savings goals: {preview.summary.goalCount}</ThemedText>
+      <ThemedText>Budgets: {preview.summary.budgetCount}</ThemedText>
       <ThemedText>Transfers: {preview.summary.transferCount}</ThemedText>
       <ThemedText>Balance adjustments: {preview.summary.adjustmentCount}</ThemedText>
       <ThemedText>Expense records: {preview.summary.expenseCount}</ThemedText>
       <ThemedText>Cash balance: {formatMoney(preview.summary.cashBalance)}</ThemedText>
       {preview.summary.cashBalance < 0 ? <ThemedText accessibilityRole="alert">Warning: this backup has a negative Cash balance.</ThemedText> : null}
-      <ThemedText>Your current records have not changed. Restoring also replaces savings goals.</ThemedText>
+      <ThemedText>Your current records have not changed. Restoring also replaces savings goals and budgets.</ThemedText>
       <ActionButton label={restoring ? "Restoring backup..." : "Restore this backup"} disabled={locked} onPress={reviewRestore} />
     </> : null}
     {selected || preview || working ? <ActionButton label={working ? 'Cancel preview' : 'Close preview'} disabled={restoring} onPress={clear} /> : null}

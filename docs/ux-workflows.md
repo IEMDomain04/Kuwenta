@@ -39,3 +39,13 @@ Fresh installs and full resets ask for starting Cash before Home. Start tracking
 ## Delete an unused account
 
 Account details > Account options > Delete account requires confirmation. Only non-Cash accounts with zero balance, no transaction history (including transfer destinations), and no linked goal can be deleted. Archived unused accounts can also be deleted. SQLite checks eligibility atomically and clears the remembered account preference when applicable. Cancel makes no writes; accounts with history should be archived.
+
+## Monthly category budgets
+
+Home > View budgets opens monthly budgets using the shared month selector. Add an expense category and a positive limit. Spent, remaining, and progress derive from all accounts' expenses in the selected Philippine transaction month; transfers, income, and balance adjustments do not count. Remaining can be negative; progress bars cap visually at 100%, while labels report overspending. Expenses without a budget are listed separately. Budgets never change account balances.
+
+Edits and deletions require confirmation; cancellation preserves data. Deleting a budget keeps expenses. Copy previous month fills only missing categories atomically and keeps existing limits. No rollover or automatic monthly copying is implemented.
+
+SQLite schema 8 adds budgets keyed by month and category. Financial backup payload 6 includes them; encryption is unchanged. Versions 1-5 remain readable and restore with empty budgets. Full reset clears budgets.
+
+Phone checks: add a Food limit of PHP 5,000 and expense of PHP 1,200 (PHP 3,800 remaining, 24%); edit/backdate/delete the expense; reach and exceed the limit; switch months; cancel edits/deletion; copy previous month twice and verify existing limits; restart; export/unlock/restore a backup with budgets; test reset using disposable records. Check the keyboard, large text, and small-screen scrolling.

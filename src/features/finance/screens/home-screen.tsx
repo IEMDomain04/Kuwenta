@@ -1,3 +1,4 @@
+import { BudgetOverview } from '../components/budget-overview';
 import { AccountsOverview } from '../components/accounts-overview';
 import { SavingsOverview } from '../components/savings-overview';
 import { useMemo } from 'react';
@@ -79,6 +80,7 @@ export default function HomeScreen() {
           </View>
         </View>)}</View></View><ThemedText type="small" style={{ fontSize: 10, lineHeight: 14 }} themeColor="textSecondary">Percentages are rounded; amounts are exact.</ThemedText></>}
     </ThemedView>
+    <BudgetOverview />
     <SavingsOverview compact />
     <ThemedView type="backgroundElement" style={styles.panel}>
     <ThemedText type="smallBold" accessibilityRole="header">Recent transactions · {readableReportingMonth(month)}</ThemedText>

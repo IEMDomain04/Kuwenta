@@ -56,7 +56,7 @@ test('initialization creates Cash exactly once and preserves records/opening bal
   await createTransaction(db, 'expense', expense());
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync('SELECT count(*) AS total FROM accounts')).total, 1);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
   assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
@@ -176,9 +176,9 @@ test('migration failure rolls back schema and version; newer schema is rejected'
   assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'accounts'"), null);
   fail = false;
   await initializeDatabase(db);
-  await db.execAsync('PRAGMA user_version = 8');
+  await db.execAsync('PRAGMA user_version = 9');
   await assert.rejects(initializeDatabase(db), /newer version/);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
 });
 
 test('a failure after an edit write rolls back the original transaction', async (t) => {
@@ -278,7 +278,7 @@ test('invalid restore payloads fail before opening a write transaction and prese
     (v) => { v.transactions[0].amount = -1; },
     (v) => { v.transactions.push({ ...v.transactions[0] }); },
     (v) => { v.transactions[0].accountId = 'missing'; },
-    (v) => { v.version = 6; },
+    (v) => { v.version = 7; },
   ]) {
     const backup = backupFixture();
     mutate(backup);
@@ -347,7 +347,7 @@ test('confirmed restore replaces all accounts and history, including when restor
   await db.runAsync("INSERT INTO accounts VALUES ('other', 'Other', 'PHP', 0, 'spending', 1, 0)");
   await createTransaction(db, 'other-record', record({ accountId: 'other' }));
   const backup = backupFixture();
-  backup.version = 1; delete backup.goals;
+  backup.version = 1; delete backup.goals; delete backup.budgets;
   await restoreBackup(db, backup);
   assert.equal((await db.getAllAsync('SELECT id FROM accounts')).length, 1);
   assert.equal(await getTransaction(db, 'other-record'), null);
@@ -382,7 +382,7 @@ test('version 1 migration preserves Cash amounts, IDs and timestamps and is repe
   await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.deepEqual(await listTransactions(db), before);
   assert.ok(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"));
@@ -521,7 +521,7 @@ test('version 3 table migration preserves records and rolls back failures', asyn
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
   db.execAsync = exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
 });
 
@@ -591,14 +591,14 @@ test('transfer backups preserve both endpoints, restore atomically, and old payl
   await saveAccount(db, { ...await getCashAccount(db), id: 'bank', name: 'Bank', openingBalance: 0 }, true);
   await createTransaction(db, 'transfer-backup', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 123 }));
   const backup = parseBackup(serializeBackup(await listAccounts(db), await listTransactions(db)));
-  assert.equal(backup.version, 5);
+  assert.equal(backup.version, 6);
   assert.equal(previewBackup(backup).transferCount, 1);
   for (const version of [1, 2, 3]) assert.throws(() => parseBackup(JSON.stringify({ ...backup, version })));
   await restoreBackup(db, backup);
   const rows = await listTransactions(db);
   assert.equal(rows[0].destinationAccountId, 'bank');
   assert.equal(calculateAccountSummary(await getAccount(db, 'bank'), rows, '2026-10').balance, 123);
-  const legacy = { ...backup, version: 3, transactions: [], goals: undefined };
+  const legacy = { ...backup, version: 3, transactions: [], goals: undefined, budgets: undefined };
   assert.equal(parseBackup(JSON.stringify(legacy)).version, 3);
 });
 
@@ -609,7 +609,7 @@ test('version 4 migration preserves existing adjustment and expense records', as
   await adjustAccountBalance(db, 'adjustment-kept', 'cash', 100, -12000);
   await db.execAsync('PRAGMA user_version = 3');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
   assert.equal((await getTransaction(db, 'adjustment-kept')).adjustmentDirection, 'increase');
   assert.equal((await getTransaction(db, 'expense-kept')).amount, 12000);
 });
@@ -724,7 +724,7 @@ test('goal backups restore all records and roll back failure during goal inserti
   db.runAsync = run;
   await restoreBackup(db, backup);
   assert.deepEqual(JSON.parse(JSON.stringify(await listGoals(db))), backup.goals);
-  await restoreBackup(db, { ...backup, version: 4, goals: undefined, transactions: [] });
+  await restoreBackup(db, { ...backup, version: 4, goals: undefined, budgets: undefined, transactions: [] });
   assert.equal((await listGoals(db)).length, 0);
 });
 
@@ -806,7 +806,7 @@ test('preferences migration preserves financial records and is repeatable', asyn
   await db.execAsync('DROP TABLE preferences; PRAGMA user_version = 5');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
   assert.equal((await getTransaction(db, 'keep-six')).amount, 12000);
 });
 
@@ -937,4 +937,89 @@ test('account deletion preserves zero-net history and both transfer endpoints; f
   assert.ok(await db.getFirstAsync("SELECT id FROM accounts WHERE id = 'empty'"));
   assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'lastEntryAccount'")).value, 'empty');
   assert.equal((await listTransactions(db)).length, 3);
+});
+
+
+test('budgets persist, copy only missing categories, recalculate expenses, and preserve transactions on deletion', async (t) => {
+  const db = await setup(t);
+  const { saveBudget, listBudgets, deleteBudget, copyPreviousBudgets } = require('../../.expo/finance-tests/storage/budgets.js');
+  const { budgetReport } = require('../../.expo/finance-tests/budgets.js');
+  const food = { month: '2026-09', category: 'Food', limitAmount: 500000 };
+  await saveBudget(db, food, true);
+  await saveBudget(db, food, true);
+  await assert.rejects(saveBudget(db, { ...food, limitAmount: 600000 }, true), /already/);
+  await saveBudget(db, { ...food, category: 'Bills', limitAmount: 100000 }, true);
+  await saveBudget(db, { ...food, month: '2026-10', limitAmount: 700000 }, true);
+  await copyPreviousBudgets(db, '2026-10');
+  await copyPreviousBudgets(db, '2026-10');
+  let rows = await listBudgets(db);
+  assert.equal(rows.length, 4);
+  assert.equal(rows.find((row) => row.month === '2026-10' && row.category === 'Food').limitAmount, 700000);
+  await createTransaction(db, 'budget-expense', expense());
+  assert.equal(budgetReport(rows, await listTransactions(db), '2026-10').budgetedSpent, 12000);
+  await updateTransaction(db, 'budget-expense', { ...expense(), amount: 13000 });
+  assert.equal(budgetReport(rows, await listTransactions(db), '2026-10').budgetedSpent, 13000);
+  await updateTransaction(db, 'budget-expense', { ...expense(), transactionDate: '2026-09-30' });
+  assert.equal(budgetReport(rows, await listTransactions(db), '2026-10').budgetedSpent, 0);
+  await saveBudget(db, { ...food, limitAmount: 600000 }, false);
+  await deleteBudget(db, food.month, food.category);
+  assert.equal((await listTransactions(db)).length, 1);
+  await initializeDatabase(db);
+  assert.equal((await listBudgets(db)).length, 3);
+});
+
+test('budget backup and reset support atomic replacement and old payloads', async (t) => {
+  const db = await setup(t);
+  const { saveBudget, listBudgets } = require('../../.expo/finance-tests/storage/budgets.js');
+  const { readBackupJson, restoreBackup, resetFinancialData } = require('../../.expo/finance-tests/storage/backup.js');
+  const budget = { month: '2026-10', category: 'Food', limitAmount: 500000 };
+  await saveBudget(db, budget, true);
+  const backup = JSON.parse(await readBackupJson(db));
+  assert.deepEqual(backup.budgets, [budget]);
+  const run = db.runAsync;
+  db.runAsync = async (sql, ...params) => { if (sql.startsWith('INSERT INTO budgets')) throw new Error('budget restore failure'); return run(sql, ...params); };
+  await assert.rejects(restoreBackup(db, backup), /budget restore failure/);
+  db.runAsync = run;
+  assert.deepEqual(await listBudgets(db), [budget]);
+  await resetFinancialData(db);
+  assert.deepEqual(await listBudgets(db), []);
+  await restoreBackup(db, backup);
+  assert.deepEqual(await listBudgets(db), [budget]);
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  await restoreBackup(db, parseBackup(JSON.stringify({ ...backup, version: 5, budgets: undefined })));
+  assert.deepEqual(await listBudgets(db), []);
+});
+
+test('budget schema migration preserves records and rolls back errors', async (t) => {
+  const db = await setup(t);
+  await createTransaction(db, 'before-budget', expense());
+  await db.execAsync('DROP TABLE budgets; PRAGMA user_version = 7');
+  const exec = db.execAsync;
+  db.execAsync = async (sql) => { await exec(sql); if (sql.includes('CREATE TABLE IF NOT EXISTS budgets')) throw new Error('budget migration failure'); };
+  await assert.rejects(initializeDatabase(db), /budget migration failure/);
+  db.execAsync = exec;
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
+  assert.equal((await listTransactions(db)).length, 1);
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+});
+
+
+test('copying budgets is atomic and deletion recalculates spending', async (t) => {
+  const db = await setup(t);
+  const { saveBudget, listBudgets, copyPreviousBudgets } = require('../../.expo/finance-tests/storage/budgets.js');
+  const { budgetReport } = require('../../.expo/finance-tests/budgets.js');
+  const food = { month: '2026-09', category: 'Food', limitAmount: 500000 };
+  await saveBudget(db, food, true);
+  await saveBudget(db, { ...food, category: 'Bills' }, true);
+  const run = db.runAsync;
+  let inserts = 0;
+  db.runAsync = async (sql, ...params) => { const result = await run(sql, ...params); if (sql.startsWith('INSERT INTO budgets') && ++inserts === 2) throw new Error('copy failure'); return result; };
+  await assert.rejects(copyPreviousBudgets(db, '2026-10'), /copy failure/);
+  db.runAsync = run;
+  assert.equal((await listBudgets(db)).filter((row) => row.month === '2026-10').length, 0);
+  await copyPreviousBudgets(db, '2026-10');
+  await createTransaction(db, 'delete-budget-expense', expense());
+  await deleteTransaction(db, 'delete-budget-expense');
+  assert.equal(budgetReport(await listBudgets(db), await listTransactions(db), '2026-10').budgetedSpent, 0);
 });

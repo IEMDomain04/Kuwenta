@@ -47,11 +47,11 @@ test('goal progress derives from balance and handles withdrawals, negatives and 
 
 test('goals and purpose snapshots round trip; malformed or duplicated goals reject before restore', () => {
   const payload = JSON.parse(serializeBackup([cash, savings], [transfer()], '2026-10-10T00:00:00.000Z', [goal]));
-  assert.equal(payload.version, 5);
+  assert.equal(payload.version, 6);
   assert.deepEqual(parseBackup(JSON.stringify(payload)).goals, [goal]);
   assert.equal(previewBackup(parseBackup(JSON.stringify(payload))).goalCount, 1);
   for(const goals of [[goal, goal], [{ ...goal, targetAmount: -1 }], [{ ...goal, accountId: 'cash' }], [{ ...goal, unknown: true }]]) assert.throws(() => parseBackup(JSON.stringify({ ...payload, goals })));
   assert.throws(() => parseBackup(JSON.stringify({ ...payload, version: 4 })));
-  const legacy = { ...payload, version: 4, goals: undefined, transactions: [transfer({ sourcePurpose: undefined, destinationPurpose: undefined })] };
-  assert.equal(parseBackup(JSON.stringify(legacy)).goals.length, 0);
+  const legacy = { ...payload, version: 4, goals: undefined, budgets: undefined, transactions: [transfer({ sourcePurpose: undefined, destinationPurpose: undefined })] };
+  assert.equal((parseBackup(JSON.stringify(legacy)).goals ?? []).length, 0);
 });

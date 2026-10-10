@@ -1,3 +1,4 @@
+import { listBudgets, saveBudget as saveBudgetRecord, deleteBudget, copyPreviousBudgets } from './storage/budgets';
 import { CashSetup } from './components/cash-setup';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,11 +16,14 @@ import { deleteAccount, completeCashSetup, listAccounts, saveAccount as saveAcco
 import { resetFinancialData, readBackupJson, restoreBackup as restoreBackupRecords } from './storage/backup';
 import type { FinanceBackup } from './backup';
 import { adjustAccountBalance, createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
-import type { Account, Transaction, TransactionDraft, SavingsGoal } from './types';
+import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
-type Snapshot = { needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
+type Snapshot = { budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
+  saveBudget: (budget: Budget, creating: boolean) => Promise<void>;
+  removeBudget: (month: string, category: string) => Promise<void>;
+  copyBudgets: (month: string) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
   completeSetup: (cents: number) => Promise<void>;
   resetData: () => Promise<void>;
@@ -75,10 +79,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const lastEntryAccount = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'lastEntryAccount'"))?.value;
       const needsCashSetup = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'cashSetupComplete'"))?.value === '0';
       const goals = await listGoals(connection);
+      const budgets = await listBudgets(connection);
       const month = philippineDateTime().transactionDate.slice(0, 7);
       const summary = calculateFinanceSummary(accounts, transactions, month);
       loadedMonth = month;
-      if (active) { setSnapshot({ needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary }); setError(''); }
+      if (active) { setSnapshot({ budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary }); setError(''); }
     }
     async function refresh() {
       if (locked || !active) return;
@@ -104,6 +109,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     actions.current = {
       refresh,
+      saveBudget: (budget, creating) => write((db) => saveBudgetRecord(db, budget, creating), 'Budget saved.'),
+      removeBudget: (month, category) => write((db) => deleteBudget(db, month, category), 'Budget deleted. Transactions are kept.'),
+      copyBudgets: (month) => write((db) => copyPreviousBudgets(db, month), 'Missing budgets copied from the previous month.'),
       removeAccount: (id) => write((db) => deleteAccount(db, id), 'Account deleted.'),
       completeSetup: (cents) => write((db) => completeCashSetup(db, cents), 'Cash account ready.'),
       resetData: () => write((db) => resetFinancialData(db), 'All data reset. Cash starts at zero.', undefined, true),
@@ -157,6 +165,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
+    saveBudget: (budget, creating) => actions.current?.saveBudget(budget, creating) ?? unavailable(),
+    removeBudget: (month, category) => actions.current?.removeBudget(month, category) ?? unavailable(),
+    copyBudgets: (month) => actions.current?.copyBudgets(month) ?? unavailable(),
     saveGoal: (goal, creating, newAccount) => actions.current?.saveGoal(goal, creating, newAccount) ?? unavailable(),
     removeAccount: (id) => actions.current?.removeAccount(id) ?? unavailable(),
     removeGoal: (id) => actions.current?.removeGoal(id) ?? unavailable(),

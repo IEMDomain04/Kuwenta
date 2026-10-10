@@ -1,3 +1,4 @@
+import { listBudgets } from './budgets';
 import { parseBackup, serializeBackup, type FinanceBackup } from '../backup';
 import { listAccounts } from './accounts';
 import { listGoals } from './goals';
@@ -8,7 +9,7 @@ import type { FinanceDatabase } from './database';
 export async function readBackupJson(db: FinanceDatabase): Promise<string> {
   let json: string | undefined;
   await db.withExclusiveTransactionAsync(async (transaction) => {
-    json = serializeBackup(await listAccounts(transaction), await listTransactions(transaction), new Date().toISOString(), await listGoals(transaction));
+    json = serializeBackup(await listAccounts(transaction), await listTransactions(transaction), new Date().toISOString(), await listGoals(transaction), await listBudgets(transaction));
   });
   if (json === undefined) throw new Error('Could not read financial records for backup.');
   return json;
@@ -19,6 +20,7 @@ export async function restoreBackup(db: FinanceDatabase, backup: FinanceBackup, 
   await db.withExclusiveTransactionAsync(async (transaction) => {
     await transaction.runAsync('DELETE FROM preferences');
     await transaction.runAsync("INSERT INTO preferences(key, value) VALUES ('cashSetupComplete', ?)", needsSetup ? '0' : '1');
+    await transaction.runAsync('DELETE FROM budgets');
     await transaction.runAsync('DELETE FROM goals');
     await transaction.runAsync('DELETE FROM transactions');
     await transaction.runAsync('DELETE FROM accounts');
@@ -30,6 +32,7 @@ export async function restoreBackup(db: FinanceDatabase, backup: FinanceBackup, 
       await transaction.runAsync('INSERT INTO transactions (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, adjustmentDirection, destinationAccountId, sourcePurpose, destinationPurpose) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         record.id, record.accountId, record.type, record.amount, record.category, record.transactionDate, record.transactionTime, record.notes ?? null, record.createdAt, record.updatedAt, record.adjustmentDirection ?? null, record.destinationAccountId ?? null, record.sourcePurpose ?? null, record.destinationPurpose ?? null);
     }
+    for (const budget of validated.budgets ?? []) await transaction.runAsync('INSERT INTO budgets(month, category, limitAmount) VALUES (?, ?, ?)', budget.month, budget.category, budget.limitAmount);
     for (const goal of validated.goals ?? []) {
       await transaction.runAsync('INSERT INTO goals(id, name, accountId, targetAmount, targetDate, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
         goal.id, goal.name, goal.accountId, goal.targetAmount, goal.targetDate ?? null, goal.createdAt, goal.updatedAt);

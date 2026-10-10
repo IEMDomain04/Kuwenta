@@ -1,17 +1,19 @@
+import { validateBudget, budgetReport } from './budgets';
 import { calculateAccountSummary, calculateFinanceSummary, calculateGoalProgress } from './calculations';
 import { isUtcTimestamp } from './dates';
-import type { Account, Transaction, SavingsGoal } from './types';
+import type { Account, Transaction, SavingsGoal, Budget } from './types';
 import { validateAccount, validateManualRecord, validateGoal } from './validation';
 
 export type FinanceBackup = {
   format: 'kuwenta-finance';
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   currency: 'PHP';
   timezone: 'Asia/Manila';
   exportedAt: string;
   accounts: Account[];
   transactions: Transaction[];
   goals?: SavingsGoal[];
+  budgets?: Budget[];
 };
 
 function object(value: unknown, keys: readonly string[]): Record<string, unknown> {
@@ -33,8 +35,8 @@ function strings(row: Record<string, unknown>, keys: readonly string[]): void {
 
 /** Validate the complete payload before a future restore writes anything. */
 function validateBackup(value: unknown): FinanceBackup {
-  const root = object(value, ['format', 'version', 'currency', 'timezone', 'exportedAt', 'accounts', 'transactions', 'goals']);
-  if (root.format !== 'kuwenta-finance' || (root.version !== 1 && root.version !== 2 && root.version !== 3 && root.version !== 4 && root.version !== 5)) {
+  const root = object(value, ['format', 'version', 'currency', 'timezone', 'exportedAt', 'accounts', 'transactions', 'goals', 'budgets']);
+  if (root.format !== 'kuwenta-finance' || (root.version !== 1 && root.version !== 2 && root.version !== 3 && root.version !== 4 && root.version !== 5 && root.version !== 6)) {
     throw new Error('Unsupported backup format or version.');
   }
   if (root.currency !== 'PHP' || root.timezone !== 'Asia/Manila') {
@@ -67,7 +69,7 @@ function validateBackup(value: unknown): FinanceBackup {
     strings(row, ['id', 'type', 'accountId', 'category', 'transactionDate', 'transactionTime', 'createdAt', 'updatedAt']);
     const transaction = { ...row } as Transaction;
     validateManualRecord(transaction);
-    if (root.version !== 5 && (transaction.sourcePurpose !== undefined || transaction.destinationPurpose !== undefined)) throw new Error('Transfer purposes require backup version 5.');
+    if (root.version !== 5 && root.version !== 6 && (transaction.sourcePurpose !== undefined || transaction.destinationPurpose !== undefined)) throw new Error('Transfer purposes require backup version 5.');
     if ((root.version === 1 || root.version === 2) && transaction.type === 'ADJUSTMENT') throw new Error('Balance adjustments require backup version 3.');
     if ((root.version === 1 || root.version === 2 || root.version === 3) && transaction.type === 'TRANSFER') throw new Error('Transfers require backup version 4.');
     if (!accountIds.has(transaction.accountId) || transaction.type === 'TRANSFER' && !accountIds.has(transaction.destinationAccountId!)) throw new Error('Backup transaction references an unknown account.');
@@ -76,7 +78,7 @@ function validateBackup(value: unknown): FinanceBackup {
     return transaction;
   });
 
-  if (root.goals !== undefined && (root.version !== 5 || !Array.isArray(root.goals))) throw new Error('Goals require a valid version 5 backup.');
+  if (root.goals !== undefined && ((root.version !== 5 && root.version !== 6) || !Array.isArray(root.goals))) throw new Error('Goals require a valid version 5 backup.');
   const goalIds = new Set<string>();
   const goalAccounts = new Set<string>();
   const goals = ((root.goals ?? []) as unknown[]).map((value) => {
@@ -87,6 +89,17 @@ function validateBackup(value: unknown): FinanceBackup {
     calculateGoalProgress(goal, accounts, transactions);
     return goal;
   });
+  if (root.budgets !== undefined && (root.version !== 6 || !Array.isArray(root.budgets))) throw new Error('Budgets require backup version 6.');
+  const budgetKeys = new Set<string>();
+  const budgets = ((root.budgets ?? []) as unknown[]).map((value) => {
+    const budget = { ...object(value, ['month', 'category', 'limitAmount']) } as Budget;
+    validateBudget(budget);
+    const key = budget.month + ':' + budget.category;
+    if (budgetKeys.has(key)) throw new Error('Duplicate category budget.');
+    budgetKeys.add(key);
+    return budget;
+  });
+  for (const month of new Set(budgets.map((row) => row.month))) budgetReport(budgets, transactions, month);
   // Reject overflow in the resulting balance and in every reporting month's totals.
   calculateFinanceSummary(accounts, transactions, '1900-01');
   const months = new Map<string, Transaction[]>();
@@ -101,7 +114,7 @@ function validateBackup(value: unknown): FinanceBackup {
   }
   return {
     format: 'kuwenta-finance', version: root.version, currency: 'PHP', timezone: 'Asia/Manila',
-    exportedAt: root.exportedAt, accounts, transactions, goals,
+    exportedAt: root.exportedAt, accounts, transactions, goals: root.version === 5 || root.version === 6 ? goals : undefined, budgets: root.version === 6 ? budgets : undefined,
   };
 }
 
@@ -111,10 +124,11 @@ export function serializeBackup(
   transactions: readonly Transaction[],
   exportedAt = new Date().toISOString(),
   goals: readonly SavingsGoal[] = [],
+  budgets: readonly Budget[] = [],
 ): string {
   return JSON.stringify(validateBackup({
-    format: 'kuwenta-finance', version: 5, currency: 'PHP', timezone: 'Asia/Manila',
-    exportedAt, accounts: Array.isArray(account) ? account : [account], transactions, goals,
+    format: 'kuwenta-finance', version: 6, currency: 'PHP', timezone: 'Asia/Manila',
+    exportedAt, accounts: Array.isArray(account) ? account : [account], transactions, goals, budgets,
   }), null, 2);
 }
 
@@ -137,12 +151,14 @@ export function previewBackup(backup: FinanceBackup): {
   adjustmentCount: number;
   transferCount: number;
   goalCount: number;
+  budgetCount: number;
   cashBalance: number;
 } {
   const validated = validateBackup(backup);
   return {
     exportedAt: validated.exportedAt,
     goalCount: validated.goals?.length ?? 0,
+    budgetCount: validated.budgets?.length ?? 0,
     transactionCount: validated.transactions.length,
     accountCount: validated.accounts.length,
     incomeCount: validated.transactions.filter((row) => row.type === 'INCOME').length,

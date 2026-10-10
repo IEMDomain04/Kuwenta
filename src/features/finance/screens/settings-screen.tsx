@@ -15,7 +15,7 @@ export default function SettingsScreen() {
   function confirmReset() {
     if (pending.current || busy) return;
     pending.current = true;
-    Alert.alert('Reset all Kuwenta data?', 'Permanently remove all accounts, opening balances, transactions, transfers, adjustments, savings goals, and saved account preferences on this device. A fresh Cash account will start at zero. This cannot be undone. Export a backup first if you want to keep your records. Exported backup files are not deleted.', [
+    Alert.alert('Reset all Kuwenta data?', 'Permanently remove all accounts, opening balances, transactions, transfers, adjustments, savings goals, budgets, and saved account preferences on this device. A fresh Cash account will start at zero. This cannot be undone. Export a backup first if you want to keep your records. Exported backup files are not deleted.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Reset all data', style: 'destructive', onPress: () => {
         setResetting(true); setError('');
@@ -28,7 +28,7 @@ export default function SettingsScreen() {
     <ActionButton label="Manage accounts" disabled={busy} onPress={() => router.push('/accounts')} />
     <ActionButton label="Manage savings goals" disabled={busy} onPress={() => router.push('/goals')} />
     <ThemedText type="smallBold" accessibilityRole="header">Data and Backups</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, and savings goals.</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
     <BackupExport disabled={busy} />
     <BackupImportPreview disabled={busy} />
     <ThemedText type="smallBold" accessibilityRole="header">Start fresh</ThemedText>

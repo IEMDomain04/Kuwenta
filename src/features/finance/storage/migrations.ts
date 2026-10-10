@@ -1,6 +1,6 @@
 import type { FinanceDatabase } from './database';
 
-const VERSION = 7;
+const VERSION = 8;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -65,5 +65,6 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       await transaction.runAsync("INSERT OR IGNORE INTO preferences(key, value) VALUES ('cashSetupComplete', ?)", version === 0 ? '0' : '1');
       await transaction.execAsync('PRAGMA user_version = 7;');
     }
+    if (version < 8) await transaction.execAsync("CREATE TABLE IF NOT EXISTS budgets (month TEXT NOT NULL, category TEXT NOT NULL, limitAmount INTEGER NOT NULL CHECK(typeof(limitAmount) = 'integer' AND limitAmount BETWEEN 1 AND 9007199254740991), PRIMARY KEY(month, category)); PRAGMA user_version = 8;");
   });
 }

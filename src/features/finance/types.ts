@@ -49,3 +49,5 @@ export type SavingsGoal = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type Budget = { month: string; category: string; limitAmount: number };
