@@ -1,4 +1,4 @@
-﻿const PH_OFFSET_MS = 8 * 60 * 60 * 1000;
+const PH_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 /** Philippine time is fixed UTC+8. Do not use the device's local date/time. */
 export function philippineDateTime(now: Date = new Date()): {
@@ -50,4 +50,29 @@ export function readableTransactionDate(date: string): string {
   if (!isValidDate(date)) throw new Error('Invalid transaction date.');
   return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' })
     .format(transactionPickerValue(date, '12:00:00'));
+}
+
+/** Readable display of stored Philippine wall time; never convert through device timezone. */
+export function formatTransactionDateTime(date: string, time: string): string {
+  if (!isValidDate(date) || !isValidTime(time)) throw new Error('Invalid transaction date/time.');
+  const [year, month, day] = date.split('-').map(Number);
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const hour = Number(time.slice(0, 2));
+  return names[month - 1] + ' ' + day + ', ' + year + ' · ' + (hour % 12 || 12) + ':' + time.slice(3, 5) + (hour < 12 ? ' AM' : ' PM') + ' · PH time';
+}
+export function readableReportingMonth(month: string): string {
+  if (!isValidMonth(month)) throw new Error('Invalid reporting month.');
+  const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return names[Number(month.slice(5)) - 1] + ' ' + month.slice(0, 4);
+}
+/** Day headings compare Philippine calendar dates, including month/year boundaries. */
+export function transactionDayHeading(date: string, now: Date = new Date()): string {
+  if (!isValidDate(date)) throw new Error('Invalid transaction date.');
+  const today = philippineDateTime(now).transactionDate;
+  const previous = new Date(today + 'T12:00:00Z');
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  const yesterday = previous.toISOString().slice(0, 10);
+  const day = new Intl.DateTimeFormat('en-PH', { weekday: 'short', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'));
+  const label = date === today ? 'Today' : date === yesterday ? 'Yesterday' : day;
+  return label + ' · ' + formatTransactionDateTime(date, '12:00:00').split(' · ')[0];
 }

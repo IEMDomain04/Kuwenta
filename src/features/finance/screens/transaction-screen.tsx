@@ -1,5 +1,8 @@
+import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { useTheme } from '@/hooks/use-theme';
+import { formatTransactionDateTime } from '../dates';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { TransactionForm } from '../components/transaction-form';
@@ -15,6 +18,8 @@ export default function TransactionScreen() {
   const initialType = params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const id = typeof params.id === 'string' ? params.id : undefined;
   const finance = useFinance();
+  const theme = useTheme();
+  const [entryType, setEntryType] = useState(initialType);
   const original = id ? finance.transactions.find((row) => row.id === id) : undefined;
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -47,15 +52,15 @@ export default function TransactionScreen() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid input.'); return; }
     Keyboard.dismiss(); pending.current = true;
     if (!original) { void save(draft); return; }
-    Alert.alert('Save transaction changes?', `${original.category} ${formatMoney(original.amount)} → ${draft.category} ${formatMoney(draft.amount)}\n${draft.type} · ${draft.transactionDate} ${draft.transactionTime} PH\n${draft.notes ?? ''}`, [
+    Alert.alert('Save transaction changes?', `${original.category} ${formatMoney(original.amount)} → ${draft.category} ${formatMoney(draft.amount)}\n${draft.type} · ${formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}\n${draft.notes ?? ''}`, [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Confirm', onPress: () => { void save(draft); } },
     ], { cancelable: false });
   }
   if (id && !original) return <FinanceScreen title="Transaction unavailable"><ThemedText>This transaction no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <FinanceScreen scroll={false} tabScreen={false} title={id ? 'Edit transaction' : 'Add transaction'}>
-      <TransactionForm key={id ?? 'new'} original={original} initialType={initialType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={leave} />
+    <FinanceScreen scroll={false} tabScreen={false} title={id ? 'Edit transaction' : entryType === 'INCOME' ? 'Add Income' : 'Add Expense'} headerLeading={<Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving || finance.busy} onPress={leave} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="arrow-back" size={24} color={theme.text} /></Pressable>}>
+      <TransactionForm key={id ?? 'new'} original={original} initialType={initialType} onTypeChange={setEntryType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={leave} />
     </FinanceScreen>
   </KeyboardAvoidingView>;
 }

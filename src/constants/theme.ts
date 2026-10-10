@@ -7,20 +7,21 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+const palette = {
+  text: '#142443', background: '#EDF7FF', backgroundElement: '#FFFFFF',
+  backgroundSelected: '#DFF3FA', textSecondary: '#526987',
+  accent: '#087F8C', onAccent: '#FFFFFF', income: '#078548',
+  expense: '#246AAB', border: '#DCECF5', incomeSurface: '#E7F8EF', incomeEnd: '#C9EFDF', expenseSurface: '#EAF4FF', expenseEnd: '#CFDEF7', balanceEnd: '#258B79',
+} as const;
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
+  light: palette,
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#E8F2FA', background: '#101C28', backgroundElement: '#1B2B3A',
+    backgroundSelected: '#294354', textSecondary: '#B2C5D7',
+    accent: '#78D9D1', onAccent: '#102D30', income: '#84DBAA',
+    expense: '#9EC9FF', border: '#344B60', incomeSurface: '#193D32',
+    incomeEnd: '#244F40', expenseSurface: '#203A55', expenseEnd: '#2A4B69',
+    balanceEnd: '#206F67',
   },
 } as const;
 

@@ -1,59 +1,96 @@
-import { StyleSheet, View } from 'react-native';
+import { formatTransactionDateTime, readableReportingMonth } from '../dates';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { Image } from 'expo-image';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ActionButton, FinanceScreen, TransactionRow } from '../components/ui';
-import { MonthSelector } from '../components/month-selector';
-import { filterTransactions } from '../reporting';
+import { useTheme } from '@/hooks/use-theme';
+import { ActionButton, FinanceScreen } from '../components/ui';
+import { CategoryIcon, SpendingDonut, categoryVisual, svgSource } from '../components/category-visual';
+import { HomeMonthPicker } from '../components/home-month-picker';
+import { filterTransactions, spendingByCategory } from '../reporting';
 import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 
 export default function HomeScreen() {
-  const { account, transactions, summary, month, busy } = useFinance();
+  const { transactions, summary, month, busy } = useFinance();
+  const theme = useTheme();
   const recent = filterTransactions(transactions, month).slice(0, 5);
-  return <FinanceScreen title="Your money">
-    <ThemedText type="small" themeColor="textSecondary">Kuwenta · PHP</ThemedText>
-    <ThemedView type="backgroundElement" style={styles.balance}>
-      <ThemedText type="smallBold">{account.name} balance</ThemedText>
-      <ThemedText style={styles.balanceAmount}>{formatMoney(summary.balance)}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">Opening balance plus all recorded income, minus all expenses.</ThemedText>
-      {summary.hasNegativeBalance && <ThemedText accessibilityRole="alert">Your Cash balance is negative. Review your records and opening balance.</ThemedText>}
-    </ThemedView>
-    <View style={styles.row}>
-      <View style={styles.action}><ActionButton primary label="Add Expense" disabled={busy}
-        onPress={() => router.push({ pathname: '/transaction', params: { type: 'EXPENSE' } })} /></View>
-      <View style={styles.action}><ActionButton label="Add Income" disabled={busy}
-        onPress={() => router.push({ pathname: '/transaction', params: { type: 'INCOME' } })} /></View>
+  const spending = spendingByCategory(transactions, month);
+  return <FinanceScreen title="Kuwenta" headerAccessory={<HomeMonthPicker />} floatingAction={
+    <Pressable accessibilityRole="button" accessibilityLabel="Add transaction" accessibilityState={{ disabled: busy }} disabled={busy}
+      onPress={() => router.push('/transaction')} style={({ pressed }) => [styles.fab, { backgroundColor: theme.accent, opacity: busy || pressed ? 0.5 : 1 }]}>
+      <Ionicons name="add" size={30} color={theme.onAccent} />
+    </Pressable>}>
+
+    <View style={[styles.balance, { backgroundColor: '#096A7C', overflow: 'hidden' }]}>
+      <Image accessible={false} source={svgSource('<defs><linearGradient id="g"><stop stop-color="#087C91"/><stop offset="1" stop-color="' + theme.balanceEnd + '"/></linearGradient></defs><rect width="400" height="200" fill="url(#g)"/><path d="M170 200Q250 70 400 145V200z" fill="#FFFFFF" opacity=".08"/>', '0 0 400 200')} style={StyleSheet.absoluteFill} contentFit="cover" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="wallet" size={22} color="#FFFFFF" /><ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>Current Cash Balance</ThemedText></View>
+      <ThemedText style={[styles.balanceAmount, { color: '#FFFFFF' }]}>{formatMoney(summary.balance)}</ThemedText>
+      <ThemedText type="small" style={{ color: '#FFFFFF' }}>All months · PHP</ThemedText>
+      {summary.hasNegativeBalance && <ThemedText accessibilityRole="alert" style={{ color: '#FFFFFF' }}>Your Cash balance is negative. Review your records and opening balance.</ThemedText>}
     </View>
-    <ThemedView type="backgroundElement" style={styles.section}>
-      <ThemedText type="smallBold" accessibilityRole="header">Monthly overview</ThemedText>
-      <MonthSelector />
+    <View style={styles.section}>
+
       <View style={styles.row}>
-        <View style={styles.total}>
-          <ThemedText type="small" themeColor="textSecondary">Income</ThemedText>
-          <ThemedText style={styles.totalAmount}>{formatMoney(summary.monthlyIncome)}</ThemedText>
-        </View>
-        <View style={styles.total}>
-          <ThemedText type="small" themeColor="textSecondary">Expenses</ThemedText>
-          <ThemedText style={styles.totalAmount}>{formatMoney(summary.monthlyExpenses)}</ThemedText>
-        </View>
+        <ThemedView type="backgroundElement" style={[styles.total, { borderColor: theme.border, backgroundColor: theme.incomeSurface, overflow: 'hidden' }]}>
+          <Image accessible={false} source={svgSource('<defs><linearGradient id="i" x2="0" y2="1"><stop stop-color="' + theme.incomeSurface + '"/><stop offset="1" stop-color="' + theme.incomeEnd + '"/></linearGradient></defs><rect width="200" height="120" fill="url(#i)"/>', '0 0 200 120')} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <View style={styles.categoryRow}><Ionicons name="arrow-up-circle" size={28} color={theme.income} /><ThemedText type="smallBold">Income</ThemedText></View>
+          <ThemedText style={styles.totalAmount} themeColor="income">{formatMoney(summary.monthlyIncome)}</ThemedText>
+        </ThemedView>
+        <ThemedView type="backgroundElement" style={[styles.total, { borderColor: theme.border, backgroundColor: theme.expenseSurface, overflow: 'hidden' }]}>
+          <Image accessible={false} source={svgSource('<defs><linearGradient id="e" x2="0" y2="1"><stop stop-color="' + theme.expenseSurface + '"/><stop offset="1" stop-color="' + theme.expenseEnd + '"/></linearGradient></defs><rect width="200" height="120" fill="url(#e)"/>', '0 0 200 120')} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <View style={styles.categoryRow}><Ionicons name="arrow-down-circle" size={28} color={theme.expense} /><ThemedText type="smallBold">Expenses</ThemedText></View>
+          <ThemedText style={styles.totalAmount} themeColor="expense">{formatMoney(summary.monthlyExpenses)}</ThemedText>
+        </ThemedView>
       </View>
-      <ThemedText type="small" themeColor="textSecondary">Monthly totals use transaction dates. Your Cash balance includes every month.</ThemedText>
+
+    </View>
+    <ThemedView type="backgroundElement" style={[styles.panel, { padding: 12, gap: 8 }]}>
+      <ThemedText type="smallBold" style={{ fontSize: 14, lineHeight: 18 }} accessibilityRole="header">Spending Breakdown · {readableReportingMonth(month)}</ThemedText>
+      {spending.length === 0 ? <ThemedText themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 15 }}>No expenses recorded for this month.</ThemedText>
+         : <><View style={{ flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}><View style={{ gap: 4, alignItems: 'center' }}>
+          <SpendingDonut categories={spending} total={summary.monthlyExpenses} />
+
+        </View><View style={{ flex: 1, minWidth: 165, gap: 8 }}>{spending.map(({ category, amount }) => <View key={category} style={{ gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
+            <CategoryIcon category={category} compact />
+            <ThemedText type="smallBold" style={{ flex: 1, minWidth: 45, fontSize: 11, lineHeight: 15 }}>{category}</ThemedText>
+            <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14 }} themeColor="textSecondary">{Math.round(amount / summary.monthlyExpenses * 100)}%</ThemedText><ThemedText type="smallBold" style={[styles.figures, { fontSize: 11, lineHeight: 15 }]}>{formatMoney(amount)}</ThemedText>
+          </View>
+          <View accessible={false} style={[styles.track, { height: 5 }, { backgroundColor: theme.backgroundSelected }]}>
+            <View style={[styles.bar, { height: 5 }, { backgroundColor: categoryVisual(category).color, width: `${amount / summary.monthlyExpenses * 100}%` }]} />
+          </View>
+        </View>)}</View></View><ThemedText type="small" style={{ fontSize: 10, lineHeight: 14 }} themeColor="textSecondary">Percentages are rounded; amounts are exact.</ThemedText></>}
     </ThemedView>
-    <ThemedText type="smallBold" accessibilityRole="header">Recent transactions · {month}</ThemedText>
-    {recent.length === 0 ? <ThemedView type="backgroundElement" style={styles.section}>
-      <ThemedText>No transactions in this month.</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">Choose another month to view history. Add Expense and Add Income start with today's Philippine date and time.</ThemedText>
-    </ThemedView> : recent.map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} />)}
+    <ThemedView type="backgroundElement" style={styles.panel}>
+    <ThemedText type="smallBold" accessibilityRole="header">Recent transactions · {readableReportingMonth(month)}</ThemedText>
+    {recent.length === 0 ? <ThemedText themeColor="textSecondary">No transactions in this month. Choose another month to view history, or add a record.</ThemedText>
+      : recent.map((transaction, index) => <View key={transaction.id} style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, paddingTop: index ? 12 : 0, borderTopWidth: index ? 1 : 0, borderColor: theme.border }}>
+        <CategoryIcon category={transaction.category} income={transaction.type === 'INCOME'} />
+        <View style={{ flex: 1, minWidth: 130, gap: 2 }}>
+          <ThemedText type="smallBold" numberOfLines={2}>{transaction.notes || transaction.category}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">{transaction.category} · {transaction.type === 'INCOME' ? 'Income' : 'Expense'}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">{formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime)}</ThemedText>
+        </View>
+        <ThemedText type="smallBold" style={[styles.figures, transaction.type === 'INCOME' && { color: theme.income }]}>{transaction.type === 'INCOME' ? '+' : '−'}{formatMoney(transaction.amount)}</ThemedText>
+      </View>)}
     <ActionButton label="View all transactions" onPress={() => router.navigate('/transactions')} />
-  </FinanceScreen>;
+  </ThemedView>
+</FinanceScreen>;
 }
 const styles = StyleSheet.create({
-  balance: { padding: 24, borderRadius: 20, gap: 8 },
-  balanceAmount: { fontSize: 40, lineHeight: 48, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  section: { padding: 16, borderRadius: 16, gap: 16 },
+  balance: { padding: 18, borderRadius: 20, gap: 8 },
+  balanceAmount: { fontSize: 38, lineHeight: 48, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  section: { gap: 12 },
+  panel: { padding: 14, borderRadius: 18, gap: 12 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  action: { flexGrow: 1, flexBasis: 140 },
-  total: { flexGrow: 1, flexBasis: 100, gap: 4 },
+  fab: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  total: { flexGrow: 1, flexBasis: 140, gap: 8, padding: 16, borderRadius: 16, borderWidth: 1 },
   totalAmount: { fontSize: 22, lineHeight: 30, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
+  figures: { fontVariant: ['tabular-nums'] },
+  track: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  bar: { height: 6, borderRadius: 3 },
 });

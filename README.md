@@ -817,3 +817,85 @@ a backdated transaction, and verify unchanged seconds. Try a phone timezone outs
 the Philippines. Type 1000, 12345.67, and 1000.; edit the middle of a grouped number,
 delete beside commas, replace a selected range, and paste grouped/invalid amounts.
 Check negative opening balance sign changes and verify saved centavos and totals.
+
+## Dashboard visual refresh
+Shared light/dark colors now use a teal accent, readable income/expense colors,
+and subtle borders. Primary buttons use the accent. Home emphasizes Current Cash
+Balance across all recorded months; monthly reporting remains separately labeled.
+Selected-month spending is grouped by category, sorted by total, and displayed
+with exact amounts and simple proportional bars. The five recent records, month
+navigation, entry shortcuts, warnings, and financial workflows remain in place.
+No dependency or database change was required. Verify both themes, large text,
+large/negative balances, empty months, and category updates after editing/deleting
+on the phone before continuing the screen redesign.
+## Reference-inspired Home styling
+Home uses a teal gradient balance panel, category icons, a compact spending donut
+with an adjacent exact total, category percentages/bars, and five recent records
+inside one panel. Local SVG drawings render through existing expo-image; there
+are no new dependencies or remote assets. Selected native tabs use teal.
+All expense categories remain visible. Percentages are rounded display values;
+financial calculations, persistence, backups, confirmations and Undo are unchanged.
+Verify SVG rendering in Expo Go, both themes, larger text, long notes, and empty,
+large or negative amounts before continuing with other screen layouts.
+## Fixed light reference layout
+Kuwenta now uses a fixed pale-blue/white light palette with navy text, teal-to-mint
+balance styling, and green/coral income/expense indicators. It does not follow
+device dark mode. Home uses tighter spacing, a compact expandable reporting-month
+control, a wrapping donut/category layout, five recent records, and bottom quick
+actions. Ionicons replaces hand-drawn category/wallet icons; only this icon pack
+was added. Native tab icons retain their existing platform implementation.
+The config requests light appearance; restart Expo Go to load the new icon package.
+Verify on the phone with dark system settings, larger text, all categories, empty
+months, negative/large balances, and month navigation. Existing calculations,
+SQLite records, encrypted backup workflows, confirmations and Undo are unchanged.
+## Home usability refinement
+Home now has an upper-right reporting month selector with a twelve-month grid,
+a directly selectable year list (1900-9999), Current month, and Cancel. Choosing
+a month applies immediately; dismissing without selection does not change reports.
+The existing provider updates monthly income, expenses, category totals and five
+recent records, while current Cash Balance stays across all months.
+A single fixed Add transaction FAB replaces the two entry buttons; extra scroll
+padding and safe-area/tab spacing keep the final records reachable.
+Light/dark system themes are restored. Home summary gradients use green and blue
+accents. The existing SVG donut remains dependency-free and shows its exact total
+in the center, or below for large amounts/larger text. Category percentages are
+rounded display values; centavo calculations and database workflows are unchanged.
+Verify both themes, direct year/month selection, cancellation, empty months,
+negative balances, chart updates after edits/deletions, larger text, and FAB
+placement/navigation on an Android phone. Earlier fixed-light instructions above
+are superseded by this increment.
+## Chart rendering, timestamps and scrolling
+The spending donut now uses react-native-gifted-charts with expo-linear-gradient
+and the SDK-compatible react-native-svg instead of an SVG image URI. Existing
+integer-centavo category totals, category colors, center total and empty states
+remain; large totals/text use the existing below-chart fallback. No chart
+animations are enabled. Phone verification is required to confirm rendering.
+Home/history/edit/delete summaries display dates and twelve-hour times such as
+Oct 10, 2026 · 1:39 AM · PH time. Stored seconds and reporting/sorting stay unchanged.
+Shared screens no longer add hard-coded tab height on top of native automatic
+bottom insets. Home reserves only FAB clearance; Settings keeps a small end
+margin and Transactions uses the available list height. Scroll bounce/overscroll
+is disabled, while history retains pull-to-refresh. Verify the last item/button,
+empty/short lists, expanded backups, keyboard and FAB on the phone.
+## Readable reporting labels and transaction form
+Home section labels now show October 2026 rather than 2026-10. Internal reporting
+keys remain unchanged. Transaction entry uses a prominent peso input, icon category
+grid, readable date/time controls, fixed Cash field, notes, and gradient Save.
+Income/Expense selection changes the entry heading; all existing categories remain.
+Back/Cancel, validation, draft handling and confirmed edits are retained.
+Creation success appears in a rounded nonblocking floating banner with Undo,
+keeping its existing ten-second expiry. It is placed above tab/FAB controls.
+No dependencies were added. Verify keyboard/scroll reachability, larger text,
+both themes, category switching, picker cancellation, saving/edit confirmation,
+and banner placement/Undo on the phone.
+## Compact category picker and date/time controls
+The transaction category grid moved into a bottom-sheet modal opened beside the
+amount. Selecting applies immediately; close, outside tap and Android Back retain
+the original selection. Names truncate to one line with ellipses while accessible
+labels retain full names. The modal respects bottom safe areas and scrolls.
+Date/time controls now share 22px Ionicons, 13px labels, matching heights/borders,
+and readable PH date/time. The raw JSX whitespace between the control row and
+conditional native picker was removed to address the Text-component runtime error.
+Storage, category defaults, validation, native picker behavior, saving and Undo
+remain unchanged. Verify modal cancellation/selection, long labels, system text
+scaling, both themes, native picker dismissal and Save on the phone.

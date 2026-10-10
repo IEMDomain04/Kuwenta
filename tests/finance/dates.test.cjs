@@ -1,4 +1,4 @@
-﻿const { test } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { philippineDateTime, isValidDate, isValidTime, isUtcTimestamp } = require('../../.expo/finance-tests/dates.js');
 
@@ -60,4 +60,29 @@ test('time selections preserve seconds when minutes are unchanged and reset them
   assert.equal(pickedTransactionTime(new Date('2026-10-10T06:35:00Z'), '14:35:37'), '14:35:37');
   assert.equal(pickedTransactionTime(new Date('2026-10-10T06:36:59Z'), '14:35:37'), '14:36:00');
   assert.equal(pickedTransactionTime(new Date('2026-10-09T16:00:00Z'), '23:59:37'), '00:00:00');
+});
+
+const { formatTransactionDateTime } = require('../../.expo/finance-tests/dates.js');
+test('readable transaction timestamps preserve Philippine wall time and handle noon/midnight', () => {
+  assert.equal(formatTransactionDateTime('2026-10-10', '01:39:25'), 'Oct 10, 2026 · 1:39 AM · PH time');
+  assert.equal(formatTransactionDateTime('2026-01-01', '00:00:59'), 'Jan 1, 2026 · 12:00 AM · PH time');
+  assert.equal(formatTransactionDateTime('2026-10-10', '12:00:00'), 'Oct 10, 2026 · 12:00 PM · PH time');
+  assert.equal(formatTransactionDateTime('2026-10-10', '23:59:59'), 'Oct 10, 2026 · 11:59 PM · PH time');
+  assert.throws(() => formatTransactionDateTime('2026-02-30', '12:00:00'));
+  assert.throws(() => formatTransactionDateTime('2026-10-10', '24:00:00'));
+});
+test('reporting months use readable names without changing month keys', () => {
+  const { readableReportingMonth } = require('../../.expo/finance-tests/dates.js');
+  assert.equal(readableReportingMonth('2026-10'), 'October 2026');
+  assert.equal(readableReportingMonth('2027-01'), 'January 2027');
+  assert.throws(() => readableReportingMonth('2026-13'));
+});
+test('day headings follow Philippine midnight and handle previous-month and year dates', () => {
+  const { transactionDayHeading } = require('../../.expo/finance-tests/dates.js');
+  const now = new Date('2026-12-31T16:05:00Z');
+  assert.equal(transactionDayHeading('2027-01-01', now), 'Today · Jan 1, 2027');
+  assert.equal(transactionDayHeading('2026-12-31', now), 'Yesterday · Dec 31, 2026');
+  assert.equal(transactionDayHeading('2026-12-30', now), 'Wed · Dec 30, 2026');
+  assert.equal(transactionDayHeading('2026-10-10', new Date('2026-10-10T15:59:59Z')), 'Today · Oct 10, 2026');
+  assert.throws(() => transactionDayHeading('2026-02-30', now));
 });

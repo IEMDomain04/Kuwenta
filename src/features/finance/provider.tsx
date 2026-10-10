@@ -1,6 +1,8 @@
+import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { useTheme } from '@/hooks/use-theme';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, AppState, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, AppState, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -28,6 +30,8 @@ export type FinanceState = Snapshot & Actions & { busy: boolean; currentMonth: s
 const Context = createContext<FinanceState | null>(null);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [restoreVersion, setRestoreVersion] = useState(0);
@@ -101,7 +105,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         return createTransactionId(connection);
       },
       saveTransaction: (id, draft, editing) => write((db) => editing ? updateTransaction(db, id, draft) : createTransaction(db, id, draft),
-        editing ? 'Transaction updated.' : 'Transaction saved for ' + draft.transactionDate + '.', editing ? undefined : id),
+        editing ? 'Transaction updated.' : (draft.type === 'INCOME' ? 'Income saved' : 'Expense saved'), editing ? undefined : id),
       removeTransaction: (id) => write((db) => deleteTransaction(db, id), 'Transaction removed.'),
     };
     void refresh();
@@ -141,16 +145,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }}><ThemedView key={restoreVersion} style={{ flex: 1 }}>
     {error ? <ThemedView style={{ padding: 16, gap: 8 }}><ThemedText accessibilityRole="alert">{error}</ThemedText>
       <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} /></ThemedView> : null}
-    {notice ? <SafeAreaView edges={['top', 'left', 'right']}>
-      <ThemedView type="backgroundElement" style={{ paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <ThemedText style={{ flex: 1 }} accessibilityLiveRegion="polite">{notice.message}</ThemedText>
-        {notice.undoId ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy}
-          onPress={() => { void undo(); }} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}><ThemedText type="smallBold">Undo</ThemedText></Pressable> : null}
-        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notification" onPress={() => setNotice(null)}
-          style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}><ThemedText>×</ThemedText></Pressable>
-      </ThemedView>
-    </SafeAreaView> : null}
     {children}
+    {notice ? <View pointerEvents="box-none" style={{ position: 'absolute', left: Math.max(12, insets.left), right: Math.max(12, insets.right), bottom: insets.bottom + 148 }}>
+      <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: theme.incomeSurface, borderColor: theme.border, borderWidth: 1, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Ionicons name="checkmark-circle" size={24} color={theme.income} />
+        <ThemedText type="small" style={{ flex: 1 }} accessibilityLiveRegion="polite">{notice.message}</ThemedText>
+        {notice.undoId ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { void undo(); }} style={{ minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' }}><ThemedText type="smallBold" themeColor="accent">Undo</ThemedText></Pressable> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notification" onPress={() => setNotice(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={18} color={theme.textSecondary} /></Pressable>
+      </View>
+    </View> : null}
   </ThemedView></Context.Provider>;
 }
 export function useFinance(): FinanceState {
