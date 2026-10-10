@@ -8,7 +8,7 @@ import { formatMoney } from '../money';
 import { readableReportingMonth, formatTransactionDateTime } from '../dates';
 import { ActionButton } from './ui';
 
-export function SavingsOverview() {
+export function SavingsOverview({ compact = false, goalsOnly = false }: { compact?: boolean; goalsOnly?: boolean }) {
   const { accounts, transactions, goals, month, busy } = useFinance();
   const theme = useTheme();
   let savings: ReturnType<typeof calculateSavings> | undefined;
@@ -16,7 +16,7 @@ export function SavingsOverview() {
   try { savings = calculateSavings(accounts, transactions, month); }
   catch (cause) { error = cause instanceof Error ? cause.message : 'Could not calculate savings.'; }
   return <>
-    <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
+    {!goalsOnly && <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
       <ThemedText type="smallBold" accessibilityRole="header">Savings</ThemedText>
       {savings ? <>
         <ThemedText type="small" themeColor="textSecondary">Current savings balance | All months</ThemedText>
@@ -31,14 +31,15 @@ export function SavingsOverview() {
         {savings.balance < 0 && <ThemedText accessibilityRole="alert">Warning: the savings balance is negative.</ThemedText>}
         {savings.usesLegacyPurposes && <ThemedText type="small" themeColor="textSecondary">Older transfers use current account purposes for this report.</ThemedText>}
       </> : <ThemedText accessibilityRole="alert">{error}</ThemedText>}
-    </View>
+    </View>}
     <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <ThemedText type="smallBold" accessibilityRole="header">Savings goals</ThemedText>
+        {compact && <ActionButton compact label="View all" disabled={busy} onPress={() => router.push("/goals")} />}
         <ActionButton compact label="Add goal" disabled={busy} onPress={() => router.push('/goal')} />
       </View>
       {goals.length === 0 && <ThemedText type="small" themeColor="textSecondary">Set a target for a dedicated savings account.</ThemedText>}
-      {goals.map((goal) => {
+      {(compact ? goals.slice(0, 2) : goals).map((goal) => {
         const account = accounts.find((row) => row.id === goal.accountId)!;
         let progress: ReturnType<typeof calculateGoalProgress>;
         try { progress = calculateGoalProgress(goal, accounts, transactions); }
@@ -59,6 +60,7 @@ export function SavingsOverview() {
           </View>
         </View>;
       })}
+      {compact && goals.length > 2 && <ThemedText type="small" themeColor="textSecondary">{goals.length - 2} more goals in View all.</ThemedText>}
     </View>
   </>;
 }

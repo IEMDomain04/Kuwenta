@@ -1,3 +1,4 @@
+import { CashSetup } from './components/cash-setup';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -10,16 +11,19 @@ import { calculateFinanceSummary } from './calculations';
 import { isValidMonth, philippineDateTime } from './dates';
 import { openFinanceDatabase } from './storage/database';
 import { listGoals, saveGoal as saveGoalRecord, deleteGoal } from './storage/goals';
-import { listAccounts, saveAccount as saveAccountRecords, updateOpeningBalance } from './storage/accounts';
-import { readBackupJson, restoreBackup as restoreBackupRecords } from './storage/backup';
+import { deleteAccount, completeCashSetup, listAccounts, saveAccount as saveAccountRecords, updateOpeningBalance } from './storage/accounts';
+import { resetFinancialData, readBackupJson, restoreBackup as restoreBackupRecords } from './storage/backup';
 import type { FinanceBackup } from './backup';
 import { adjustAccountBalance, createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
 import type { Account, Transaction, TransactionDraft, SavingsGoal } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
-type Snapshot = { goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
+type Snapshot = { needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
-  saveGoal: (goal: SavingsGoal, creating: boolean) => Promise<void>;
+  removeAccount: (id: string) => Promise<void>;
+  completeSetup: (cents: number) => Promise<void>;
+  resetData: () => Promise<void>;
+  saveGoal: (goal: SavingsGoal, creating: boolean, newAccount?: Account) => Promise<void>;
   removeGoal: (id: string) => Promise<void>;
   adjustBalance: (id: string, accountId: string, target: number, expected: number) => Promise<void>;
   restoreBackup: (backup: FinanceBackup) => Promise<void>;
@@ -68,11 +72,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const account = accounts.find((row) => row.id === 'cash');
       if (!account) throw new Error('Cash account is missing.');
       const transactions = await listTransactions(connection);
+      const lastEntryAccount = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'lastEntryAccount'"))?.value;
+      const needsCashSetup = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'cashSetupComplete'"))?.value === '0';
       const goals = await listGoals(connection);
       const month = philippineDateTime().transactionDate.slice(0, 7);
       const summary = calculateFinanceSummary(accounts, transactions, month);
       loadedMonth = month;
-      if (active) { setSnapshot({ goals, accounts, account, transactions, month, summary }); setError(''); }
+      if (active) { setSnapshot({ needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary }); setError(''); }
     }
     async function refresh() {
       if (locked || !active) return;
@@ -90,7 +96,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (active && restoring) { setSnapshot(null); setSelectedMonth(null); setRestoreVersion((version) => version + 1); }
         if (active) setNotice({ message, undoId, expiresAt: Date.now() + (undoId ? 10_000 : 4000) });
         try { await load(); }
-        catch { if (active) setError(restoring ? 'Backup restored, but records could not refresh. Tap Retry.' : 'Change saved, but records could not refresh. Tap Retry.'); }
+        catch { if (active) setError(restoring ? 'Records replaced, but could not refresh. Tap Retry.' : 'Change saved, but records could not refresh. Tap Retry.'); }
       })();
       running = pending.catch(() => {});
       try { await pending; }
@@ -98,7 +104,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     actions.current = {
       refresh,
-      saveGoal: (goal, creating) => write((db) => saveGoalRecord(db, goal, creating), creating ? 'Goal added.' : 'Goal updated.'),
+      removeAccount: (id) => write((db) => deleteAccount(db, id), 'Account deleted.'),
+      completeSetup: (cents) => write((db) => completeCashSetup(db, cents), 'Cash account ready.'),
+      resetData: () => write((db) => resetFinancialData(db), 'All data reset. Cash starts at zero.', undefined, true),
+      saveGoal: (goal, creating, newAccount) => write((db) => saveGoalRecord(db, goal, creating, newAccount), creating ? 'Goal added.' : 'Goal updated.'),
       removeGoal: (id) => write((db) => deleteGoal(db, id), 'Goal removed. Account funds are unchanged.'),
       adjustBalance: (id, accountId, target, expected) => write((db) => adjustAccountBalance(db, id, accountId, target, expected), 'Balance adjusted.'),
       restoreBackup: (backup) => write((db) => restoreBackupRecords(db, backup), 'Backup restored.', undefined, true),
@@ -143,14 +152,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       : <><ThemedText accessibilityRole="alert">{error || 'Preparing records…'}</ThemedText>
         <ActionButton label="Retry" onPress={() => { void actions.current?.refresh(); }} /></>}
   </FinanceScreen>;
+  if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents) => actions.current?.completeSetup(cents) ?? Promise.reject(new Error('App is closing.'))} />;
   if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
-    saveGoal: (goal, creating) => actions.current?.saveGoal(goal, creating) ?? unavailable(),
+    saveGoal: (goal, creating, newAccount) => actions.current?.saveGoal(goal, creating, newAccount) ?? unavailable(),
+    removeAccount: (id) => actions.current?.removeAccount(id) ?? unavailable(),
     removeGoal: (id) => actions.current?.removeGoal(id) ?? unavailable(),
     adjustBalance: (id, accountId, target, expected) => actions.current?.adjustBalance(id, accountId, target, expected) ?? unavailable(),
     refresh: () => actions.current?.refresh() ?? Promise.resolve(),
+    completeSetup: (cents) => actions.current?.completeSetup(cents) ?? unavailable(),
+    resetData: () => actions.current?.resetData() ?? unavailable(),
     restoreBackup: (backup) => actions.current?.restoreBackup(backup) ?? unavailable(),
     getBackupJson: () => actions.current?.getBackupJson() ?? unavailable(),
     saveAccount: (account, creating) => actions.current?.saveAccount(account, creating) ?? unavailable(),

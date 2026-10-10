@@ -1,15 +1,16 @@
+import { AccountsOverview } from '../components/accounts-overview';
 import { SavingsOverview } from '../components/savings-overview';
 import { useMemo } from 'react';
-import { calculateCurrentMoney, calculateAccountSummary } from '../calculations';
+import { calculateCurrentMoney } from '../calculations';
 import { formatTransactionDateTime, readableReportingMonth } from '../dates';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
-import { ActionButton, FinanceScreen } from '../components/ui';
+import { ActionButton, FinanceScreen, AddTransactionButton } from '../components/ui';
 import { CategoryIcon, SpendingDonut, categoryVisual, svgSource } from '../components/category-visual';
 import { HomeMonthPicker } from '../components/home-month-picker';
 import { filterTransactions, spendingByCategory } from '../reporting';
@@ -25,18 +26,14 @@ export default function HomeScreen() {
   }, [accounts, transactions]);
   const recent = filterTransactions(transactions, month).slice(0, 5);
   const spending = spendingByCategory(transactions, month);
-  return <FinanceScreen title="Kuwenta" headerAccessory={<HomeMonthPicker />} floatingAction={
-    <Pressable accessibilityRole="button" accessibilityLabel="Add transaction" accessibilityState={{ disabled: busy }} disabled={busy}
-      onPress={() => router.push('/transaction')} style={({ pressed }) => [styles.fab, { backgroundColor: theme.accent, opacity: busy || pressed ? 0.5 : 1 }]}>
-      <Ionicons name="add" size={30} color={theme.onAccent} />
-    </Pressable>}>
+  return <FinanceScreen title="Kuwenta" headerAccessory={<HomeMonthPicker />} floatingAction={<AddTransactionButton disabled={busy} />}>
 
     <View style={[styles.balance, { backgroundColor: '#096A7C', overflow: 'hidden' }]}>
       <Image accessible={false} source={svgSource('<defs><linearGradient id="g"><stop stop-color="#087C91"/><stop offset="1" stop-color="' + theme.balanceEnd + '"/></linearGradient></defs><rect width="400" height="200" fill="url(#g)"/><path d="M170 200Q250 70 400 145V200z" fill="#FFFFFF" opacity=".08"/>', '0 0 400 200')} style={StyleSheet.absoluteFill} contentFit="cover" />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="wallet" size={22} color="#FFFFFF" /><ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>Available Money</ThemedText></View>
-      <ThemedText style={[styles.balanceAmount, { color: '#FFFFFF' }]}>{currentMoney.values ? formatMoney(currentMoney.values.availableMoney) : '—'}</ThemedText>
+      <ThemedText numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4} style={[styles.balanceAmount, { color: '#FFFFFF' }]}>{currentMoney.values ? formatMoney(currentMoney.values.availableMoney) : '—'}</ThemedText>
       <ThemedText type="small" style={{ color: '#FFFFFF' }}>Included accounts · All months · PHP</ThemedText>
-      {currentMoney.values?.hasNegativeAccount && <ThemedText accessibilityRole="alert" style={{ color: '#FFFFFF' }}>One or more account balances are negative. Review Accounts in Settings.</ThemedText>}
+      {currentMoney.values?.hasNegativeAccount && <ThemedText accessibilityRole="alert" style={{ color: '#FFFFFF' }}>One or more account balances are negative. Open Accounts to review them.</ThemedText>}
     </View>
     {currentMoney.error ? <ThemedText accessibilityRole="alert">{currentMoney.error}</ThemedText> : null}
     <ThemedView type="backgroundElement" style={styles.panel}>
@@ -46,41 +43,10 @@ export default function HomeScreen() {
       </View>
       <ThemedText type="small" themeColor="textSecondary">All accounts · All months · PHP</ThemedText>
       {accounts.some((account) => account.archived) && <ThemedText type="small" themeColor="textSecondary">Archived account balances remain included.</ThemedText>}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <ThemedText type="small" themeColor="textSecondary">Cash balance</ThemedText>
-        <ThemedText type="smallBold" style={styles.figures}>{formatMoney(summary.balance)}</ThemedText>
-      </View>
     </ThemedView>
-    <ThemedView type="backgroundElement" style={styles.panel}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <ThemedText type="smallBold" accessibilityRole="header">Accounts</ThemedText>
-        <Pressable accessibilityRole="button" accessibilityLabel="Add account" accessibilityState={{ disabled: busy }} disabled={busy}
-          onPress={() => router.push('/account')} style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed || busy ? 0.5 : 1 })}>
-          <Ionicons name="add-circle-outline" size={20} color={theme.accent} /><ThemedText type="smallBold" themeColor="accent">Add account</ThemedText>
-        </Pressable>
-      </View>
-      {accounts.map((account, index) => {
-        const balance = calculateAccountSummary(account, transactions, month).balance;
-        return <Pressable key={account.id} accessibilityRole="button" accessibilityLabel={(account.archived ? 'View archived account ' : 'View account ') + account.name + ', ' + formatMoney(balance)} accessibilityState={{ disabled: busy }} disabled={busy}
-          onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
-          style={({ pressed }) => ({ paddingVertical: 12, borderTopWidth: index ? 1 : 0, borderColor: theme.border, gap: 4, opacity: pressed || busy ? 0.5 : 1 })}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <Ionicons name={account.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={24} color={theme.accent} />
-            <View style={{ flex: 1, minWidth: 100, gap: 2 }}>
-              <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail">{account.name}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">{account.purpose === 'savings' ? 'Savings' : 'Spending'}{account.archived ? ' · Archived' : ''}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
-            </View>
-            <ThemedText type="smallBold" style={[styles.figures, { flexShrink: 1 }]}>{formatMoney(balance)}</ThemedText>
-            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-          </View>
-          {balance < 0 && <ThemedText type="small" accessibilityRole="alert">Negative balance</ThemedText>}
-        </Pressable>;
-      })}
-    </ThemedView>
-    <SavingsOverview />
+    <AccountsOverview compact />
     <View style={styles.section}>
-      <ThemedText type="small" themeColor="textSecondary">Monthly reports · All accounts</ThemedText>
+      <ThemedText type="smallBold" accessibilityRole="header">Monthly Overview · All accounts</ThemedText>
 
       <View style={styles.row}>
         <ThemedView type="backgroundElement" style={[styles.total, { borderColor: theme.border, backgroundColor: theme.incomeSurface, overflow: 'hidden' }]}>
@@ -113,6 +79,7 @@ export default function HomeScreen() {
           </View>
         </View>)}</View></View><ThemedText type="small" style={{ fontSize: 10, lineHeight: 14 }} themeColor="textSecondary">Percentages are rounded; amounts are exact.</ThemedText></>}
     </ThemedView>
+    <SavingsOverview compact />
     <ThemedView type="backgroundElement" style={styles.panel}>
     <ThemedText type="smallBold" accessibilityRole="header">Recent transactions · {readableReportingMonth(month)}</ThemedText>
     {recent.length === 0 ? <ThemedText themeColor="textSecondary">No transactions in this month. Choose another month to view history, or add a record.</ThemedText>

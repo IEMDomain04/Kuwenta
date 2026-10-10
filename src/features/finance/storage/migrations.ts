@@ -1,6 +1,6 @@
 import type { FinanceDatabase } from './database';
 
-const VERSION = 5;
+const VERSION = 7;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -60,5 +60,10 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
     }
     if (version < 5) await transaction.execAsync(
       "ALTER TABLE transactions ADD COLUMN sourcePurpose TEXT CHECK(sourcePurpose IN ('spending', 'savings')); ALTER TABLE transactions ADD COLUMN destinationPurpose TEXT CHECK(destinationPurpose IN ('spending', 'savings')); CREATE TABLE IF NOT EXISTS goals (id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0), name TEXT NOT NULL CHECK(length(trim(name)) > 0), accountId TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE RESTRICT, targetAmount INTEGER NOT NULL CHECK(typeof(targetAmount) = 'integer' AND targetAmount BETWEEN 1 AND 9007199254740991), targetDate TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL CHECK(updatedAt >= createdAt)); PRAGMA user_version = 5;");
+    if (version < 6) await transaction.execAsync("CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL); PRAGMA user_version = 6;");
+    if (version < 7) {
+      await transaction.runAsync("INSERT OR IGNORE INTO preferences(key, value) VALUES ('cashSetupComplete', ?)", version === 0 ? '0' : '1');
+      await transaction.execAsync('PRAGMA user_version = 7;');
+    }
   });
 }

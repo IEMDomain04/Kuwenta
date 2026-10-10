@@ -1,5 +1,5 @@
-import type { SavingsGoal } from '../types';
-import { validateGoal } from '../validation';
+import type { Account, SavingsGoal } from '../types';
+import { validateGoal, validateAccount } from '../validation';
 import { calculateGoalProgress } from '../calculations';
 import { listAccounts } from './accounts';
 import { listTransactions } from './transactions';
@@ -14,14 +14,23 @@ export async function listGoals(db: FinanceDatabase): Promise<SavingsGoal[]> {
     return goal;
   });
 }
-export async function saveGoal(db: FinanceDatabase, goal: SavingsGoal, creating: boolean): Promise<void> {
+export async function saveGoal(db: FinanceDatabase, goal: SavingsGoal, creating: boolean, newAccount?: Account): Promise<void> {
   await db.withExclusiveTransactionAsync(async (transaction) => {
+    const existing = await transaction.getFirstAsync<SavingsGoal>('SELECT * FROM goals WHERE id = ?', goal.id);
+    if (creating && existing) {
+      if (existing.accountId !== goal.accountId) throw new Error('Goal submission ID is already in use.');
+      return;
+    }
+    if (!creating && !existing) throw new Error('Goal no longer exists.');
+    if (newAccount) {
+      validateAccount(newAccount);
+      if (!creating || newAccount.id !== goal.accountId || newAccount.purpose !== 'savings' || newAccount.archived || newAccount.openingBalance !== 0 || newAccount.includedInAvailable) throw new Error('A new dedicated savings account must start at zero and be excluded from Available Money.');
+      if (await transaction.getFirstAsync('SELECT id FROM accounts WHERE id = ?', newAccount.id)) throw new Error('Account submission ID is already in use.');
+      await transaction.runAsync('INSERT INTO accounts(id, name, currency, openingBalance, purpose, includedInAvailable, archived) VALUES (?, ?, ?, ?, ?, ?, ?)', newAccount.id, newAccount.name.trim(), 'PHP', 0, 'savings', 0, 0);
+    }
     const accounts = await listAccounts(transaction);
     validateGoal(goal, accounts);
     if (accounts.find((row) => row.id === goal.accountId)!.archived) throw new Error('Unarchive the savings account before saving the goal.');
-    const existing = await transaction.getFirstAsync<SavingsGoal>('SELECT * FROM goals WHERE id = ?', goal.id);
-    if (creating && existing) return;
-    if (!creating && !existing) throw new Error('Goal no longer exists.');
     const linked = await transaction.getFirstAsync<{ id: string }>('SELECT id FROM goals WHERE accountId = ? AND id <> ?', goal.accountId, goal.id);
     if (linked) throw new Error('This savings account already has a goal. Choose a dedicated account.');
     const saved = { ...goal, name: goal.name.trim(), createdAt: existing?.createdAt ?? goal.createdAt, updatedAt: [goal.updatedAt, existing?.updatedAt ?? ''].sort().at(-1)! };

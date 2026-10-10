@@ -14,9 +14,11 @@ export async function readBackupJson(db: FinanceDatabase): Promise<string> {
   return json;
 }
 /** Explicit replacement only after UI confirmation. Any failure rolls back all accounts and records. */
-export async function restoreBackup(db: FinanceDatabase, backup: FinanceBackup): Promise<void> {
+export async function restoreBackup(db: FinanceDatabase, backup: FinanceBackup, needsSetup = false): Promise<void> {
   const validated = parseBackup(JSON.stringify(backup));
   await db.withExclusiveTransactionAsync(async (transaction) => {
+    await transaction.runAsync('DELETE FROM preferences');
+    await transaction.runAsync("INSERT INTO preferences(key, value) VALUES ('cashSetupComplete', ?)", needsSetup ? '0' : '1');
     await transaction.runAsync('DELETE FROM goals');
     await transaction.runAsync('DELETE FROM transactions');
     await transaction.runAsync('DELETE FROM accounts');
@@ -33,4 +35,12 @@ export async function restoreBackup(db: FinanceDatabase, backup: FinanceBackup):
         goal.id, goal.name, goal.accountId, goal.targetAmount, goal.targetDate ?? null, goal.createdAt, goal.updatedAt);
     }
   });
+}
+/** Start fresh using the existing validated, atomic replacement path. */
+export async function resetFinancialData(db: FinanceDatabase): Promise<void> {
+  const fresh = parseBackup(serializeBackup([{
+    id: 'cash', name: 'Cash', currency: 'PHP', openingBalance: 0,
+    purpose: 'spending', includedInAvailable: true, archived: false,
+  }], [], new Date().toISOString(), []));
+  await restoreBackup(db, fresh, true);
 }

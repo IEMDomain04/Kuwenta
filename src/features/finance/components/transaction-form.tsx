@@ -9,8 +9,10 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { CATEGORIES, type Transaction, type TransactionDraft, type ManualTransactionType } from '../types';
 import { philippineDateTime, isValidDate, isValidTime } from '../dates';
-import { moneyInput, parseMoney } from '../money';
+import { moneyInput, parseMoney, formatMoney } from '../money';
 import { formatEditableMoney } from '../inputs';
+import { calculateAccountSummary } from '../calculations';
+import { defaultEntryAccount, previewTransfer } from '../workflows';
 import { MoneyField } from './money-field';
 import { TransactionDateTime } from './transaction-date-time';
 import { ActionButton } from './ui';
@@ -19,11 +21,11 @@ type Props = { original?: Transaction; initialAccountId?: string; initialDestina
 type Field = 'amount' | 'date' | 'time';
 export function TransactionForm({ original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
   const theme = useTheme();
-  const { accounts } = useFinance();
+  const { accounts, transactions, lastEntryAccount } = useFinance();
   const [accountOpen, setAccountOpen] = useState(false);
   const [choosingDestination, setChoosingDestination] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState(original?.destinationAccountId ?? initialDestinationAccountId ?? '');
-  const [accountId, setAccountId] = useState(original?.accountId ?? initialAccountId ?? accounts.find((account) => !account.archived && account.id !== initialDestinationAccountId)?.id ?? '');
+  const [accountId, setAccountId] = useState(original?.accountId ?? defaultEntryAccount(accounts, initialAccountId, lastEntryAccount, initialDestinationAccountId));
   const selectedAccount = accounts.find((account) => account.id === accountId);
   const { height, fontScale } = useWindowDimensions();
   const [amountWidth, setAmountWidth] = useState(0);
@@ -38,6 +40,12 @@ export function TransactionForm({ original, initialAccountId, initialDestination
   const [notes, setNotes] = useState(original?.notes ?? '');
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const notesRef = useRef<TextInput>(null);
+  let transferPreview: ReturnType<typeof previewTransfer> | undefined;
+  let previewError = '';
+  if (type === 'TRANSFER' && accountId && destinationAccountId && amount && !errors.amount) {
+    try { transferPreview = previewTransfer(accounts, transactions, { type, accountId, destinationAccountId, category: 'Transfer', amount: parseMoney(amount.replace(/,/g, '')), transactionDate: date, transactionTime: time }, original); }
+    catch (cause) { previewError = cause instanceof Error ? cause.message : 'Could not preview balances.'; }
+  }
   const inputStyle = { color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 };
   function submit() {
     const issues = { ...errors };
@@ -66,7 +74,7 @@ export function TransactionForm({ original, initialAccountId, initialDestination
         <View onLayout={(event) => setAmountWidth(event.nativeEvent.layout.width)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', minHeight: 52 }}>
           <ThemedText style={{ fontSize: amountFontSize, lineHeight: Math.ceil(amountFontSize * 1.3), fontWeight: '700' }}>₱</ThemedText>
           <MoneyField accessibilityLabel="Amount in pesos" value={amount} onValueChange={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: undefined })); }} onRejected={() => setErrors((current) => ({ ...current, amount: 'Use digits and up to two decimal places. Input was not accepted.' }))} editable={!disabled}
-            keyboardType="decimal-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => notesRef.current?.focus()}
+            autoFocus={!original} keyboardType="decimal-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => notesRef.current?.focus()}
             placeholder="0" placeholderTextColor={theme.textSecondary} style={{ flex: 1, minWidth: 0, color: theme.text, paddingVertical: 4, paddingHorizontal: 0, fontSize: amountFontSize, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] }} />
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}
@@ -95,6 +103,13 @@ export function TransactionForm({ original, initialAccountId, initialDestination
       <ThemedText type="smallBold">To account</ThemedText>
       <ActionButton label={accounts.find((account) => account.id === destinationAccountId)?.name ?? 'Choose destination account'} disabled={disabled}
         onPress={() => { Keyboard.dismiss(); setChoosingDestination(true); setAccountOpen(true); }} />
+      {transferPreview && <View style={{ gap: 6, backgroundColor: theme.background, borderRadius: 12, padding: 12 }}>
+        <ThemedText type="smallBold">Balances after saving</ThemedText>
+        <ThemedText type="small">{selectedAccount?.name}: {formatMoney(transferPreview.sourceBalance)}</ThemedText>
+        <ThemedText type="small">{accounts.find((account) => account.id === destinationAccountId)?.name}: {formatMoney(transferPreview.destinationBalance)}</ThemedText>
+        {(transferPreview.sourceBalance < 0 || transferPreview.destinationBalance < 0) && <ThemedText accessibilityRole="alert">Warning: an account will have a negative balance.</ThemedText>}
+      </View>}
+      {previewError ? <ThemedText accessibilityRole="alert">{previewError}</ThemedText> : null}
       {accounts.filter((account) => !account.archived).length < 2 && <ThemedText accessibilityRole="alert">Add or unarchive another account to make a transfer.</ThemedText>}
     </>}
     <ThemedText type="smallBold">Notes (optional)</ThemedText>
@@ -122,7 +137,7 @@ export function TransactionForm({ original, initialAccountId, initialDestination
               {accounts.filter((account) => !account.archived && (!choosingDestination || account.id !== accountId)).map((account) => <Pressable key={account.id} accessibilityRole="button" accessibilityLabel={account.name} accessibilityState={{ selected: account.id === (choosingDestination ? destinationAccountId : accountId), disabled }} disabled={disabled}
                 onPress={() => { if (choosingDestination) setDestinationAccountId(account.id); else setAccountId(account.id); if (!choosingDestination && destinationAccountId === account.id) setDestinationAccountId(''); setAccountOpen(false); }} style={{ minHeight: 52, padding: 12, marginBottom: 8, borderRadius: 12, backgroundColor: account.id === (choosingDestination ? destinationAccountId : accountId) ? theme.backgroundSelected : theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="wallet-outline" size={22} color={theme.accent} />
-                <ThemedText numberOfLines={1} style={{ flex: 1 }}>{account.name}</ThemedText>
+                <View style={{ flex: 1, minWidth: 0 }}><ThemedText numberOfLines={1} ellipsizeMode="tail">{account.name}</ThemedText><ThemedText type="small" themeColor="textSecondary">{formatMoney(calculateAccountSummary(account, transactions, "1900-01").balance)}</ThemedText></View>
                 {account.id === (choosingDestination ? destinationAccountId : accountId) && <Ionicons name="checkmark-circle" size={20} color={theme.accent} />}
               </Pressable>)}
               {!accounts.some((account) => !account.archived) && <ThemedText>No active accounts. Add or unarchive one in Settings.</ThemedText>}

@@ -42,3 +42,29 @@ export async function saveAccount(db: FinanceDatabase, account: Account, creatin
 export async function updateOpeningBalance(db: FinanceDatabase, cents: number): Promise<void> {
   await saveAccount(db, { ...await getCashAccount(db), openingBalance: cents }, false);
 }
+/** Save setup exactly once; opening money is never recorded as income. */
+export async function completeCashSetup(db: FinanceDatabase, cents: number): Promise<void> {
+  if (!Number.isSafeInteger(cents) || cents < 0) throw new Error('Starting money must be zero or positive integer centavos.');
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    const completed = await transaction.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'cashSetupComplete'");
+    if (completed?.value !== '0') return;
+    const cash = await getCashAccount(transaction);
+    if (cash.archived) throw new Error('Cash must be active for setup.');
+    await transaction.runAsync("UPDATE accounts SET openingBalance = ? WHERE id = 'cash'", cents);
+    await transaction.runAsync("UPDATE preferences SET value = '1' WHERE key = 'cashSetupComplete'");
+  });
+}
+
+/** Delete only an unused, empty account; never remove financial history. */
+export async function deleteAccount(db: FinanceDatabase, id: string): Promise<void> {
+  if (id === 'cash') throw new Error('The default Cash account cannot be deleted. Use Reset all data to start over.');
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    const account = await transaction.getFirstAsync<AccountRow>('SELECT * FROM accounts WHERE id = ?', id);
+    if (!account) return; // A repeated deletion cannot affect another account.
+    if (await transaction.getFirstAsync('SELECT id FROM transactions WHERE accountId = ? OR destinationAccountId = ? LIMIT 1', id, id)) throw new Error('This account has transaction history. Archive it instead to preserve your records.');
+    if (await transaction.getFirstAsync('SELECT id FROM goals WHERE accountId = ? LIMIT 1', id)) throw new Error('Delete or relink the savings goal before deleting this account.');
+    if (account.openingBalance !== 0) throw new Error('This account still has a balance. Resolve it before deleting the account.');
+    await transaction.runAsync("DELETE FROM preferences WHERE key = 'lastEntryAccount' AND value = ?", id);
+    await transaction.runAsync('DELETE FROM accounts WHERE id = ?', id);
+  });
+}

@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { AccountManager } from '../components/account-manager';
 import { MoneyField } from '../components/money-field';
-import { ActionButton, FinanceScreen } from '../components/ui';
+import { ActionButton, FinanceScreen, BackButton } from '../components/ui';
 import { calculateAccountSummary } from '../calculations';
 import { formatEditableMoney } from '../inputs';
 import { formatMoney, moneyInput, parseMoney } from '../money';
@@ -19,6 +19,8 @@ export default function AccountScreen() {
   const account = finance.accounts.find((row) => row.id === accountId);
   const balance = account ? calculateAccountSummary(account, finance.transactions, finance.month).balance : 0;
   const [mode, setMode] = useState<'details' | 'edit' | 'adjust'>('details');
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [correctOpening, setCorrectOpening] = useState(false);
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [rejected, setRejected] = useState(false);
@@ -29,7 +31,7 @@ export default function AccountScreen() {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (pending.current || locked) return true;
-      if (mode === 'adjust') { setMode('details'); return true; }
+      if (mode !== 'details') { setMode('details'); return true; }
       return false;
     });
     return () => subscription.remove();
@@ -43,6 +45,33 @@ export default function AccountScreen() {
       submission.current = undefined; setMode('details'); setError('');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not adjust the balance.'); }
     finally { pending.current = false; setWorking(false); }
+  }
+  function remove() {
+    if (!account || locked || pending.current) return;
+    const reason = account.id === 'cash' ? 'The default Cash account cannot be deleted. Use Reset all data to start over.'
+      : finance.transactions.some((row) => row.accountId === account.id || row.destinationAccountId === account.id) ? 'This account has transaction history. Archive it instead to preserve your records.'
+      : finance.goals.some((goal) => goal.accountId === account.id) ? 'Delete or relink the savings goal before deleting this account.'
+      : balance !== 0 ? 'This account still has a balance. Resolve it before deleting the account.' : '';
+    if (reason) { setError(reason); return; }
+    pending.current = true;
+    Alert.alert('Delete account?', 'Permanently delete ' + account.name + '? This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
+      { text: 'Delete account', style: 'destructive', onPress: () => {
+        setWorking(true); setError('');
+        void finance.removeAccount(account.id).then(leave).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not delete the account.')).finally(() => { pending.current = false; setWorking(false); });
+      } },
+    ], { cancelable: false });
+  }
+  function archive() {
+    if (!account || locked || pending.current) return;
+    pending.current = true;
+    Alert.alert(account.archived ? 'Unarchive account?' : 'Archive account?', account.archived ? 'Make this account available for transactions again.' : 'The balance, transactions and linked goal are kept. New transactions and edits are blocked until unarchived.', [
+      { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
+      { text: account.archived ? 'Unarchive' : 'Archive', onPress: () => {
+        setWorking(true);
+        void finance.saveAccount({ ...account, archived: !account.archived }, false).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not update the account.')).finally(() => { pending.current = false; setWorking(false); setOptionsOpen(false); });
+      } },
+    ], { cancelable: false });
   }
   function review() {
     if (!account || locked || pending.current || rejected) return;
@@ -60,10 +89,10 @@ export default function AccountScreen() {
     ], { cancelable: false });
   }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <FinanceScreen title={!accountId ? 'Add account' : mode === 'adjust' ? 'Adjust balance' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false}>
+    <FinanceScreen title={!accountId ? 'Add account' : mode === 'adjust' ? 'Adjust balance' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (pending.current) return; if (mode !== 'details') setMode('details'); else leave(); }} />}>
       {!accountId ? <AccountManager initialPurpose={purpose === "savings" ? "savings" : "spending"} onClose={leave} />
         : !account ? <><ThemedText>This account is no longer available.</ThemedText><ActionButton label="Back" onPress={leave} /></>
-        : mode === 'edit' ? <AccountManager accountId={accountId} onClose={() => setMode('details')} />
+        : mode === 'edit' ? <AccountManager accountId={accountId} initialCorrectOpening={correctOpening} onClose={() => setMode('details')} />
         : <>
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 }}>
             <ThemedText type="smallBold">{account.name}{account.archived ? ' · Archived' : ''}</ThemedText>
@@ -85,14 +114,23 @@ export default function AccountScreen() {
             <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setMode('details'); setError(''); } }} />
           </> : <>
             {!account.archived && <>
-              <ActionButton primary label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setMode('adjust'); }} />
-              <ActionButton label="Transfer money" disabled={locked || finance.accounts.filter((row) => !row.archived).length < 2}
+              <ActionButton label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setMode('adjust'); }} />
+              <ActionButton primary label="Transfer money" disabled={locked || finance.accounts.filter((row) => !row.archived).length < 2}
                 onPress={() => router.push({ pathname: '/transaction', params: { type: 'TRANSFER', accountId: account.id } })} />
               {finance.accounts.filter((row) => !row.archived).length < 2 && <ThemedText type="small">Add another active account to transfer money.</ThemedText>}
-              <ActionButton label="Edit account"  disabled={locked} onPress={() => setMode('edit')} />
+
             </>}
-            {account.archived && <ThemedText type="small">Unarchive this account in Settings before making changes.</ThemedText>}
-            <ActionButton label="Back" disabled={locked} onPress={leave} />
+            {account.archived && <ThemedText type="small">Unarchive this account in Account options before making changes.</ThemedText>}
+            <ActionButton label={optionsOpen ? 'Close account options' : 'Account options'} selected={optionsOpen} disabled={locked} onPress={() => setOptionsOpen(!optionsOpen)} />
+            {optionsOpen && <View style={{ gap: 8 }}>
+              {!account.archived && <>
+                <ActionButton label="Edit account settings" disabled={locked} onPress={() => { setCorrectOpening(false); setMode('edit'); }} />
+                <ActionButton label="Correct opening balance" disabled={locked} onPress={() => { setCorrectOpening(true); setMode('edit'); }} />
+              </>}
+              <ActionButton label="Delete account" disabled={locked} onPress={remove} />
+              <ActionButton label={account.archived ? 'Unarchive account' : 'Archive account'} disabled={locked} onPress={archive} />
+            </View>}
+
           </>}
           {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
         </>}

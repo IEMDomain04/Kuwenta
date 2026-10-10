@@ -11,7 +11,7 @@ import type { Account } from '../types';
 import { ActionButton } from './ui';
 import { MoneyField } from './money-field';
 
-export function AccountManager({ accountId, onClose, initialPurpose = 'spending' }: { accountId?: string; onClose?: () => void; initialPurpose?: Account['purpose'] } = {}) {
+export function AccountManager({ accountId, onClose, initialPurpose = 'spending', initialCorrectOpening = false }: { accountId?: string; onClose?: () => void; initialPurpose?: Account['purpose']; initialCorrectOpening?: boolean } = {}) {
   const { accounts, transactions, month, busy, saveAccount, newSubmissionId } = useFinance();
   const theme = useTheme();
   const initial = accountId ? accounts.find((account) => account.id === accountId) : undefined;
@@ -19,7 +19,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     ? initial ? initial.archived ? null : { ...initial } : { id: '', name: '', currency: 'PHP', openingBalance: 0, purpose: initialPurpose, includedInAvailable: initialPurpose === 'spending', archived: false }
     : null);
   const [opening, setOpening] = useState(initial ? formatEditableMoney(moneyInput(initial.openingBalance), true)! : onClose ? '0' : '');
-  const [correctOpening, setCorrectOpening] = useState(false);
+  const [correctOpening, setCorrectOpening] = useState(initialCorrectOpening);
   const [rejected, setRejected] = useState(false);
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);

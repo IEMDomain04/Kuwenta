@@ -1,4 +1,5 @@
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { router } from 'expo-router';
 import { CategoryIcon } from './category-visual';
 import { formatTransactionDateTime } from '../dates';
 import type { ReactNode } from 'react';
@@ -14,11 +15,11 @@ import type { Transaction } from '../types';
 export function FinanceScreen({ title, children, scroll = true, tabScreen = true, headerAccessory, headerLeading, floatingAction, centeredTitle = false }: { title: string; children: ReactNode; scroll?: boolean; tabScreen?: boolean; headerAccessory?: ReactNode; headerLeading?: ReactNode; floatingAction?: ReactNode; centeredTitle?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const content = <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, ...(centeredTitle ? { justifyContent: 'center' } : {}) }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>{headerLeading}<ThemedText type="subtitle" style={!tabScreen || centeredTitle ? { fontSize: 22, lineHeight: 30, flexShrink: 1 } : undefined} accessibilityRole="header">{title}</ThemedText></View>{headerAccessory}</View>{children}</>;
+  const content = <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, ...(centeredTitle ? { justifyContent: 'center' } : {}) }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>{headerLeading ?? (!tabScreen ? <BackButton /> : null)}<ThemedText type="subtitle" style={!tabScreen || centeredTitle ? { fontSize: 22, lineHeight: 30, flexShrink: 1 } : undefined} accessibilityRole="header">{title}</ThemedText></View>{headerAccessory}</View>{children}</>;
   return <SafeAreaView edges={tabScreen ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']} style={[styles.safe, { backgroundColor: theme.background }]}>
     {scroll ? <ScrollView style={{ flex: 1 }} bounces={false} overScrollMode="never" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, !!floatingAction && { paddingBottom: 90 }, !tabScreen && { paddingBottom: 16 }]}>{content}</ScrollView>
       : <ThemedView style={[styles.content, styles.fill, !tabScreen && { paddingBottom: 16 }]}>{content}</ThemedView>}
-    {floatingAction && <View style={{ position: 'absolute', right: Math.max(insets.right, 16), bottom: 16 }}>{floatingAction}</View>}
+    {floatingAction && <View style={{ position: 'absolute', right: Math.max(insets.right, 16), bottom: tabScreen ? 16 : Math.max(insets.bottom, 16) }}>{floatingAction}</View>}
   </SafeAreaView>;
 }
 export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
@@ -61,3 +62,19 @@ const styles = StyleSheet.create({
   button: { padding: 16, minHeight: 48, borderRadius: 12, alignItems: 'center' },
   card: { padding: 16, borderRadius: 12, gap: 6 },
 });
+
+export function BackButton({ onPress, disabled = false }: { onPress?: () => void; disabled?: boolean }) {
+  const theme = useTheme();
+  return <Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={disabled} accessibilityState={{ disabled }}
+    onPress={onPress ?? (() => { if (router.canGoBack()) router.back(); else router.replace('/'); })}
+    style={{ width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+    <Ionicons name="arrow-back" size={24} color={theme.text} />
+  </Pressable>;
+}
+export function AddTransactionButton({ disabled }: { disabled: boolean }) {
+  const theme = useTheme();
+  return <Pressable accessibilityRole="button" accessibilityLabel="Add transaction" disabled={disabled} accessibilityState={{ disabled }}
+    onPress={() => router.push('/transaction')} style={({ pressed }) => ({ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent, elevation: 4, opacity: disabled || pressed ? 0.5 : 1 })}>
+    <Ionicons name="add" size={30} color={theme.onAccent} />
+  </Pressable>;
+}

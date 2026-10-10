@@ -43,6 +43,7 @@ export async function createTransaction(db: FinanceDatabase, id: string, draft: 
     const now = new Date().toISOString();
     await transaction.runAsync('INSERT INTO transactions (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, destinationAccountId, sourcePurpose, destinationPurpose) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id, draft.accountId, draft.type, draft.amount, draft.category, draft.transactionDate, draft.transactionTime, draft.notes ?? null, now, now, draft.destinationAccountId ?? null, sourcePurpose, destinationPurpose);
+    await transaction.runAsync("INSERT INTO preferences(key, value) VALUES ('lastEntryAccount', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", draft.accountId);
     saved = await getTransaction(transaction, id) ?? undefined;
     if (!saved) throw new Error('Could not retrieve the saved transaction.');
     calculateFinanceSummary(await listAccounts(transaction), await listTransactions(transaction), draft.transactionDate.slice(0, 7));
