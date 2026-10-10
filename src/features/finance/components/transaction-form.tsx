@@ -17,27 +17,27 @@ import { MoneyField } from './money-field';
 import { TransactionDateTime } from './transaction-date-time';
 import { ActionButton } from './ui';
 
-type Props = { original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; error: string; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
+type Props = { initialDraft?: TransactionDraft; original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; error: string; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
 type Field = 'amount' | 'date' | 'time';
-export function TransactionForm({ original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
+export function TransactionForm({ initialDraft, original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
   const theme = useTheme();
   const { accounts, transactions, lastEntryAccount } = useFinance();
   const [accountOpen, setAccountOpen] = useState(false);
   const [choosingDestination, setChoosingDestination] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState(original?.destinationAccountId ?? initialDestinationAccountId ?? '');
-  const [accountId, setAccountId] = useState(original?.accountId ?? defaultEntryAccount(accounts, initialAccountId, lastEntryAccount, initialDestinationAccountId));
+  const [accountId, setAccountId] = useState(original?.accountId ?? initialDraft?.accountId ?? defaultEntryAccount(accounts, initialAccountId, lastEntryAccount, initialDestinationAccountId));
   const selectedAccount = accounts.find((account) => account.id === accountId);
   const { height, fontScale } = useWindowDimensions();
   const [amountWidth, setAmountWidth] = useState(0);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [defaults] = useState(() => philippineDateTime());
-  const [type, setType] = useState<ManualTransactionType>(original?.type === 'TRANSFER' ? 'TRANSFER' : original?.type === 'INCOME' ? 'INCOME' : original ? 'EXPENSE' : initialType);
-  const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.amount))! : '');
+  const [type, setType] = useState<ManualTransactionType>(original?.type === 'TRANSFER' ? 'TRANSFER' : original?.type === 'INCOME' ? 'INCOME' : original ? 'EXPENSE' : initialDraft?.type ?? initialType);
+  const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.amount))! : initialDraft ? formatEditableMoney(moneyInput(initialDraft.amount))! : '');
   const amountFontSize = amountWidth > 0 ? Math.max(20, Math.min(36, Math.floor(amountWidth / ((Math.max(amount.length, 1) + 1) * 0.65 * fontScale)))) : 36;
-  const [category, setCategory] = useState(original?.category ?? (initialType === 'TRANSFER' ? 'Transfer' : CATEGORIES[initialType][0]));
-  const [date, setDate] = useState(original?.transactionDate ?? defaults.transactionDate);
-  const [time, setTime] = useState(original?.transactionTime ?? defaults.transactionTime);
-  const [notes, setNotes] = useState(original?.notes ?? '');
+  const [category, setCategory] = useState(original?.category ?? initialDraft?.category ?? (initialType === 'TRANSFER' ? 'Transfer' : CATEGORIES[initialType][0]));
+  const [date, setDate] = useState(original?.transactionDate ?? initialDraft?.transactionDate ?? defaults.transactionDate);
+  const [time, setTime] = useState(original?.transactionTime ?? initialDraft?.transactionTime ?? defaults.transactionTime);
+  const [notes, setNotes] = useState(original?.notes ?? initialDraft?.notes ?? '');
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const notesRef = useRef<TextInput>(null);
   let transferPreview: ReturnType<typeof previewTransfer> | undefined;
@@ -74,7 +74,7 @@ export function TransactionForm({ original, initialAccountId, initialDestination
         <View onLayout={(event) => setAmountWidth(event.nativeEvent.layout.width)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', minHeight: 52 }}>
           <ThemedText style={{ fontSize: amountFontSize, lineHeight: Math.ceil(amountFontSize * 1.3), fontWeight: '700' }}>₱</ThemedText>
           <MoneyField accessibilityLabel="Amount in pesos" value={amount} onValueChange={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: undefined })); }} onRejected={() => setErrors((current) => ({ ...current, amount: 'Use digits and up to two decimal places. Input was not accepted.' }))} editable={!disabled}
-            autoFocus={!original} keyboardType="decimal-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => notesRef.current?.focus()}
+            autoFocus={!original && !initialDraft} keyboardType="decimal-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => notesRef.current?.focus()}
             placeholder="0" placeholderTextColor={theme.textSecondary} style={{ flex: 1, minWidth: 0, color: theme.text, paddingVertical: 4, paddingHorizontal: 0, fontSize: amountFontSize, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] }} />
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}

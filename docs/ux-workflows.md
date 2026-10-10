@@ -49,3 +49,17 @@ Edits and deletions require confirmation; cancellation preserves data. Deleting 
 SQLite schema 8 adds budgets keyed by month and category. Financial backup payload 6 includes them; encryption is unchanged. Versions 1-5 remain readable and restore with empty budgets. Full reset clears budgets.
 
 Phone checks: add a Food limit of PHP 5,000 and expense of PHP 1,200 (PHP 3,800 remaining, 24%); edit/backdate/delete the expense; reach and exceed the limit; switch months; cancel edits/deletion; copy previous month twice and verify existing limits; restart; export/unlock/restore a backup with budgets; test reset using disposable records. Check the keyboard, large text, and small-screen scrolling.
+
+## Offline Quick Entry
+
+Home > Quick Entry, or Add Transaction > Quick Entry, accepts one ordinary income or expense. Review transaction opens the existing editable form; only Save writes a record. Existing validation, duplicate prevention, success feedback, and ten-second Undo remain in place. Parsing uses local rules; no model, internet, dependency, or database migration is added.
+
+Supported examples: Lunch 120; Pamasahe 30 kahapon; Salary 25,000; Groceries 1,500.50 from Cash. Amounts must be positive pesos with at most two decimal places and valid comma grouping. An exact account name goes last after from, using, or sa account. Omitted accounts use context, then the last eligible account. Today/ngayon and yesterday/kahapon use Philippine dates; time defaults to now and stays editable. Category keywords are suggestions; unknown descriptions use Other with a visible warning. Transfers, multiple amounts, abbreviated amounts, foreign currencies, and unsupported relative dates require the regular form. This is not general language understanding.
+
+Phone checks: airplane mode, examples above, missing amounts, duplicate account names, archived accounts, large amounts, review cancellation, correcting a suggested category, Save and Undo, small-screen keyboard visibility. No record should exist until Save.
+
+## Interface review after Quick Entry
+
+Completed focused fixes: Quick Entry scrolls on smaller screens, review avoids reopening the amount keyboard, and transaction back/cancel actions respect pending operations. Unavailable transaction screens now use the same back navigation as other detail screens.
+
+Next usability pass: test Home section density, discoverability of Accounts/Goals/Budgets, long names and large values, category/account picker sizing, budget editing with the keyboard, and Settings reset/restore clarity on a phone. Existing three tabs, light design, and financial workflows are retained. Broader layout changes and AI model selection should follow these checks.

@@ -45,6 +45,7 @@ export default function HomeScreen() {
       <ThemedText type="small" themeColor="textSecondary">All accounts · All months · PHP</ThemedText>
       {accounts.some((account) => account.archived) && <ThemedText type="small" themeColor="textSecondary">Archived account balances remain included.</ThemedText>}
     </ThemedView>
+    <ActionButton compact label="Quick Entry" disabled={busy} onPress={() => router.push({ pathname: '/transaction', params: { quick: '1' } })} />
     <AccountsOverview compact />
     <View style={styles.section}>
       <ThemedText type="smallBold" accessibilityRole="header">Monthly Overview · All accounts</ThemedText>
