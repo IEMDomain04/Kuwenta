@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { moneyInsights } from '../insights';
 import { router } from 'expo-router';
@@ -14,6 +15,14 @@ import { useFinance } from '../provider';
 import { FinanceScreen, AddTransactionButton } from '../components/ui';
 import { BudgetOverview } from '../components/budget-overview';
 import { PeriodOverview } from '../components/period-overview';
+
+const mascotImages = {
+  friendly: require('../../../../assets/images/mascot/friendly.png'),
+  thinking: require('../../../../assets/images/mascot/thinking.png'),
+  celebrating: require('../../../../assets/images/mascot/celebrating.png'),
+  encouraging: require('../../../../assets/images/mascot/encouraging.png'),
+  concerned: require('../../../../assets/images/mascot/concerned.png'),
+};
 
 export default function HomeScreen() {
   const { displayName, accounts, transactions, budgets, goals, month, busy } = useFinance();
@@ -37,19 +46,28 @@ export default function HomeScreen() {
   let insights: string[] = [];
   try { insights = moneyInsights(accounts, transactions, budgets, goals, now); }
   catch { insights = ['Insights are unavailable. Review your records in Accounts and History.']; }
+  const insightMessage = insights[0] ?? message;
+  // Expressions describe the displayed insight; they never change financial records.
+  const reaction = /over budget|budget used|transferred out/i.test(insightMessage) ? 'concerned'
+    : /target reached/i.test(insightMessage) ? 'celebrating'
+    : /transferred into savings|funded|lower compared/i.test(insightMessage) ? 'encouraging'
+    : insights.length ? 'thinking' : 'friendly';
   return <FinanceScreen title="Kuwenta" floatingAction={<AddTransactionButton disabled={busy} />}>
     <View style={styles.greeting}>
       <ThemedText type="small" themeColor="textSecondary">{dateLabel}</ThemedText>
       <ThemedText accessibilityRole="header" style={styles.heading}>{dashboardGreeting(displayName ?? '', now)}</ThemedText>
     </View>
-    <Pressable accessibilityRole="button" accessibilityLabel="View money insights" accessibilityHint="Opens full insight details" onPress={() => setInsightsOpen(true)} style={({ pressed }) => [styles.insight, { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}>
-      <View style={[styles.icon, { backgroundColor: theme.incomeSurface }]}><Ionicons name="bulb-outline" size={20} color={theme.accent} /></View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <ThemedText type="smallBold" style={{ fontSize: 13, lineHeight: 18 }}>Your money, at a glance</ThemedText>
-        <ThemedText numberOfLines={fontScale > 1.3 ? undefined : 3} ellipsizeMode="tail" style={styles.message}>{insights[0] ?? message}</ThemedText>
-      </View>
-      <Ionicons accessible={false} name="chevron-forward" size={16} color={theme.textSecondary} style={{ marginTop: 2 }} />
-    </Pressable>
+    <View style={[styles.insight, { backgroundColor: theme.incomeSurface }]}>
+      <Image source={mascotImages[reaction]} contentFit="contain" accessible={false} style={styles.mascot} />
+      <Pressable accessibilityRole="button" accessibilityLabel="View money insights" accessibilityHint="Opens full insight details" onPress={() => setInsightsOpen(true)} style={({ pressed }) => [styles.bubble, { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}>
+        <View style={[styles.bubbleTail, { backgroundColor: theme.backgroundElement }]} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <ThemedText type="smallBold" style={{ flex: 1, color: theme.income, fontSize: 12, lineHeight: 17 }}>Kuwenta</ThemedText>
+          <Ionicons accessible={false} name="chevron-forward" size={14} color={theme.textSecondary} />
+        </View>
+        <ThemedText numberOfLines={fontScale > 1.3 ? undefined : 3} ellipsizeMode="tail" style={styles.message}>{insightMessage}</ThemedText>
+      </Pressable>
+    </View>
     <Modal visible={insightsOpen} transparent animationType="fade" onRequestClose={() => setInsightsOpen(false)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close insights" onPress={() => setInsightsOpen(false)} style={{ flex: 1 }} />
@@ -96,7 +114,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   greeting: { gap: 4, paddingTop: 6, paddingBottom: 12 },
   heading: { fontSize: 22, lineHeight: 30, fontWeight: '600' },
-  insight: { flexDirection: 'row', alignItems: 'flex-start', padding: 12, borderRadius: 22, borderWidth: 1, gap: 10 },
-  icon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  insight: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 22, gap: 10 },
+  mascot: { width: 80, height: 94, flexShrink: 0 },
+  bubble: { flex: 1, minWidth: 0, padding: 12, borderRadius: 18, borderWidth: 1, gap: 4 },
+  bubbleTail: { position: 'absolute', left: -5, top: 24, width: 10, height: 10, transform: [{ rotate: '45deg' }] },
   message: { fontSize: 12, lineHeight: 18 },
 });
