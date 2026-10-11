@@ -41,13 +41,15 @@ export default function HomeScreen() {
   const today = dashboardReport(transactions, 'day', month, now);
   const dateLabel = new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', weekday: 'long', month: 'long', day: 'numeric' }).format(now);
   const message = !hasActivity ? 'Your money story starts here. Record your first income or expense to see your activity.'
-    : today.expenses ? 'You recorded ' + formatMoney(today.expenses) + ' in expenses today. Review your activity below to see where you stand.'
+    : today.expenses ? 'You spent ' + formatMoney(today.expenses) + ' today. Tap to review your spending and budget details.'
     : today.income ? 'You recorded ' + formatMoney(today.income) + ' in income today. Keep recording your activity to build a clearer picture.'
     : 'No income or expenses recorded today. Your previous activity is ready to review below.';
   let insights: string[] = [];
   try { insights = moneyInsights(accounts, transactions, budgets, goals, now); }
   catch { insights = ['Insights are unavailable. Review your records in Accounts and History.']; }
-  const insightMessage = insights[0] ?? message;
+  const budgetWarning = insights.find((text) => /over budget|budget used/.test(text));
+  const savingsProgress = insights.find((text) => /target reached|funded|transferred into savings/.test(text));
+  const insightMessage = budgetWarning ?? (today.expenses ? message : savingsProgress ?? insights[0] ?? message);
   // Expressions describe the displayed insight; they never change financial records.
   const reaction = /over budget|budget used|transferred out/i.test(insightMessage) ? 'concerned'
     : /target reached/i.test(insightMessage) ? 'celebrating'

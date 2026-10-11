@@ -26,7 +26,7 @@ export function FinanceScreen({ title, children, scroll = true, tabScreen = true
 export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
   const theme = useTheme();
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.accentPressed : theme.accent : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.accent : theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
+    style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.accentPressed : theme.accent : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.background, borderWidth: 0 }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
     <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail" style={{ maxWidth: '100%', textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
   </Pressable>;
 }
