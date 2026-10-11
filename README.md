@@ -11,7 +11,6 @@ A local PHP money tracker built with Expo 57, React Native, Expo Router, and SQL
 - Monthly category budgets and savings goals in Plans.
 - Filtered transaction history and readable dates.
 - Onboarding, encrypted backup export/restore, and full reset in Settings.
-- Money Check: rule-based, read-only purchase previews, recurring daily/weekday costs, monthly savings scenarios, balances and budget comparisons. Explicit prices and timeframes are required where relevant. Upcoming unrecorded bills and income are excluded.
 - Quick Entry recognizes supported transaction phrases and opens a draft for review before saving.
 
 ## Development
@@ -36,6 +35,6 @@ The preview profile produces an installable Android APK. Installed standalone bu
 
 ## Verification
 
-Finance tests cover accounting, persistence boundaries, backups, validation, Quick Entry and Money Check scenarios. The Money Check dataset includes 40 representative English, Filipino and Taglish phrases; only predefined wording and supported frequencies are recognized. ESLint is not currently configured.
+Finance tests cover accounting, persistence boundaries, backups, validation, Quick Entry scenarios, including mobile load expenses and cash-in/cash-out transfers between existing accounts. ESLint is not currently configured.
 
-Phone testing should include repeated saves, Undo, transfers, keyboard layouts, backup/restore, reset, and hypothetical checks without any record changes.
+Phone testing should include repeated saves, Undo, transfers, keyboard layouts, backup/restore, reset, and Quick Entry draft review before saving.

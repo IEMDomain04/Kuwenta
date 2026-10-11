@@ -87,7 +87,7 @@ export function AddTransactionButton({ disabled }: { disabled: boolean }) {
     { label: 'Income', description: 'Record money received', icon: 'arrow-down-outline', type: 'INCOME' },
     { label: 'Expense', description: 'Record spending', icon: 'arrow-up-outline', type: 'EXPENSE' },
     { label: 'Transfer', description: 'Move money between accounts', icon: 'swap-horizontal', type: 'TRANSFER' },
-    { label: 'Money Check', description: 'Preview spending and review your money', icon: 'chatbubble-outline', type: 'CHAT' },
+    { label: 'Quick Entry', description: 'Type a transaction', icon: 'create-outline', type: 'QUICK' },
   ] as const;
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel="Add money activity" disabled={disabled} accessibilityState={{ disabled, expanded: open }} onPress={() => setOpen(true)} style={({ pressed }) => ({ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent, elevation: 4, opacity: disabled || pressed ? 0.5 : 1 })}><Ionicons name="add" size={30} color={theme.onAccent} /></Pressable>
@@ -97,7 +97,7 @@ export function AddTransactionButton({ disabled }: { disabled: boolean }) {
         <View accessibilityViewIsModal style={{ width: '100%', maxWidth: 300, padding: 10, borderRadius: 20, backgroundColor: theme.backgroundElement }}>
           {items.map((item) => <Pressable key={item.type} accessibilityRole="button" disabled={disabled} onPress={() => {
             setOpen(false);
-            if (item.type === 'CHAT') router.push('/chat');
+            if (item.type === 'QUICK') router.push({ pathname: '/transaction', params: { quick: '1' } });
             else if (item.type === 'TRANSFER') router.push('/transfer');
             else router.push({ pathname: '/transaction', params: { type: item.type } });
           }} style={{ minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}>

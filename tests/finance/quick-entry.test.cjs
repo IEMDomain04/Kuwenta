@@ -41,7 +41,7 @@ test('missing, ambiguous, invalid and unsupported phrases never become saveable 
   assert.throws(() => parse('a'.repeat(251)));
   const unclear = parse('Something 120');
   assert.equal(unclear.draft.category, 'Other');
-  assert.match(unclear.warnings[0], /could not be identified/);
+  assert.match(unclear.warnings[0], /Choose a category/);
 });
 
 test('parsing is pure and never changes account records', () => {
@@ -49,4 +49,32 @@ test('parsing is pure and never changes account records', () => {
   const before = JSON.stringify(accounts);
   parse('Lunch 120', accounts);
   assert.equal(JSON.stringify(accounts), before);
+});
+
+
+test('load phrases create Bills expenses in the specified active account', () => {
+ for (const phrase of ['Mobile load 100 from Cash', 'Bought load 100 using Bank 2', 'Prepaid airtime 100', 'Data promo 100', 'Nagpaload 100']) {
+  const result = parse(phrase).draft;
+  assert.equal(result.type, 'EXPENSE'); assert.equal(result.amount, 10000);
+  if (!phrase.startsWith('Nagpaload')) assert.equal(result.category, 'Bills');
+ }
+ assert.equal(parse('Bought load 50 using Bank 2').draft.accountId, 'bank');
+});
+test('cash in and cash out are transfers, never income or expenses', () => {
+ const incoming = parse('Cash in 500 from Cash to Bank 2').draft;
+ assert.equal(incoming.type, 'TRANSFER'); assert.equal(incoming.category, 'Transfer');
+ assert.equal(incoming.accountId, 'cash'); assert.equal(incoming.destinationAccountId, 'bank');
+ assert.equal(incoming.amount, 50000);
+ const outgoing = parse('Cash out 300 kahapon from Bank 2 to Cash').draft;
+ assert.equal(outgoing.accountId, 'bank'); assert.equal(outgoing.destinationAccountId, 'cash');
+ assert.equal(outgoing.transactionDate, '2026-10-10');
+ assert.equal(parse('Transfer 200 from Cash to Bank 2').draft.type, 'TRANSFER');
+ assert.equal(parse('Cash-in 500 from Cash to Bank 2').draft.type, 'TRANSFER');
+});
+test('incomplete, invalid or external transfers require clarification instead of guessing', () => {
+ for (const phrase of ['Cash in 500 to Bank 2', 'Cash out 300', 'Cash in 500 from Cash', 'Cash in 500 from Cash to Cash', 'Cash in 500 from Cash to Unknown', 'Cash in -500 from Cash to Bank 2', 'Cash in 500 and 200 from Cash to Bank 2', 'Cash in 500 from External to Cash']) assert.throws(() => parse(phrase), phrase);
+ assert.throws(() => parse('Cash in 500 from Cash to Bank 2', [cash, { ...bank, archived: true }]));
+ assert.throws(() => parse('Cash in 500 from Cash to Bank 2', [cash, bank, { ...bank, id: 'duplicate' }]));
+ const frozen = Object.freeze([Object.freeze({ ...cash }), Object.freeze({ ...bank })]);
+ const before = JSON.stringify(frozen); parse('Cash in 500 from Cash to Bank 2', frozen); assert.equal(JSON.stringify(frozen), before);
 });

@@ -23,7 +23,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
   const { accounts, transactions, lastEntryAccount } = useFinance();
   const [accountOpen, setAccountOpen] = useState(false);
   const [choosingDestination, setChoosingDestination] = useState(false);
-  const [destinationAccountId, setDestinationAccountId] = useState(original?.destinationAccountId ?? initialDestinationAccountId ?? '');
+  const [destinationAccountId, setDestinationAccountId] = useState(original?.destinationAccountId ?? initialDraft?.destinationAccountId ?? initialDestinationAccountId ?? '');
   const [accountId, setAccountId] = useState(original?.accountId ?? initialDraft?.accountId ?? defaultEntryAccount(accounts, initialAccountId, lastEntryAccount, initialDestinationAccountId));
   const selectedAccount = accounts.find((account) => account.id === accountId);
   const { height, fontScale } = useWindowDimensions();
