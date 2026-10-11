@@ -8,9 +8,10 @@ import { formatMoney } from '../money';
 import { readableReportingMonth, formatTransactionDateTime } from '../dates';
 import { ActionButton } from './ui';
 
-export function SavingsOverview({ compact = false, goalsOnly = false }: { compact?: boolean; goalsOnly?: boolean }) {
-  const { accounts, transactions, goals, month, busy } = useFinance();
+export function SavingsOverview({ compact = false, goalsOnly = false, reportingMonth }: { compact?: boolean; goalsOnly?: boolean; reportingMonth?: string }) {
+  const { accounts, transactions, goals, month: selectedMonth, busy } = useFinance();
   const theme = useTheme();
+  const month = reportingMonth ?? selectedMonth;
   let savings: ReturnType<typeof calculateSavings> | undefined;
   let error = '';
   try { savings = calculateSavings(accounts, transactions, month); }

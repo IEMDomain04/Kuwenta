@@ -3,8 +3,8 @@ import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
   const colors = useTheme();
-  return <NativeTabs backgroundColor={colors.backgroundElement} indicatorColor={colors.backgroundSelected} tintColor={colors.accent} iconColor={{ default: colors.textSecondary, selected: colors.accent }}
-    labelStyle={{ default: { fontSize: 12 }, selected: { fontSize: 12, color: colors.accent } }}>
+  return <NativeTabs backgroundColor={colors.backgroundElement} indicatorColor={colors.incomeSurface} tintColor={colors.income} iconColor={{ default: colors.textSecondary, selected: colors.income }}
+    labelStyle={{ default: { fontSize: 11 }, selected: { fontSize: 11, color: colors.income } }}>
     <NativeTabs.Trigger name="index">
       <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
       <NativeTabs.Trigger.Icon src={require('@/assets/images/tabIcons/home.png')} renderingMode="template" />
@@ -12,6 +12,10 @@ export default function AppTabs() {
     <NativeTabs.Trigger name="accounts">
       <NativeTabs.Trigger.Label>Accounts</NativeTabs.Trigger.Label>
       <NativeTabs.Trigger.Icon md="account_balance_wallet" sf="wallet.pass" />
+    </NativeTabs.Trigger>
+    <NativeTabs.Trigger name="plans">
+      <NativeTabs.Trigger.Label>Plans</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger.Icon md="assignment" sf="list.clipboard" />
     </NativeTabs.Trigger>
     <NativeTabs.Trigger name="transactions">
       <NativeTabs.Trigger.Label>History</NativeTabs.Trigger.Label>

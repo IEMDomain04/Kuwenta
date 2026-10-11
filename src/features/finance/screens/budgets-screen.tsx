@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { SelectionSheet } from '../components/selection-sheet';
 import { useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import { HomeMonthPicker } from '../components/home-month-picker';
 import { ActionButton, FinanceScreen, BackButton } from '../components/ui';
 
 export default function BudgetsScreen() {
+  const params = useLocalSearchParams<{ add?: string; category?: string }>();
   const finance = useFinance();
   const theme = useTheme();
   const { month, budgets, transactions, busy } = finance;
@@ -27,7 +29,14 @@ export default function BudgetsScreen() {
   const pending = useRef(false);
   const locked = busy || working;
   useEffect(() => { const listener = BackHandler.addEventListener('hardwareBackPress', () => pending.current || locked); return () => listener.remove(); }, [locked]);
-  useEffect(() => { setEditor(null); setCategoryOpen(false); setError(''); setRejected(false); }, [month]);
+  useEffect(() => {
+    const existing = report.rows.find((row) => row.category === params.category);
+    const unusedCategory = CATEGORIES.EXPENSE.find((category) => !report.rows.some((row) => row.category === category));
+    setEditor(existing ? { category: existing.category, amount: formatEditableMoney(moneyInput(existing.limitAmount))!, creating: false } : params.add === '1' && unusedCategory ? { category: unusedCategory, amount: '', creating: true } : null);
+    setCategoryOpen(false); setError(''); setRejected(false);
+    // Route intent initializes the editor; saving does not reopen it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, params.add, params.category]);
   async function perform(operation: () => Promise<void>) {
     setWorking(true); setError('');
     try { await operation(); setEditor(null); }

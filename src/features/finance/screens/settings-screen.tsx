@@ -33,10 +33,6 @@ export default function SettingsScreen() {
     <ThemedText type="small" themeColor="textSecondary">Philippine Peso (PHP)</ThemedText>
     <ActionButton label="Manage accounts" disabled={busy} onPress={() => router.navigate('/accounts')} />
     </View><View style={section}>
-    <ThemedText type="smallBold" accessibilityRole="header">Budgets & Goals</ThemedText>
-    <ActionButton label="Budgets" disabled={busy} onPress={() => router.push('/budgets')} />
-    <ActionButton label="Savings & Goals" disabled={busy} onPress={() => router.push('/goals')} />
-    </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
     <BackupExport disabled={busy} />
