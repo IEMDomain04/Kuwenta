@@ -1,3 +1,4 @@
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -7,7 +8,7 @@ export default function AppTabs() {
     labelStyle={{ default: { fontSize: 11 }, selected: { fontSize: 11, color: colors.income } }}>
     <NativeTabs.Trigger name="index">
       <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-      <NativeTabs.Trigger.Icon src={require('@/assets/images/tabIcons/home.png')} renderingMode="template" />
+      <NativeTabs.Trigger.Icon src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="home-outline" />} renderingMode="template" />
     </NativeTabs.Trigger>
     <NativeTabs.Trigger name="accounts">
       <NativeTabs.Trigger.Label>Accounts</NativeTabs.Trigger.Label>
