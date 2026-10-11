@@ -2,7 +2,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { moneyInsights } from '../insights';
 import { router } from 'expo-router';
 import { CategoryIcon } from '../components/category-visual';
-import { formatTransactionDateTime } from '../dates';
+import { philippineDateTime, formatTransactionDateTime } from '../dates';
 import { useEffect, useState } from 'react';
 import { AppState, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -12,6 +12,7 @@ import { dashboardGreeting, dashboardReport } from '../dashboard';
 import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 import { FinanceScreen, AddTransactionButton } from '../components/ui';
+import { BudgetOverview } from '../components/budget-overview';
 import { PeriodOverview } from '../components/period-overview';
 
 export default function HomeScreen() {
@@ -66,6 +67,7 @@ export default function HomeScreen() {
       </View>
     </Modal>
     {hasActivity ? <PeriodOverview now={now} /> : null}
+    <BudgetOverview compact reportingMonth={philippineDateTime(now).transactionDate.slice(0, 7)} />
     {recent.length > 0 ? <View style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 12, gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <ThemedText type="smallBold" style={{ fontSize: 13 }} accessibilityRole="header">Recent transactions</ThemedText>

@@ -25,9 +25,16 @@ export function FinanceScreen({ title, children, scroll = true, tabScreen = true
 }
 export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
   const theme = useTheme();
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
     style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.secondary : theme.accentPressed : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.accent : theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
-    <ThemedText type="smallBold" style={{ textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
+    <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail" style={{ maxWidth: '100%', textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
+  </Pressable>;
+}
+export function IconButton({ icon, label, onPress, disabled = false, destructive = false }: { icon: 'pencil-outline' | 'trash-outline'; label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
+  const theme = useTheme();
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
+    style={({ pressed }) => ({ width: 44, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: destructive ? theme.errorSurface : theme.infoSurface, opacity: disabled || pressed ? 0.5 : 1 })}>
+    <Ionicons name={icon} size={19} color={destructive ? theme.error : theme.secondary} />
   </Pressable>;
 }
 export function TransactionRow({ transaction, accountName, destinationName, disabled, onEdit, onDelete, showDate = false }: { transaction: Transaction; accountName: string; destinationName?: string; disabled: boolean; onEdit: () => void; onDelete?: () => void; showDate?: boolean }) {

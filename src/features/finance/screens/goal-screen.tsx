@@ -6,7 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
-import { ActionButton, FinanceScreen, BackButton } from '../components/ui';
+import { IconButton, ActionButton, FinanceScreen, BackButton } from '../components/ui';
 import { TransactionDateTime } from '../components/transaction-date-time';
 import { MoneyField } from '../components/money-field';
 import { formatEditableMoney } from '../inputs';
@@ -109,7 +109,7 @@ export default function GoalScreen() {
       {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
       <ActionButton primary label={working ? 'Saving...' : original ? 'Save changes' : 'Save goal'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) leave(); }} />
-      {original && <ActionButton label="Delete goal" disabled={locked} onPress={remove} />}
+      {original && <IconButton icon="trash-outline" destructive label="Delete goal" disabled={locked} onPress={remove} />}
     </FinanceScreen>
   </KeyboardAvoidingView>;
 }

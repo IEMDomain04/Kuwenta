@@ -10,7 +10,7 @@ import { formatEditableMoney } from '../inputs';
 import { formatMoney, moneyInput, parseMoney } from '../money';
 import { validateAccount } from '../validation';
 import type { Account } from '../types';
-import { ActionButton } from './ui';
+import { ActionButton, IconButton } from './ui';
 import { MoneyField } from './money-field';
 
 export function AccountManager({ accountId, onClose, initialPurpose = 'spending', initialCorrectOpening = false }: { accountId?: string; onClose?: () => void; initialPurpose?: Account['purpose']; initialCorrectOpening?: boolean } = {}) {
@@ -131,7 +131,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
         <ThemedText type="small" themeColor="textSecondary">Opening: {formatMoney(account.openingBalance)} · {account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
         {summary.hasNegativeBalance && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this account balance is negative.</ThemedText>}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {!account.archived && <ActionButton compact label="Edit" disabled={locked || Boolean(editor)} onPress={() => edit(account)} />}
+          {!account.archived && <IconButton icon="pencil-outline" label={'Edit account ' + account.name} disabled={locked || Boolean(editor)} onPress={() => edit(account)} />}
           <ActionButton compact label={account.archived ? 'Unarchive' : 'Archive'} disabled={locked || Boolean(editor)} onPress={() => archive(account)} />
         </View>
 
