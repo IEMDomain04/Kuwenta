@@ -26,7 +26,7 @@ type Actions = {
   removeBudget: (month: string, category: string) => Promise<void>;
   copyBudgets: (month: string) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
-  completeSetup: (cents: number, displayName?: string) => Promise<void>;
+  completeSetup: (cents: number, displayName?: string, accountName?: string) => Promise<void>;
   resetData: () => Promise<void>;
   saveGoal: (goal: SavingsGoal, creating: boolean, newAccount?: Account) => Promise<void>;
   removeGoal: (id: string) => Promise<void>;
@@ -116,7 +116,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       removeBudget: (month, category) => write((db) => deleteBudget(db, month, category), 'Budget deleted. Transactions are kept.'),
       copyBudgets: (month) => write((db) => copyPreviousBudgets(db, month), 'Missing budgets copied from the previous month.'),
       removeAccount: (id) => write((db) => deleteAccount(db, id), 'Account deleted.'),
-      completeSetup: (cents, name) => write((db) => completeCashSetup(db, cents, name), 'Cash account ready.'),
+      completeSetup: (cents, name, accountName) => write((db) => completeCashSetup(db, cents, name, accountName), 'Cash account ready.'),
       resetData: () => write((db) => resetFinancialData(db), 'All data reset. Cash starts at zero.', undefined, true),
       saveGoal: (goal, creating, newAccount) => write((db) => saveGoalRecord(db, goal, creating, newAccount), creating ? 'Goal added.' : 'Goal updated.'),
       removeGoal: (id) => write((db) => deleteGoal(db, id), 'Goal removed. Account funds are unchanged.'),
@@ -163,7 +163,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       : <><ThemedText accessibilityRole="alert">{error || 'Preparing records…'}</ThemedText>
         <ActionButton label="Retry" onPress={() => { void actions.current?.refresh(); }} /></>}
   </FinanceScreen>;
-  if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name) => actions.current?.completeSetup(cents, name) ?? Promise.reject(new Error('App is closing.'))} />;
+  if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? Promise.reject(new Error('App is closing.'))} />;
   if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
   const noticeColor = notice?.tone === 'info' ? theme.info : theme.success;
   const noticeSurface = notice?.tone === 'info' ? theme.infoSurface : theme.successSurface;
@@ -179,7 +179,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     removeGoal: (id) => actions.current?.removeGoal(id) ?? unavailable(),
     adjustBalance: (id, accountId, target, expected) => actions.current?.adjustBalance(id, accountId, target, expected) ?? unavailable(),
     refresh: () => actions.current?.refresh() ?? Promise.resolve(),
-    completeSetup: (cents, name) => actions.current?.completeSetup(cents, name) ?? unavailable(),
+    completeSetup: (cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? unavailable(),
     resetData: () => actions.current?.resetData() ?? unavailable(),
     restoreBackup: (backup) => actions.current?.restoreBackup(backup) ?? unavailable(),
     getBackupJson: () => actions.current?.getBackupJson() ?? unavailable(),
