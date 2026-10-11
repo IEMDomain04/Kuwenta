@@ -24,7 +24,7 @@ export function BudgetOverview({ compact = false, reportingMonth }: { compact?: 
   return (
     <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="pie-chart-outline" size={18} color={theme.secondary} /><ThemedText type="smallBold" accessibilityRole="header" style={{ color: theme.secondary }}>{compact ? "This month's budget" : 'Budgets'}</ThemedText></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="pie-chart-outline" size={18} color={theme.budget} /><ThemedText type="smallBold" accessibilityRole="header" style={{ color: theme.budget }}>{compact ? "This month's budget" : 'Budgets'}</ThemedText></View>
         <ActionButton compact label="Manage" disabled={finance.busy} onPress={() => openBudget()} />
       </View>
       <ThemedText type="small" themeColor="textSecondary">{readableReportingMonth(month)}</ThemedText>
@@ -35,7 +35,7 @@ export function BudgetOverview({ compact = false, reportingMonth }: { compact?: 
           <ThemedText type="small">{formatMoney(row.spent)} / {formatMoney(row.limitAmount)}</ThemedText>
         </View>
         <View accessibilityRole="progressbar" accessibilityLabel={row.category + ' usage'} accessibilityValue={{ min: 0, max: 100, now: Math.min(100, Math.round(row.progress * 100)), text: Math.round(row.progress * 100) + '% used' }} style={{ height: 6, borderRadius: 3, backgroundColor: theme.infoSurface, overflow: 'hidden' }}>
-          <View style={{ height: 6, width: `${Math.min(1, row.progress) * 100}%`, backgroundColor: row.remaining < 0 ? theme.expense : theme.secondary }} />
+          <View style={{ height: 6, width: `${Math.min(1, row.progress) * 100}%`, backgroundColor: row.remaining < 0 ? theme.expense : theme.budget }} />
         </View>
         <ThemedText type="small" style={{ color: row.remaining < 0 ? theme.expense : theme.textSecondary }}>{row.remaining < 0 ? 'Over by ' : 'Remaining '}{formatMoney(Math.abs(row.remaining))}</ThemedText>
       </Pressable>)}

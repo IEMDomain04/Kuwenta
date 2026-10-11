@@ -8,18 +8,18 @@ import '@/global.css';
 import { Platform } from 'react-native';
 
 const palette = {
-  text: '#0A1129', background: '#F4F8FA', backgroundElement: '#FFFFFF',
-  backgroundSelected: '#E5F2F6', textSecondary: '#526579',
-  accent: '#1282A1', accentPressed: '#0F6D87', onAccent: '#FFFFFF',
-  navy: '#00205C', secondary: '#033F77',
-  income: '#278258', expense: '#B93846', border: '#DCE5EC',
-  incomeSurface: '#E8F5ED', incomeEnd: '#D2EBDD',
-  expenseSurface: '#FCECEF', expenseEnd: '#F6D9DF', balanceEnd: '#033F77',
-  warning: '#805600', warningSurface: '#FFF4D6',
-  success: '#216B48', successSurface: '#E8F5ED',
-  info: '#033F77', infoSurface: '#E5F2F6',
-  error: '#A32939', errorSurface: '#FCECEF',
-  disabledBackground: '#E7EDF2', disabledText: '#657487',
+  text: '#0A1129', background: '#F2FAF5', backgroundElement: '#FFFFFF',
+  backgroundSelected: '#DDF3E5', textSecondary: '#52645C',
+  accent: '#087F50', accentPressed: '#06633E', onAccent: '#FFFFFF',
+  navy: '#00205C', secondary: '#033F77', budget: '#0B7285', navigationInactive: '#687C71',
+  income: '#087F50', expense: '#B4233C', border: '#DCE9E1',
+  incomeSurface: '#DDF3E5', incomeEnd: '#D2EBDD',
+  expenseSurface: '#FDECEF', expenseEnd: '#F6D9DF', balanceEnd: '#033F77',
+  warning: '#925B08', warningSurface: '#FFF4D6',
+  success: '#087F50', successSurface: '#E5F5EB',
+  info: '#033F77', infoSurface: '#EAF2FB',
+  error: '#B4233C', errorSurface: '#FDECEF',
+  disabledBackground: '#E8EFEB', disabledText: '#687C71',
   overlay: '#0A112966',
 } as const;
 // Kuwenta currently uses the light palette throughout.

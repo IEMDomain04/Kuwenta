@@ -26,7 +26,7 @@ export function FinanceScreen({ title, children, scroll = true, tabScreen = true
 export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
   const theme = useTheme();
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.secondary : theme.accentPressed : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.accent : theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
+    style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.accentPressed : theme.accent : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.accent : theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
     <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail" style={{ maxWidth: '100%', textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
   </Pressable>;
 }
@@ -101,7 +101,7 @@ export function AddTransactionButton({ disabled }: { disabled: boolean }) {
             else if (item.type === 'TRANSFER') router.push('/transfer');
             else router.push({ pathname: '/transaction', params: { type: item.type } });
           }} style={{ minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}>
-            <Ionicons name={item.icon} size={20} color={item.type === 'INCOME' ? theme.income : theme.accentPressed} />
+            <Ionicons name={item.icon} size={20} color={item.type === 'INCOME' ? theme.income : item.type === 'EXPENSE' ? theme.expense : item.type === 'TRANSFER' ? theme.info : theme.accent} />
             <View style={{ flex: 1 }}><ThemedText type="smallBold">{item.label}</ThemedText><ThemedText type="small" themeColor="textSecondary">{item.description}</ThemedText></View>
           </Pressable>)}
         </View>

@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { moneyInsights } from '../insights';
@@ -57,7 +58,7 @@ export default function HomeScreen() {
       <ThemedText type="small" themeColor="textSecondary">{dateLabel}</ThemedText>
       <ThemedText accessibilityRole="header" style={styles.heading}>{dashboardGreeting(displayName ?? '', now)}</ThemedText>
     </View>
-    <View style={[styles.insight, { backgroundColor: theme.incomeSurface }]}>
+    <LinearGradient colors={[theme.backgroundSelected, theme.background]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.insight}>
       <Image source={mascotImages[reaction]} contentFit="contain" accessible={false} style={styles.mascot} />
       <Pressable accessibilityRole="button" accessibilityLabel="View money insights" accessibilityHint="Opens full insight details" onPress={() => setInsightsOpen(true)} style={({ pressed }) => [styles.bubble, { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}>
         <View style={[styles.bubbleTail, { backgroundColor: theme.backgroundElement }]} />
@@ -67,7 +68,7 @@ export default function HomeScreen() {
         </View>
         <ThemedText numberOfLines={fontScale > 1.3 ? undefined : 3} ellipsizeMode="tail" style={styles.message}>{insightMessage}</ThemedText>
       </Pressable>
-    </View>
+    </LinearGradient>
     <Modal visible={insightsOpen} transparent animationType="fade" onRequestClose={() => setInsightsOpen(false)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close insights" onPress={() => setInsightsOpen(false)} style={{ flex: 1 }} />

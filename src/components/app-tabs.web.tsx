@@ -13,8 +13,8 @@ export default function AppTabs() {
   return <Tabs><TabSlot /><TabList asChild>
     <ThemedView type="backgroundElement" style={{ flexDirection: 'row', padding: 8 }}>
       {items.map((item) => <TabTrigger key={item.name} name={item.name} href={item.href} asChild><Pressable accessibilityLabel={item.label} style={{ flex: 1, minHeight: 48, gap: 3, justifyContent: 'center', alignItems: 'center', borderRadius: 12, backgroundColor: path === item.href ? theme.incomeSurface : 'transparent' }}>
-        <Ionicons name={item.icon} size={22} color={path === item.href ? theme.income : theme.textSecondary} />
-        <ThemedText type="small" style={{ fontSize: 11, color: path === item.href ? theme.income : theme.textSecondary }}>{item.label}</ThemedText>
+        <Ionicons name={item.icon} size={22} color={path === item.href ? theme.income : theme.navigationInactive} />
+        <ThemedText type="small" style={{ fontSize: 11, color: path === item.href ? theme.income : theme.navigationInactive }}>{item.label}</ThemedText>
       </Pressable></TabTrigger>)}
     </ThemedView>
   </TabList></Tabs>;
