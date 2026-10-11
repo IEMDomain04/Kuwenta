@@ -28,9 +28,9 @@ export function SavingsOverview({ compact = false, goalsOnly = false }: { compac
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <ThemedText type="small">Savings rate</ThemedText><ThemedText type="smallBold">{savings.savingsRate === null ? '—' : savings.savingsRate.toFixed(1) + '%'}</ThemedText>
         </View>
-        {savings.balance < 0 && <ThemedText accessibilityRole="alert">Warning: the savings balance is negative.</ThemedText>}
+        {savings.balance < 0 && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: the savings balance is negative.</ThemedText>}
         {savings.usesLegacyPurposes && <ThemedText type="small" themeColor="textSecondary">Older transfers use current account purposes for this report.</ThemedText>}
-      </> : <ThemedText accessibilityRole="alert">{error}</ThemedText>}
+      </> : <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText>}
     </View>}
     <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
@@ -52,7 +52,7 @@ export function SavingsOverview({ compact = false, goalsOnly = false }: { compac
             <View style={{ height: 8, backgroundColor: theme.accent, width: ((progress.progress * 100) + '%') as `${number}%` }} />
           </View>
           <ThemedText type="small" themeColor="textSecondary">{progress.achieved ? 'Target reached' : Math.round(progress.progress * 100) + '% saved / ' + formatMoney(progress.remaining) + ' remaining'}</ThemedText>
-          {progress.balance < 0 && <ThemedText accessibilityRole="alert">Warning: this savings account has a negative balance.</ThemedText>}
+          {progress.balance < 0 && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this savings account has a negative balance.</ThemedText>}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <ActionButton compact primary label="Add money" disabled={busy || account.archived || !accounts.some((row) => !row.archived && row.id !== account.id)}
               onPress={() => router.push({ pathname: '/transaction', params: { type: 'TRANSFER', destinationAccountId: account.id } })} />

@@ -1,12 +1,13 @@
+import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { SelectionSheet } from '../components/selection-sheet';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
+import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
 import { ActionButton, FinanceScreen, BackButton } from '../components/ui';
 import { TransactionDateTime } from '../components/transaction-date-time';
-import { philippineDateTime } from '../dates';
 import { MoneyField } from '../components/money-field';
 import { formatEditableMoney } from '../inputs';
 import { formatMoney, moneyInput, parseMoney } from '../money';
@@ -23,7 +24,8 @@ export default function GoalScreen() {
   const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.targetAmount))! : '');
   const [date, setDate] = useState(original?.targetDate ?? '');
   const [accountId, setAccountId] = useState(original?.accountId ?? '');
-  const [createAccount, setCreateAccount] = useState(!original && !finance.accounts.some((account) => account.purpose === 'savings' && !account.archived && !finance.goals.some((goal) => goal.accountId === account.id)));
+  const [createAccount, setCreateAccount] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
   const accountSubmission = useRef<string | undefined>(undefined);
   const [error, setError] = useState('');
@@ -80,7 +82,7 @@ export default function GoalScreen() {
       } },
     ], { cancelable: false });
   }
-  const inputStyle = { borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 14, color: theme.text };
+  const inputStyle = { borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 12, color: theme.text };
   if (id && !original) return <FinanceScreen title="Goal unavailable" tabScreen={false}><ThemedText>This goal no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <FinanceScreen title={original ? 'Edit savings goal' : 'Add savings goal'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) leave(); }} />}>
@@ -90,24 +92,22 @@ export default function GoalScreen() {
       <MoneyField accessibilityLabel="Goal target amount in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle}
         onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} />
       <ThemedText type="smallBold">Dedicated savings account</ThemedText>
-      {!original && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        <ActionButton compact label="Create new account" selected={createAccount} disabled={locked} onPress={() => setCreateAccount(true)} />
-        <ActionButton compact label="Link existing account" selected={!createAccount} disabled={locked} onPress={() => setCreateAccount(false)} />
-      </View>}
+      <Pressable accessibilityRole="button" accessibilityLabel="Choose dedicated savings account" disabled={locked} onPress={() => { Keyboard.dismiss(); setAccountOpen(true); }} style={{ minHeight: 48, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Ionicons name="wallet-outline" size={20} color={theme.accent} />
+        <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{createAccount ? 'New savings account' : finance.accounts.find((account) => account.id === accountId)?.name ?? 'Choose a savings account'}</ThemedText>
+        <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+      </Pressable>
+      {available.length === 0 && !createAccount ? <ThemedText type="small" themeColor="textSecondary">A goal needs a dedicated savings account. Open the selector to create one{original ? ' or unarchive the linked account' : ''}.</ThemedText> : null}
       {createAccount && !original ? <>
-        <ThemedText type="small">Saving this goal creates a dedicated savings account with a zero balance. It is excluded from Available Money.</ThemedText>
-        <TextInput accessibilityLabel="New savings account name" value={newAccountName} onChangeText={setNewAccountName} editable={!locked} placeholder={name || 'Savings account name'} placeholderTextColor={theme.textSecondary} style={inputStyle} />
-      </> : <>
-        <View style={{ gap: 8 }}>{available.map((account) => <ActionButton key={account.id} label={account.name} selected={accountId === account.id} disabled={locked} onPress={() => setAccountId(account.id)} />)}</View>
-        {available.length === 0 && <ThemedText type="small">No eligible savings accounts. Choose Create new account, or unarchive an unlinked savings account.</ThemedText>}
-        {original && !available.some((account) => account.id === original.accountId) && <ThemedText type="small">Unarchive the linked account to keep using it, or choose another account.</ThemedText>}
-      </>}
-      {date ? <>
-        <TransactionDateTime dateOnly date={date} time="00:00:00" disabled={locked} onDateChange={setDate} onTimeChange={() => {}} />
-        <ActionButton label="Remove target date" disabled={locked} onPress={() => setDate('')} />
-      </> : <ActionButton label="Add target date (optional)" disabled={locked} onPress={() => setDate(philippineDateTime().transactionDate)} />}
-      {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
-      <ActionButton primary label={working ? 'Saving...' : original ? 'Review changes' : 'Review and save goal'} disabled={locked || rejected} onPress={review} />
+        <ThemedText type="small">New account name (optional)</ThemedText>
+        <TextInput accessibilityLabel="New savings account name" value={newAccountName} onChangeText={setNewAccountName} editable={!locked} placeholder={name || 'Uses the goal name'} placeholderTextColor={theme.textSecondary} style={inputStyle} />
+        <ThemedText type="small" themeColor="textSecondary">Created with this goal at zero balance. Add money by transferring from another account.</ThemedText>
+      </> : null}
+      <SelectionSheet visible={accountOpen} title="Savings account" selected={createAccount ? '__new__' : accountId} disabled={locked} options={[...available.map((account) => ({ value: account.id, label: account.name })), ...(!original ? [{ value: '__new__', label: '+ Create savings account' }] : [])]} onClose={() => setAccountOpen(false)} onSelect={(value) => { setCreateAccount(value === '__new__'); if (value !== '__new__') setAccountId(value); setError(''); }} />
+      <TransactionDateTime dateOnly optional date={date} time="00:00:00" disabled={locked} onDateChange={setDate} onTimeChange={() => {}} />
+      {date ? <Pressable accessibilityRole="button" accessibilityLabel="Clear target date" disabled={locked} onPress={() => setDate('')} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="accent">Clear date</ThemedText></Pressable> : null}
+      {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
+      <ActionButton primary label={working ? 'Saving...' : original ? 'Save changes' : 'Save goal'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) leave(); }} />
       {original && <ActionButton label="Delete goal" disabled={locked} onPress={remove} />}
     </FinanceScreen>

@@ -119,7 +119,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       <ThemedText>Balance adjustments: {preview.summary.adjustmentCount}</ThemedText>
       <ThemedText>Expense records: {preview.summary.expenseCount}</ThemedText>
       <ThemedText>Cash balance: {formatMoney(preview.summary.cashBalance)}</ThemedText>
-      {preview.summary.cashBalance < 0 ? <ThemedText accessibilityRole="alert">Warning: this backup has a negative Cash balance.</ThemedText> : null}
+      {preview.summary.cashBalance < 0 ? <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this backup has a negative Cash balance.</ThemedText> : null}
       <ThemedText>Your current records have not changed. Restoring also replaces savings goals and budgets.</ThemedText>
       <ActionButton label={restoring ? "Restoring backup..." : "Restore this backup"} disabled={locked} onPress={reviewRestore} />
     </> : null}

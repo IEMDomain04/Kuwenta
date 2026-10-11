@@ -29,7 +29,7 @@ export function QuickEntry({ disabled, accountId, onReview, onCancel }: { disabl
     </ScrollView>
     <TextInput autoFocus accessibilityLabel="Quick transaction phrase" value={text} maxLength={250} onChangeText={(value) => { setText(value); setError(''); }} editable={!disabled} placeholder="Lunch 120" placeholderTextColor={theme.textSecondary} returnKeyType="done" onSubmitEditing={review}
       style={{ padding: 14, color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
-    {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
+    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     <ActionButton primary label="Review transaction" disabled={disabled || !text.trim()} onPress={review} />
     <ActionButton label="Use regular form" disabled={disabled} onPress={onCancel} />
     <ThemedText type="small" themeColor="textSecondary">Uses local text rules, not a chat model. Nothing is saved until you review the form and press Save.</ThemedText>

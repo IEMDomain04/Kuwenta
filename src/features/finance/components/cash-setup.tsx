@@ -79,7 +79,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
           <ThemedText type="small" themeColor="textSecondary">Export a password-protected backup to protect your records before uninstalling or resetting. Your optional name stays local and is not included in financial backups; restoring a backup clears it.</ThemedText>
         </>}
       </View>
-      {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
+      {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
       <ActionButton primary label={saving ? 'Saving...' : step === 4 ? 'Start tracking' : 'Continue'} disabled={locked || step === 3 && rejected} onPress={() => { if (step === 4) void finish(); else next(); }} />
       {step === 0 && <ActionButton label="Skip introduction" disabled={locked} onPress={() => setStep(1)} />}
       {step === 3 && <ActionButton label="Start with zero" disabled={locked} onPress={() => next(true)} />}

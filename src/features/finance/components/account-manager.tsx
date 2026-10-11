@@ -81,7 +81,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     try { previewBalance = parseMoney(opening.replace(/,/g, '') || '0', { allowZero: true, allowNegative: true }); }
     catch { /* An incomplete or invalid draft has no displayable balance. */ }
   }
-  const previewColor = editor?.purpose === 'savings' ? theme.income : theme.accent;
+  const previewColor = editor?.purpose === 'savings' ? theme.income : theme.secondary;
   const inputStyle = { color: theme.text, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 12, fontSize: 12 };
   return <View style={{ gap: 12 }}>
     <ThemedText type="smallBold" accessibilityRole="header">Accounts · PHP</ThemedText>
@@ -89,16 +89,16 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       <ThemedText type="smallBold">{editor.id ? 'Edit account' : 'Add account'}</ThemedText>
       {!editor.id ? <View accessibilityLabel="New account preview" style={{ padding: 16, minHeight: 150, borderRadius: 20, backgroundColor: previewColor, gap: 12, boxShadow: '0 3px 8px rgba(20, 36, 67, 0.08)' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={20} color="#FFFFFF" />
+          <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={20} color={theme.onAccent} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: '#FFFFFF' }}>{editor.name.trim() || 'New account'}</ThemedText>
-            <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: '#FFFFFF' }}>{editor.purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
+            <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: theme.onAccent }}>{editor.name.trim() || 'New account'}</ThemedText>
+            <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: theme.onAccent }}>{editor.purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
           </View>
         </View>
         <View style={{ marginTop: 'auto', gap: 3 }}>
-          <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: '#FFFFFF' }}>STARTING BALANCE</ThemedText>
-          <ThemedText style={{ fontSize: 18, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: '#FFFFFF' }}>{previewBalance === undefined ? '—' : formatMoney(previewBalance)}</ThemedText>
-          {previewBalance !== undefined && previewBalance < 0 ? <ThemedText type="small" style={{ fontSize: 10, color: '#FFFFFF' }}>Negative starting balance</ThemedText> : null}
+          <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: theme.onAccent }}>STARTING BALANCE</ThemedText>
+          <ThemedText style={{ fontSize: 18, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: theme.onAccent }}>{previewBalance === undefined ? '—' : formatMoney(previewBalance)}</ThemedText>
+          {previewBalance !== undefined && previewBalance < 0 ? <ThemedText type="small" style={{ fontSize: 10, color: theme.onAccent }}>Negative starting balance</ThemedText> : null}
         </View>
       </View> : null}
       {savedAccount && <ThemedText type="smallBold">Current balance: {formatMoney(calculateAccountSummary(savedAccount, transactions, month).balance)}</ThemedText>}
@@ -120,7 +120,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       <ActionButton primary label={working ? 'Saving…' : editor.id ? 'Save changes' : 'Save account'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setEditor(null); setError(''); newId.current = undefined; onClose?.(); } }} />
     </View> : !onClose ? <ActionButton label="Add account" primary disabled={locked} onPress={() => edit()} /> : null}
-    {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
+    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     {(onClose ? editor ? [] : accounts.filter((account) => account.id === accountId) : accounts).map((account) => {
       const summary = calculateAccountSummary(account, transactions, month);
       const count = transactions.filter((row) => (row.accountId === account.id || row.destinationAccountId === account.id)).length;
@@ -129,7 +129,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
         <ThemedText style={{ fontSize: 22, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(summary.balance)}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">{account.purpose === 'spending' ? 'Spending' : 'Savings'} · {count} {count === 1 ? 'transaction' : 'transactions'}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">Opening: {formatMoney(account.openingBalance)} · {account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
-        {summary.hasNegativeBalance && <ThemedText accessibilityRole="alert">Warning: this account balance is negative.</ThemedText>}
+        {summary.hasNegativeBalance && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this account balance is negative.</ThemedText>}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {!account.archived && <ActionButton compact label="Edit" disabled={locked || Boolean(editor)} onPress={() => edit(account)} />}
           <ActionButton compact label={account.archived ? 'Unarchive' : 'Archive'} disabled={locked || Boolean(editor)} onPress={() => archive(account)} />
@@ -139,7 +139,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     })}
     {onClose && !editor && <ActionButton label="Back" disabled={locked} onPress={() => { if (!pending.current) onClose(); }} />}
     <Modal visible={purposeOpen && Boolean(editor)} transparent animationType="fade" onRequestClose={() => setPurposeOpen(false)}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close purpose selection" onPress={() => setPurposeOpen(false)} style={{ flex: 1 }} />
         <SafeAreaView edges={['bottom', 'left', 'right']} style={{ maxHeight: height * 0.8, backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
           <View accessibilityViewIsModal>

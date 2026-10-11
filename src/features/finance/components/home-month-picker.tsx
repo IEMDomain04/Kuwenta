@@ -25,7 +25,7 @@ export function HomeMonthPicker() {
       <ThemedText type="smallBold" themeColor="accent">{label}</ThemedText><Ionicons name="chevron-down" color={theme.accent} size={16} />
     </Pressable>
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000066' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close month picker" onPress={() => setOpen(false)} style={{ flex: 1 }} />
         <SafeAreaView edges={['bottom', 'left', 'right']} style={{ backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: height * 0.85 }}>
           <View accessibilityViewIsModal style={{ padding: 20, gap: 12 }}>

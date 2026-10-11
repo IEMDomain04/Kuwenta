@@ -48,7 +48,7 @@ export default function TransactionsScreen() {
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {(['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)}
-          style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filter === value ? theme.accent : theme.expenseSurface, opacity: pressed ? 0.5 : 1 })}>
+          style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filter === value ? theme.accentPressed : theme.infoSurface, opacity: pressed ? 0.5 : 1 })}>
           <ThemedText type="small" style={{ fontSize: 11, color: filter === value ? theme.onAccent : theme.text }}>{filter === value ? '✓ ' : ''}{value === 'ALL' ? 'All' : value === 'INCOME' ? 'Income' : value === 'TRANSFER' ? 'Transfers' : 'Expenses'}</ThemedText>
         </Pressable>)}
       </View>
@@ -64,7 +64,7 @@ export default function TransactionsScreen() {
       <Ionicons name="refresh-outline" size={16} color={theme.textSecondary} />
       <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>{busy ? 'Refreshing…' : 'Pull down to refresh'}</ThemedText>
     </View>
-    {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
+    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     {accountFilter !== null && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
       <ThemedText type="small" style={{ flex: 1 }}>Account: {accounts.find((account) => account.id === accountFilter)?.name ?? 'Unavailable account'}</ThemedText>
       <ActionButton compact label="Reset account" onPress={() => setAccountFilter(null)} />

@@ -56,7 +56,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     catch (cause) { return { summary: null, error: cause instanceof Error ? cause.message : 'Could not calculate this month.' }; }
   }, [snapshot, selectedMonth]);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState<{ message: string; undoId?: string; expiresAt?: number } | null>(null);
+  const [notice, setNotice] = useState<{ message: string; undoId?: string; expiresAt?: number; tone?: 'success' | 'info' } | null>(null);
   const actions = useRef<Actions | null>(null);
   const undoPending = useRef(false);
   useEffect(() => {
@@ -100,7 +100,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const pending = (async () => {
         await operation(connection!);
         if (active && restoring) { setSnapshot(null); setSelectedMonth(null); setRestoreVersion((version) => version + 1); }
-        if (active) setNotice({ message, undoId, expiresAt: Date.now() + (undoId ? 10_000 : 4000) });
+        if (active) setNotice({ message, undoId, tone: message.startsWith('Transfer') || restoring ? 'info' : 'success', expiresAt: Date.now() + (undoId ? 10_000 : 4000) });
         try { await load(); }
         catch { if (active) setError(restoring ? 'Records replaced, but could not refresh. Tap Retry.' : 'Change saved, but records could not refresh. Tap Retry.'); }
       })();
@@ -163,6 +163,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   </FinanceScreen>;
   if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name) => actions.current?.completeSetup(cents, name) ?? Promise.reject(new Error('App is closing.'))} />;
   if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
+  const noticeColor = notice?.tone === 'info' ? theme.info : theme.success;
+  const noticeSurface = notice?.tone === 'info' ? theme.infoSurface : theme.successSurface;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
@@ -184,14 +186,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     saveTransaction: (id, draft, editing) => actions.current?.saveTransaction(id, draft, editing) ?? unavailable(),
     removeTransaction: (id) => actions.current?.removeTransaction(id) ?? unavailable(),
   }}><ThemedView key={restoreVersion} style={{ flex: 1 }}>
-    {error ? <ThemedView style={{ padding: 16, gap: 8 }}><ThemedText accessibilityRole="alert">{error}</ThemedText>
+    {error ? <ThemedView style={{ padding: 16, gap: 8, backgroundColor: theme.errorSurface }}><ThemedText style={{ color: theme.error }} accessibilityRole="alert">{error}</ThemedText>
       <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} /></ThemedView> : null}
     {children}
     {notice ? <View pointerEvents="box-none" style={{ position: 'absolute', left: Math.max(12, insets.left), right: Math.max(12, insets.right), bottom: insets.bottom + 148 }}>
-      <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: theme.incomeSurface, borderColor: theme.border, borderWidth: 1, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Ionicons name="checkmark-circle" size={24} color={theme.income} />
-        <ThemedText type="small" style={{ flex: 1 }} accessibilityLiveRegion="polite">{notice.message}</ThemedText>
-        {notice.undoId ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { void undo(); }} style={{ minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' }}><ThemedText type="smallBold" themeColor="accent">Undo</ThemedText></Pressable> : null}
+      <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: noticeSurface, borderColor: theme.border, borderWidth: 1, elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Ionicons name={notice?.tone === 'info' ? 'information-circle' : 'checkmark-circle'} size={24} color={noticeColor} />
+        <ThemedText type="small" style={{ flex: 1, color: noticeColor }} accessibilityLiveRegion="polite">{notice.message}</ThemedText>
+        {notice.undoId ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { void undo(); }} style={{ minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' }}><ThemedText type="smallBold" themeColor="secondary">Undo</ThemedText></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notification" onPress={() => setNotice(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={18} color={theme.textSecondary} /></Pressable>
       </View>
     </View> : null}

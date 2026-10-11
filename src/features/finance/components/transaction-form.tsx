@@ -2,7 +2,6 @@ import { useFinance } from '../provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { CategoryIcon, categoryVisual } from './category-visual';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRef, useState } from 'react';
 import { Keyboard, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -110,23 +109,23 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
         <ThemedText type="smallBold">Balances after saving</ThemedText>
         <ThemedText type="small">{selectedAccount?.name}: {formatMoney(transferPreview.sourceBalance)}</ThemedText>
         <ThemedText type="small">{accounts.find((account) => account.id === destinationAccountId)?.name}: {formatMoney(transferPreview.destinationBalance)}</ThemedText>
-        {(transferPreview.sourceBalance < 0 || transferPreview.destinationBalance < 0) && <ThemedText accessibilityRole="alert">Warning: an account will have a negative balance.</ThemedText>}
+        {(transferPreview.sourceBalance < 0 || transferPreview.destinationBalance < 0) && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: an account will have a negative balance.</ThemedText>}
       </View>}
       {previewError ? <ThemedText accessibilityRole="alert">{previewError}</ThemedText> : null}
       {accounts.filter((account) => !account.archived).length < 2 && <ThemedText accessibilityRole="alert">Add or unarchive another account to make a transfer.</ThemedText>}
     </>}
-    {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
+    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     </ScrollView>
     <View style={{ gap: 6, paddingTop: 8, borderTopWidth: 1, borderColor: theme.border }}>
         <Pressable accessibilityRole="button" accessibilityLabel={original ? 'Review changes' : 'Save'} accessibilityState={{ disabled }} disabled={disabled} onPress={submit}>
-      <LinearGradient colors={['#087F8C', '#258B79']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ padding: 16, minHeight: 50, borderRadius: 14, alignItems: 'center', opacity: disabled ? 0.5 : 1 }}>
-        <ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>{disabled ? 'Please wait…' : original ? 'Review changes' : 'Save'}</ThemedText>
-      </LinearGradient>
+      <View style={{ backgroundColor: disabled ? theme.disabledBackground : theme.accentPressed, padding: 16, minHeight: 50, borderRadius: 14, alignItems: 'center', opacity: disabled ? 0.5 : 1 }}>
+        <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : theme.onAccent }}>{disabled ? 'Please wait…' : original ? 'Review changes' : 'Save'}</ThemedText>
+      </View>
     </Pressable>
     <ActionButton compact label="Cancel" disabled={disabled} onPress={onCancel} />
     </View>
     <Modal visible={accountOpen} transparent animationType="fade" onRequestClose={() => setAccountOpen(false)}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000066' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close account picker" onPress={() => setAccountOpen(false)} style={{ flex: 1 }} />
         <SafeAreaView edges={['bottom', 'left', 'right']} style={{ maxHeight: height * 0.8, backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
           <View accessibilityViewIsModal style={{ padding: 16, gap: 12 }}>
@@ -148,7 +147,7 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
       </View>
     </Modal>
     <Modal visible={categoryOpen} transparent animationType="fade" onRequestClose={() => setCategoryOpen(false)}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000066' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close category picker" onPress={() => setCategoryOpen(false)} style={{ flex: 1 }} />
         <SafeAreaView edges={['bottom', 'left', 'right']} style={{ maxHeight: height * 0.8, backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
           <View accessibilityViewIsModal style={{ padding: 16, gap: 12 }}>

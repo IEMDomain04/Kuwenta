@@ -46,7 +46,7 @@ export default function SettingsScreen() {
     <ThemedText type="smallBold" accessibilityRole="header">Reset App</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Permanently clear Kuwenta records on this device and restart with Cash at zero. Export a backup above before resetting. There is no Undo.</ThemedText>
     <ActionButton label={resetting ? 'Resetting...' : 'Reset all data'} disabled={busy || resetting} onPress={confirmReset} />
-    {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
+    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     </View>
     <ThemedText type="smallBold" accessibilityRole="header">About Kuwenta</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Track, move, and save money in Philippine pesos.</ThemedText>

@@ -25,8 +25,8 @@ export function FinanceScreen({ title, children, scroll = true, tabScreen = true
 export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
   const theme = useTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, { backgroundColor: primary ? theme.accent : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.accent : theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, (pressed || disabled) && { opacity: 0.5 }]}>
-    <ThemedText type="smallBold" style={primary ? { color: theme.onAccent } : undefined}>{selected ? '✓ ' : ''}{label}</ThemedText>
+    style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.secondary : theme.accentPressed : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.accent : theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
+    <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
   </Pressable>;
 }
 export function TransactionRow({ transaction, accountName, destinationName, disabled, onEdit, onDelete, showDate = false }: { transaction: Transaction; accountName: string; destinationName?: string; disabled: boolean; onEdit: () => void; onDelete?: () => void; showDate?: boolean }) {

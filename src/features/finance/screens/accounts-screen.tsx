@@ -29,7 +29,7 @@ export default function AccountsScreen() {
         <ThemedText type="small" style={{ fontSize: 11, lineHeight: 16 }}>Available Money: {formatMoney(money.availableMoney)}</ThemedText>
         {accounts.some((account) => account.archived) ? <ThemedText type="small" themeColor="textSecondary">Archived balances remain included.</ThemedText> : null}
         {money.hasNegativeAccount ? <ThemedText accessibilityRole="alert" type="small">One or more accounts have a negative balance.</ThemedText> : null}
-      </> : <ThemedText accessibilityRole="alert">{error}</ThemedText>}
+      </> : <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText>}
     </View>
     {money ? <View style={{ padding: 14, borderRadius: 20, backgroundColor: theme.incomeSurface, gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="bulb-outline" size={18} color={theme.accent} /><ThemedText type="smallBold" style={{ fontSize: 12, lineHeight: 17 }}>Account insight</ThemedText></View>

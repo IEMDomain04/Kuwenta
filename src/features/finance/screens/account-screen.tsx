@@ -22,7 +22,6 @@ export default function AccountScreen() {
   const balance = account ? calculateAccountSummary(account, finance.transactions, finance.month).balance : 0;
   const [mode, setMode] = useState<'details' | 'edit' | 'adjust'>('details');
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [correctOpening, setCorrectOpening] = useState(false);
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [rejected, setRejected] = useState(false);
@@ -94,7 +93,7 @@ export default function AccountScreen() {
     <FinanceScreen title={!accountId ? 'Add account' : mode === 'adjust' ? 'Adjust balance' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (pending.current) return; if (mode !== 'details') setMode('details'); else leave(); }} />}>
       {!accountId ? <AccountManager initialPurpose={purpose === "savings" ? "savings" : "spending"} onClose={leave} />
         : !account ? <><ThemedText>This account is no longer available.</ThemedText><ActionButton label="Back" onPress={leave} /></>
-        : mode === 'edit' ? <AccountManager accountId={accountId} initialCorrectOpening={correctOpening} onClose={() => setMode('details')} />
+        : mode === 'edit' ? <AccountManager accountId={accountId} onClose={() => setMode('details')} />
         : <>
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -103,7 +102,7 @@ export default function AccountScreen() {
             </View>
             <ThemedText type="small" themeColor="textSecondary">Current balance</ThemedText>
             <ThemedText style={{ fontSize: 24, lineHeight: 32, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(balance)}</ThemedText>
-            {balance < 0 && <ThemedText accessibilityRole="alert">Warning: this account balance is negative.</ThemedText>}
+            {balance < 0 && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this account balance is negative.</ThemedText>}
             <ThemedText type="small">{account.currency} · {account.purpose === 'spending' ? 'Spending' : 'Savings'}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">{account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">Original opening balance: {formatMoney(account.openingBalance)}</ThemedText>
@@ -134,23 +133,27 @@ export default function AccountScreen() {
               {history.length ? history.slice(0, 5).map((row) => <TransactionRow key={row.id} transaction={row} showDate accountName={finance.accounts.find((item) => item.id === row.accountId)?.name ?? 'Unknown account'} destinationName={finance.accounts.find((item) => item.id === row.destinationAccountId)?.name} disabled={locked || row.type === 'ADJUSTMENT'} onEdit={() => router.push({ pathname: '/transaction', params: { id: row.id } })} />) : <ThemedText type="small" themeColor="textSecondary">No transactions for this account yet.</ThemedText>}
             </View>
             <Modal visible={optionsOpen} transparent animationType="fade" onRequestClose={() => setOptionsOpen(false)}>
-              <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#00000066' }}>
+              <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: theme.overlay }}>
                 <Pressable accessibilityRole="button" accessibilityLabel="Close account options" onPress={() => setOptionsOpen(false)} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
                 <View accessibilityViewIsModal style={{ padding: 16, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 8 }}>
-                  <ThemedText type="smallBold">Account options</ThemedText>
-                  {!account.archived && <>
-                    <ActionButton compact label="Edit account" disabled={locked} onPress={() => { setOptionsOpen(false); setCorrectOpening(false); setMode('edit'); }} />
-                    <ActionButton compact label="Advanced: correct opening balance" disabled={locked} onPress={() => { setOptionsOpen(false); setCorrectOpening(true); setMode('edit'); }} />
-                  </>}
-                  <ActionButton compact label={account.archived ? 'Unarchive account' : 'Archive account'} disabled={locked} onPress={() => { setOptionsOpen(false); archive(); }} />
-                  <ActionButton compact label="Delete account" disabled={locked} onPress={() => { setOptionsOpen(false); remove(); }} />
-                  <ActionButton compact label="Cancel" onPress={() => setOptionsOpen(false)} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ThemedText type="smallBold" style={{ flex: 1 }}>Account options</ThemedText>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Close account options" onPress={() => setOptionsOpen(false)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={20} color={theme.text} /></Pressable>
+                  </View>
+                  {[
+                    ...(!account.archived ? [{ label: 'Edit account', icon: 'create-outline' as const, action: () => { setOptionsOpen(false); setMode('edit'); } }] : []),
+                    { label: account.archived ? 'Unarchive account' : 'Archive account', icon: 'archive-outline' as const, action: () => { setOptionsOpen(false); archive(); } },
+                    { label: 'Delete account', icon: 'trash-outline' as const, action: () => { setOptionsOpen(false); remove(); } },
+                  ].map((option) => <Pressable key={option.label} accessibilityRole="button" disabled={locked} onPress={option.action} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8 }}>
+                    <Ionicons name={option.icon} size={18} color={option.icon === 'trash-outline' ? theme.expense : theme.accent} />
+                    <ThemedText type="small" style={{ color: option.icon === 'trash-outline' ? theme.expense : theme.text }}>{option.label}</ThemedText>
+                  </Pressable>)}
                 </View>
               </View>
             </Modal>
 
           </>}
-          {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
+          {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
         </>}
     </FinanceScreen>
   </KeyboardAvoidingView>;

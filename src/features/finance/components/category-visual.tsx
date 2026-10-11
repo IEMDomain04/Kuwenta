@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { formatMoney } from '../money';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -6,8 +7,8 @@ import { View, useWindowDimensions } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 
 const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
-  'Balance adjustment': { color: '#087F8C', icon: 'options-outline' },
-  Transfer: { color: '#087F8C', icon: 'swap-horizontal' },
+  'Balance adjustment': { color: Colors.light.accent, icon: 'options-outline' },
+  Transfer: { color: Colors.light.accent, icon: 'swap-horizontal' },
   Food: { color: '#ED8B35', icon: 'restaurant' },
   Transportation: { color: '#3196D5', icon: 'bus' },
   Shopping: { color: '#8964CF', icon: 'bag-handle' },
@@ -19,7 +20,7 @@ const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof
   Subscriptions: { color: '#5C8B9A', icon: 'phone-portrait' },
   Other: { color: '#7D929D', icon: 'ellipsis-horizontal' },
 };
-const incomeVisual = { color: '#078548', icon: 'cash' as const };
+const incomeVisual = { color: Colors.light.income, icon: 'cash' as const };
 export function categoryVisual(category: string, income = false) {
   return income ? incomeVisual : visuals[category] ?? visuals.Other;
 }

@@ -1000,3 +1000,7 @@ Device verification still required:
 - Export/restore an encrypted backup, try a wrong password, cancel replacement, and cancel reset before testing full reset with backed-up test data.
 - The reported standalone APK crash after Save remains unconfirmed. With Android platform tools available, clear logs with `adb logcat -c`, reproduce the crash, then capture `adb logcat -b crash -d`. Record device/Android version, APK build, transaction type, and whether the record persists. Do not publish logs containing personal financial details.
 - Lint is blocked until ESLint is installed/configured; TypeScript and finance tests provide the current automated checks.
+
+
+### Kuwenta light palette
+Shared theme tokens define navy text, blue spending cards, teal actions, green income/savings, red expenses/errors, amber warnings, white surfaces, and pale backgrounds. Success notices use green; transfers and record replacement use blue information styling. Undo timing remains unchanged. Small white button labels use darker teal for contrast. Verified primary text/button/account/notification pairs meet 4.5:1; category visuals retain distinct colors.
