@@ -1,6 +1,6 @@
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, Modal, Pressable, ScrollView, Switch, TextInput, View, useWindowDimensions } from 'react-native';
+import { Alert, BackHandler, Keyboard, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -56,7 +56,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     if (!editor || locked || pending.current || rejected) return;
     let draft: Account;
     try {
-      draft = { ...editor, id: editor.id || 'new-account', name: editor.name.trim(), openingBalance: editor.id && !correctOpening ? editor.openingBalance : parseMoney(opening.replace(/,/g, ''), { allowZero: true, allowNegative: true }) };
+      draft = { ...editor, id: editor.id || 'new-account', name: editor.name.trim(), includedInAvailable: editor.purpose === 'spending', openingBalance: editor.id && !correctOpening ? editor.openingBalance : parseMoney(opening.replace(/,/g, ''), { allowZero: true, allowNegative: true }) };
       validateAccount(draft);
       calculateAccountSummary(draft, transactions, month);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid account.'); return; }
@@ -110,21 +110,14 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
         <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{editor.purpose === 'spending' ? 'Spending' : 'Savings'}</ThemedText>
         <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
       </Pressable>
-      <ThemedText type="small">{editor.id ? 'Opening balance' : 'Starting balance'}</ThemedText>
-      {editor.id && <><ThemedText type="small">{formatMoney(editor.openingBalance)}</ThemedText><ThemedText type="small" themeColor="textSecondary">The original starting amount, separate from your current balance.</ThemedText><ActionButton compact label={correctOpening ? "Keep original opening balance" : "Correct opening balance"} disabled={locked} onPress={() => { setCorrectOpening(!correctOpening); setRejected(false); setError(""); }} /></>}
+      {(!editor.id || correctOpening) ? <ThemedText type="small">{editor.id ? 'Correct original opening balance' : 'Starting balance'}</ThemedText> : null}
+      {editor.id && correctOpening ? <ThemedText type="small" themeColor="textSecondary">This changes your historical starting balance. To correct today's balance, use Adjust balance instead.</ThemedText> : null}
       {(!editor.id || correctOpening) && <>
       <MoneyField signed accessibilityLabel="Account opening balance in pesos" value={opening} onValueChange={(value) => { setOpening(value); setRejected(false); setError(''); }}
         onRejected={() => { setRejected(true); setError('Use digits, up to two decimal places, and an optional minus sign.'); }} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="small" themeColor="textSecondary">A starting balance adjustment, separate from income.</ThemedText>
       </>}
-      {editor.id ? <>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <ThemedText type="small" style={{ flex: 1 }}>Include in Available Money</ThemedText>
-        <Switch accessibilityLabel="Include account in Available Money" value={editor.includedInAvailable} disabled={locked} onValueChange={(includedInAvailable) => setEditor({ ...editor, includedInAvailable })} trackColor={{ true: theme.accent }} />
-      </View>
-      <ThemedText type="small" themeColor="textSecondary">Included balances contribute to Available Money in Accounts.</ThemedText>
-      </> : null}
-      <ActionButton primary label={working ? 'Saving…' : editor.id ? 'Review changes' : 'Save account'} disabled={locked || rejected} onPress={review} />
+      <ActionButton primary label={working ? 'Saving…' : editor.id ? 'Save changes' : 'Save account'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setEditor(null); setError(''); newId.current = undefined; onClose?.(); } }} />
     </View> : !onClose ? <ActionButton label="Add account" primary disabled={locked} onPress={() => edit()} /> : null}
     {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}

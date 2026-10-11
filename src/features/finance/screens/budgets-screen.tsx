@@ -69,7 +69,7 @@ export default function BudgetsScreen() {
       {report.rows.map((row) => <View key={row.category} style={{ padding: 14, borderRadius: 16, backgroundColor: theme.backgroundElement, gap: 8 }}>
         <ThemedText type="smallBold">{row.category}</ThemedText>
         <ThemedText type="small">Spent {formatMoney(row.spent)} / Limit {formatMoney(row.limitAmount)}</ThemedText>
-        <ThemedText type="small">{row.status} - {row.remaining < 0 ? 'Over by ' + formatMoney(-row.remaining) : 'Remaining ' + formatMoney(row.remaining)}</ThemedText>
+        <ThemedText type="small" style={{ color: row.remaining < 0 ? theme.expense : theme.textSecondary }}>{row.status} - {row.remaining < 0 ? 'Over by ' + formatMoney(-row.remaining) : 'Remaining ' + formatMoney(row.remaining)}</ThemedText>
         <View accessibilityRole="progressbar" accessibilityLabel={row.category + ' budget usage'} accessibilityValue={{ min: 0, max: 100, now: Math.min(100, Math.round(row.progress * 100)), text: Math.round(row.progress * 100) + '% used, ' + row.status }} style={{ height: 6, borderRadius: 3, backgroundColor: theme.backgroundSelected, overflow: 'hidden' }}>
           <View style={{ height: 6, width: (Math.min(1, row.progress) * 100 + '%') as `${number}%`, backgroundColor: row.remaining < 0 ? theme.expense : theme.accent }} />
         </View>
@@ -78,6 +78,7 @@ export default function BudgetsScreen() {
           <ActionButton compact label="Delete" disabled={locked} onPress={() => confirm('Delete budget?', 'Remove ' + row.category + ' budget for ' + readableReportingMonth(month) + '? Your expenses are kept.', () => finance.removeBudget(month, row.category), true)} />
         </View>
       </View>)}
+      {report.rows.length > 0 ? <ThemedText type="small" style={{ color: report.remaining < 0 ? theme.expense : theme.income }}>{formatMoney(Math.abs(report.remaining))} {report.remaining < 0 ? 'over budget' : 'remaining'}</ThemedText> : null}
       {report.rows.length === 0 && <ThemedText>No budgets for this month. Add a category limit to start tracking.</ThemedText>}
       {!editor && <ActionButton primary label="Add category budget" disabled={locked || unused.length === 0} onPress={() => { setEditor({ category: unused[0], amount: '', creating: true }); setRejected(false); setError(''); }} />}
       {editor && <View style={{ gap: 10, padding: 14, borderRadius: 16, backgroundColor: theme.backgroundElement }}>
@@ -85,7 +86,7 @@ export default function BudgetsScreen() {
         {editor.creating ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{unused.map((category) => <ActionButton key={category} compact label={category} selected={editor.category === category} disabled={locked} onPress={() => setEditor({ ...editor, category })} />)}</View> : <ThemedText>{editor.category}</ThemedText>}
         <MoneyField accessibilityLabel="Monthly budget limit in pesos" autoFocus value={editor.amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary}
           onValueChange={(amount) => { setEditor({ ...editor, amount }); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }}
-          style={{ color: theme.text, fontSize: 24, padding: 14, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
+          style={{ color: theme.text, fontSize: 22, padding: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
         <ActionButton primary label={working ? 'Saving...' : editor.creating ? 'Save budget' : 'Review changes'} disabled={locked || rejected} onPress={save} />
         <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setEditor(null); setError(''); } }} />
       </View>}

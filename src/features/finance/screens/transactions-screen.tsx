@@ -46,10 +46,10 @@ export default function TransactionsScreen() {
   }
   return <FinanceScreen title="Transaction history" centeredTitle scroll={false} floatingAction={<AddTransactionButton disabled={busy} />}>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {(['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)}
-          style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filter === value ? theme.accent : theme.expenseSurface, opacity: pressed ? 0.5 : 1 })}>
-          <ThemedText type="small" style={{ fontSize: 12, color: filter === value ? theme.onAccent : theme.text }}>{filter === value ? '✓ ' : ''}{value === 'ALL' ? 'All' : value === 'INCOME' ? 'Income' : value === 'TRANSFER' ? 'Transfers' : 'Expenses'}</ThemedText>
+          style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filter === value ? theme.accent : theme.expenseSurface, opacity: pressed ? 0.5 : 1 })}>
+          <ThemedText type="small" style={{ fontSize: 11, color: filter === value ? theme.onAccent : theme.text }}>{filter === value ? '✓ ' : ''}{value === 'ALL' ? 'All' : value === 'INCOME' ? 'Income' : value === 'TRANSFER' ? 'Transfers' : 'Expenses'}</ThemedText>
         </Pressable>)}
       </View>
       <HomeMonthPicker />

@@ -20,7 +20,7 @@ export function SavingsOverview({ compact = false, goalsOnly = false }: { compac
       <ThemedText type="smallBold" accessibilityRole="header">Savings</ThemedText>
       {savings ? <>
         <ThemedText type="small" themeColor="textSecondary">Current savings balance | All months</ThemedText>
-        <ThemedText style={{ fontSize: 24, fontWeight: '700' }}>{formatMoney(savings.balance)}</ThemedText>
+        <ThemedText style={{ fontSize: 22, fontWeight: '700' }}>{formatMoney(savings.balance)}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">{readableReportingMonth(month)}</ThemedText>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <ThemedText type="small">Saved this month</ThemedText><ThemedText type="smallBold">{formatMoney(savings.savedThisMonth)}</ThemedText>
@@ -45,13 +45,13 @@ export function SavingsOverview({ compact = false, goalsOnly = false }: { compac
         try { progress = calculateGoalProgress(goal, accounts, transactions); }
         catch (cause) { return <ThemedText key={goal.id} accessibilityRole="alert">{goal.name}: {cause instanceof Error ? cause.message : 'Could not calculate progress.'}</ThemedText>; }
         return <View key={goal.id} style={{ gap: 8, borderTopWidth: 1, borderColor: theme.border, paddingTop: 12 }}>
-          <ThemedText type="smallBold">{goal.name}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">{account.name}{account.archived ? ' | Archived' : ''}{goal.targetDate ? ' | Target ' + formatTransactionDateTime(goal.targetDate, '00:00:00').split(' · ')[0] : ''}</ThemedText>
+          <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail">{goal.name}</ThemedText>
+          <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" themeColor="textSecondary">{account.name}{account.archived ? ' | Archived' : ''}{goal.targetDate ? ' | Target ' + formatTransactionDateTime(goal.targetDate, '00:00:00').split(' · ')[0] : ''}</ThemedText>
           <ThemedText type="small">{formatMoney(progress.balance)} of {formatMoney(goal.targetAmount)}</ThemedText>
           <View accessibilityRole="progressbar" accessibilityLabel={goal.name + ' progress'} accessibilityValue={{ min: 0, max: 100, now: Math.round(progress.progress * 100) }} style={{ height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: theme.backgroundSelected }}>
             <View style={{ height: 8, backgroundColor: theme.accent, width: ((progress.progress * 100) + '%') as `${number}%` }} />
           </View>
-          <ThemedText type="small" themeColor="textSecondary">{progress.achieved ? 'Target reached' : formatMoney(progress.remaining) + ' remaining'}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">{progress.achieved ? 'Target reached' : Math.round(progress.progress * 100) + '% saved / ' + formatMoney(progress.remaining) + ' remaining'}</ThemedText>
           {progress.balance < 0 && <ThemedText accessibilityRole="alert">Warning: this savings account has a negative balance.</ThemedText>}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <ActionButton compact primary label="Add money" disabled={busy || account.archived || !accounts.some((row) => !row.archived && row.id !== account.id)}

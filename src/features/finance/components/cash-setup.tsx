@@ -33,7 +33,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
       if (step === 1 && (name.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(name))) throw new Error('Use a name up to 50 characters.');
       if (step === 3) {
         if (rejected && !zero) return;
-        setCents(zero ? 0 : parseMoney(amount.replace(/,/g, ''), { allowZero: true }));
+        setCents(zero ? 0 : parseMoney(amount.replace(/,/g, '') || '0', { allowZero: true }));
         if (zero) { setAmount('0'); setRejected(false); }
       }
       Keyboard.dismiss(); setError(''); setStep(step + 1);
@@ -46,7 +46,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not finish setup. Your details are kept.'); }
     finally { pending.current = false; setSaving(false); }
   }
-  const inputStyle = { color: theme.text, padding: 14, borderWidth: 1, borderColor: theme.border, borderRadius: 12, fontSize: 14 };
+  const inputStyle = { color: theme.text, padding: 14, borderWidth: 1, borderColor: theme.border, borderRadius: 12, fontSize: 12 };
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <FinanceScreen title={titles[step]} tabScreen={false} headerLeading={<View />}>
       <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">Step {step + 1} of {titles.length}</ThemedText>
@@ -63,19 +63,19 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         </>}
         {step === 2 && <>
           <ThemedText type="smallBold">Philippine Peso (PHP)</ThemedText>
-          <ThemedText type="small">PHP is currently the only supported currency. All accounts and reports use pesos. Transaction dates and times follow Philippine time.</ThemedText>
+          <ThemedText type="small">PHP is currently the only supported currency. All accounts and reports use pesos.</ThemedText>
         </>}
         {step === 3 && <>
           <ThemedText>How much cash do you have right now?</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">This is an opening balance, not income. You can add other accounts later.</ThemedText>
-          <MoneyField accessibilityLabel="Starting cash in pesos" value={amount} autoFocus editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={{ ...inputStyle, fontSize: 28 }}
+          <MoneyField accessibilityLabel="Starting cash in pesos" value={amount} autoFocus editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={{ ...inputStyle, fontSize: 24 }}
             onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} />
         </>}
         {step === 4 && <>
           <ThemedText type="smallBold">{name.trim() ? 'Welcome, ' + name.trim() : 'Welcome'}!</ThemedText>
           <ThemedText type="small">Cash starts at {formatMoney(cents)} in PHP.</ThemedText>
-          <ThemedText type="small">Tap + to record money. Quick Entry turns short phrases into drafts for you to review before saving.</ThemedText>
-          <ThemedText type="small">Home shows your balances and monthly reports. Transactions holds your history. Settings has account management and encrypted backups.</ThemedText>
+          <ThemedText type="small">Record income and expenses, or transfer money between accounts without counting it as income.</ThemedText>
+          <ThemedText type="small">Home shows insights and recent activity. Accounts manages your balances. History holds your transactions. Settings has budgets, goals, and backups.</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">Export a password-protected backup to protect your records before uninstalling or resetting. Your optional name stays local and is not included in financial backups; restoring a backup clears it.</ThemedText>
         </>}
       </View>

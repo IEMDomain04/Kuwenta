@@ -46,7 +46,7 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
     try { transferPreview = previewTransfer(accounts, transactions, { type, accountId, destinationAccountId, category: 'Transfer', amount: parseMoney(amount.replace(/,/g, '')), transactionDate: date, transactionTime: time }, original); }
     catch (cause) { previewError = cause instanceof Error ? cause.message : 'Could not preview balances.'; }
   }
-  const inputStyle = { color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 14 };
+  const inputStyle = { color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 12 };
   function submit() {
     const issues = { ...errors };
     let cents = 0;
@@ -79,12 +79,14 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}
           onPress={() => { Keyboard.dismiss(); setCategoryOpen(true); }} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-          <ThemedText numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>{category}</ThemedText>
+          <ThemedText numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, fontSize: 12, lineHeight: 18, textAlign: 'right' }}>{category}</ThemedText>
           {type !== "TRANSFER" && <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />}
         </Pressable>
       </View>
     </View>
     {errors.amount ? <ThemedText accessibilityRole="alert">{errors.amount}</ThemedText> : null}
+    <ThemedText type="smallBold">Notes (optional)</ThemedText>
+    <TextInput ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note…" placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
     <TransactionDateTime date={date} time={time} disabled={disabled}
       onDateChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: undefined })); }}
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />
@@ -94,7 +96,7 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
       onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
       <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
-      <ThemedText numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} · PHP{selectedAccount?.archived ? ' · Archived' : ''}</ThemedText>
+      <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} · PHP{selectedAccount?.archived ? ' · Archived' : ''}</ThemedText>
       <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
     </Pressable>
     {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
@@ -113,8 +115,6 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
       {previewError ? <ThemedText accessibilityRole="alert">{previewError}</ThemedText> : null}
       {accounts.filter((account) => !account.archived).length < 2 && <ThemedText accessibilityRole="alert">Add or unarchive another account to make a transfer.</ThemedText>}
     </>}
-    <ThemedText type="smallBold">Notes (optional)</ThemedText>
-    <TextInput ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note…" placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
     {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
     </ScrollView>
     <View style={{ gap: 6, paddingTop: 8, borderTopWidth: 1, borderColor: theme.border }}>

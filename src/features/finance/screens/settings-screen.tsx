@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, View } from 'react-native';
 import { router } from 'expo-router';
+import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { FinanceScreen, ActionButton } from '../components/ui';
 import { BackupExport } from '../components/backup-export';
@@ -8,7 +9,9 @@ import { BackupImportPreview } from '../components/backup-import-preview';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
-  const { busy, resetData } = useFinance();
+  const { busy, resetData, displayName } = useFinance();
+  const theme = useTheme();
+  const section = { padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 };
   const pending = useRef(false);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState('');
@@ -24,21 +27,27 @@ export default function SettingsScreen() {
     ], { cancelable: false });
   }
   return <FinanceScreen title="Settings">
-    <ThemedText type="smallBold" accessibilityRole="header">Account Management</ThemedText>
+    <View style={section}>
+    <ThemedText type="smallBold" accessibilityRole="header">Profile</ThemedText>
+    <ThemedText type="small">{displayName || 'Kuwenta user'}</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Philippine Peso (PHP)</ThemedText>
     <ActionButton label="Manage accounts" disabled={busy} onPress={() => router.navigate('/accounts')} />
-    <ThemedText type="smallBold" accessibilityRole="header">Planning</ThemedText>
+    </View><View style={section}>
+    <ThemedText type="smallBold" accessibilityRole="header">Budgets & Goals</ThemedText>
     <ActionButton label="Budgets" disabled={busy} onPress={() => router.push('/budgets')} />
     <ActionButton label="Savings & Goals" disabled={busy} onPress={() => router.push('/goals')} />
-    <ThemedText type="smallBold" accessibilityRole="header">Data and Backups</ThemedText>
+    </View><View style={section}>
+    <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
     <BackupExport disabled={busy} />
     <BackupImportPreview disabled={busy} />
-    <ThemedText type="smallBold" accessibilityRole="header">Start fresh</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Restoring replaces current financial records. Export a backup first to keep them.</ThemedText>
+    </View><View style={section}>
+    <ThemedText type="smallBold" accessibilityRole="header">Reset App</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Permanently clear Kuwenta records on this device and restart with Cash at zero. Export a backup above before resetting. There is no Undo.</ThemedText>
     <ActionButton label={resetting ? 'Resetting...' : 'Reset all data'} disabled={busy || resetting} onPress={confirmReset} />
     {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
-    <ThemedText type="smallBold" accessibilityRole="header">Appearance</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Kuwenta uses a light interface.</ThemedText>
+    </View>
     <ThemedText type="smallBold" accessibilityRole="header">About Kuwenta</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Track, move, and save money in Philippine pesos.</ThemedText>
   </FinanceScreen>;

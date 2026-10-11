@@ -1,5 +1,6 @@
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { Alert, BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
@@ -96,9 +97,12 @@ export default function AccountScreen() {
         : mode === 'edit' ? <AccountManager accountId={accountId} initialCorrectOpening={correctOpening} onClose={() => setMode('details')} />
         : <>
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 }}>
-            <ThemedText type="smallBold">{account.name}{account.archived ? ' · Archived' : ''}</ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ThemedText type="smallBold" numberOfLines={1} style={{ flex: 1 }}>{account.name}{account.archived ? ' · Archived' : ''}</ThemedText>
+            <Pressable accessibilityRole="button" accessibilityLabel="Account options" disabled={locked} onPress={() => setOptionsOpen(true)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="ellipsis-horizontal" size={20} color={theme.accent} /></Pressable>
+            </View>
             <ThemedText type="small" themeColor="textSecondary">Current balance</ThemedText>
-            <ThemedText style={{ fontSize: 28, lineHeight: 36, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(balance)}</ThemedText>
+            <ThemedText style={{ fontSize: 24, lineHeight: 32, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(balance)}</ThemedText>
             {balance < 0 && <ThemedText accessibilityRole="alert">Warning: this account balance is negative.</ThemedText>}
             <ThemedText type="small">{account.currency} · {account.purpose === 'spending' ? 'Spending' : 'Savings'}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">{account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
@@ -115,7 +119,6 @@ export default function AccountScreen() {
             <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setMode('details'); setError(''); } }} />
           </> : <>
             {!account.archived && <>
-              <ThemedText type="small" themeColor="textSecondary">Adjust balance records a correction. Edit account details changes the name and spending preferences.</ThemedText>
               <ActionButton compact label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setMode('adjust'); }} />
               <ActionButton primary label="Transfer money" disabled={locked || finance.accounts.filter((row) => !row.archived).length < 2}
                 onPress={() => router.push({ pathname: '/transaction', params: { type: 'TRANSFER', accountId: account.id } })} />
@@ -130,15 +133,21 @@ export default function AccountScreen() {
               </View>
               {history.length ? history.slice(0, 5).map((row) => <TransactionRow key={row.id} transaction={row} showDate accountName={finance.accounts.find((item) => item.id === row.accountId)?.name ?? 'Unknown account'} destinationName={finance.accounts.find((item) => item.id === row.destinationAccountId)?.name} disabled={locked || row.type === 'ADJUSTMENT'} onEdit={() => router.push({ pathname: '/transaction', params: { id: row.id } })} />) : <ThemedText type="small" themeColor="textSecondary">No transactions for this account yet.</ThemedText>}
             </View>
-            <ActionButton label={optionsOpen ? 'Close account options' : 'Account options'} selected={optionsOpen} disabled={locked} onPress={() => setOptionsOpen(!optionsOpen)} />
-            {optionsOpen && <View style={{ gap: 8 }}>
-              {!account.archived && <>
-                <ActionButton label="Edit account details" disabled={locked} onPress={() => { setCorrectOpening(false); setMode('edit'); }} />
-                <ActionButton label="Correct opening balance" disabled={locked} onPress={() => { setCorrectOpening(true); setMode('edit'); }} />
-              </>}
-              <ActionButton label="Delete account" disabled={locked} onPress={remove} />
-              <ActionButton label={account.archived ? 'Unarchive account' : 'Archive account'} disabled={locked} onPress={archive} />
-            </View>}
+            <Modal visible={optionsOpen} transparent animationType="fade" onRequestClose={() => setOptionsOpen(false)}>
+              <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#00000066' }}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Close account options" onPress={() => setOptionsOpen(false)} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
+                <View accessibilityViewIsModal style={{ padding: 16, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 8 }}>
+                  <ThemedText type="smallBold">Account options</ThemedText>
+                  {!account.archived && <>
+                    <ActionButton compact label="Edit account" disabled={locked} onPress={() => { setOptionsOpen(false); setCorrectOpening(false); setMode('edit'); }} />
+                    <ActionButton compact label="Advanced: correct opening balance" disabled={locked} onPress={() => { setOptionsOpen(false); setCorrectOpening(true); setMode('edit'); }} />
+                  </>}
+                  <ActionButton compact label={account.archived ? 'Unarchive account' : 'Archive account'} disabled={locked} onPress={() => { setOptionsOpen(false); archive(); }} />
+                  <ActionButton compact label="Delete account" disabled={locked} onPress={() => { setOptionsOpen(false); remove(); }} />
+                  <ActionButton compact label="Cancel" onPress={() => setOptionsOpen(false)} />
+                </View>
+              </View>
+            </Modal>
 
           </>}
           {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}

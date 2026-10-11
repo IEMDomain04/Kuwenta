@@ -64,5 +64,5 @@ export function parseQuickEntry(text: string, accounts: readonly Account[], now 
   if (matches.length > 1) throw new Error('More than one category matches. Use one transaction description or select a category in the regular form.');
   const category = matches[0]?.[0] ?? 'Other';
   return { draft: { type, accountId, category, amount, transactionDate, transactionTime: defaults.transactionTime, notes: description || undefined },
-    warnings: [category === 'Other' ? 'Category could not be identified. Review Other or choose a category.' : 'Category is a suggestion. Review all details before saving.', 'Time defaults to now; change it if needed.'] };
+    warnings: [category === 'Other' ? 'Category could not be identified. Review Other or choose a category.' : 'Category is a suggestion. Review all details before saving.', 'Account: ' + accounts.find((account) => account.id === accountId)!.name + '. Review before saving.', 'Time defaults to now; change it if needed.'] };
 }

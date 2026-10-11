@@ -1,3 +1,4 @@
+import { moneyInsights } from '../insights';
 import { router } from 'expo-router';
 import { CategoryIcon } from '../components/category-visual';
 import { formatTransactionDateTime } from '../dates';
@@ -13,7 +14,7 @@ import { FinanceScreen, AddTransactionButton } from '../components/ui';
 import { PeriodOverview } from '../components/period-overview';
 
 export default function HomeScreen() {
-  const { displayName, accounts, transactions, month, busy } = useFinance();
+  const { displayName, accounts, transactions, budgets, goals, month, busy } = useFinance();
   const theme = useTheme();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -29,6 +30,9 @@ export default function HomeScreen() {
     : today.expenses ? 'You recorded ' + formatMoney(today.expenses) + ' in expenses today. Review your activity below to see where you stand.'
     : today.income ? 'You recorded ' + formatMoney(today.income) + ' in income today. Keep recording your activity to build a clearer picture.'
     : 'No income or expenses recorded today. Your previous activity is ready to review below.';
+  let insights: string[] = [];
+  try { insights = moneyInsights(accounts, transactions, budgets, goals, now); }
+  catch { insights = ['Insights are unavailable. Review your records in Accounts and History.']; }
   return <FinanceScreen title="Kuwenta" floatingAction={<AddTransactionButton disabled={busy} />}>
     <View style={styles.greeting}>
       <ThemedText type="small" themeColor="textSecondary">{dateLabel}</ThemedText>
@@ -38,7 +42,8 @@ export default function HomeScreen() {
       <View style={[styles.icon, { backgroundColor: theme.incomeSurface }]}><Ionicons name="bulb-outline" size={24} color={theme.accent} /></View>
       <View style={{ flex: 1, gap: 4 }}>
         <ThemedText type="smallBold" style={{ fontSize: 13, lineHeight: 18 }}>Your money, at a glance</ThemedText>
-        <ThemedText style={styles.message}>{message}</ThemedText>
+        <ThemedText style={styles.message}>{insights[0] ?? message}</ThemedText>
+        {insights.slice(1).map((insight) => <ThemedText key={insight} style={styles.message}>{insight}</ThemedText>)}
       </View>
     </View>
     {hasActivity ? <PeriodOverview now={now} /> : null}

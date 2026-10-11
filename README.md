@@ -980,3 +980,23 @@ Checks on phone: card/list switching, large balances and system text, account cr
 
 
 Accounts visual refinement: Add Account lives inside the balance summary; the insight/chart row uses a 60/40 split and stacks on narrow screens or larger system text. Wallet cards retain their card width for an odd final account, with icon/name at the top and balance near the bottom. Compact typography is the default design direction: small supporting labels with clear headings and larger primary amounts, preserving system text scaling and comfortable touch targets.
+
+
+### Compact workflows (phases 4-6)
+- Account details use an options menu for edit, archive, delete, and advanced opening-balance correction. Normal editing changes name and purpose; saving sets Available Money inclusion from purpose. Existing account flags remain unchanged until an edit is saved.
+- Transaction notes appear below the amount, with date/time and account selectors following. Existing category selection, transfer previews, confirmations, sticky save actions, and Undo are retained.
+- Settings groups Profile, Budgets & Goals, Backup & Restore, and Reset App. Budget overspending is highlighted; goals show percentage and remaining money.
+- Onboarding keeps the five-step flow and explains Home, Accounts, History, and Settings. Blank starting Cash defaults to zero; setup values survive Back/Continue within the session.
+- Phone checks: account menu cancel/save, transfer previews and Undo, long History labels, budget and goal updates, onboarding with zero Cash, backup/restore cancellation, and reset confirmation. A full restart during unfinished onboarding starts the walkthrough again; no draft persistence was added.
+
+
+### Offline assistance and reliability (phases 7-8)
+Home insights run locally from recorded transactions: current-month budget usage, highest expense category, matched month-to-date spending comparisons (days 1-28 with records in both periods), net savings funding, and current goal progress. Up to three insights appear; they are summaries, not forecasts. Quick Entry shows an active account choice and prepares a review draft; an explicit account clause overrides the selection. No model, network request, or automatic financial write is used.
+
+Device verification still required:
+- In airplane mode, review Quick Entry and save/Undo an income, expense, and transfer; reopen the app and confirm records persist.
+- Try ambiguous phrases, repeated Save taps, backdated entries, very large amounts, negative balances, and changing the selected account.
+- Test small-screen layout, largest system text, TalkBack labels, keyboard visibility, long names, and money-input cursor movement.
+- Export/restore an encrypted backup, try a wrong password, cancel replacement, and cancel reset before testing full reset with backed-up test data.
+- The reported standalone APK crash after Save remains unconfirmed. With Android platform tools available, clear logs with `adb logcat -c`, reproduce the crash, then capture `adb logcat -b crash -d`. Record device/Android version, APK build, transaction type, and whether the record persists. Do not publish logs containing personal financial details.
+- Lint is blocked until ESLint is installed/configured; TypeScript and finance tests provide the current automated checks.
