@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useRef, useState } from 'react';
 import { TextInput, type TextInputProps } from 'react-native';
 import { editMoneyInput } from '../inputs';
@@ -7,10 +7,11 @@ type Props = Omit<TextInputProps, 'value' | 'onChangeText' | 'selection' | 'onSe
   value: string; signed?: boolean; onValueChange: (value: string) => void; onRejected: () => void;
 };
 export function MoneyField({ value, signed = false, onValueChange, onRejected, ...props }: Props) {
+  const theme = useTheme();
   const caret = useRef({ start: value.length, end: value.length });
   const pendingCaret = useRef<{ start: number; end: number } | undefined>(undefined);
   const [selection, setSelection] = useState<{ start: number; end: number }>();
-  return <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" {...props} value={value} selection={selection} keyboardType="decimal-pad"
+  return <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" {...props} value={value} selection={selection} keyboardType="decimal-pad"
     selectTextOnFocus={/^-?0+(?:\.0{1,2})?$/.test(value.replace(/,/g, ''))}
     onSelectionChange={(event) => {
       const next = event.nativeEvent.selection;

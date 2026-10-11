@@ -1,7 +1,7 @@
-import { Colors } from '@/constants/theme';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { useAppearance } from '@/hooks/appearance-provider';
 import { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { FinanceScreen, ActionButton } from '../components/ui';
@@ -12,6 +12,10 @@ import { useFinance } from '../provider';
 export default function SettingsScreen() {
   const { busy, resetData, displayName, saveDisplayName } = useFinance();
   const theme = useTheme();
+  const { mode, setMode } = useAppearance();
+  const [appearanceError, setAppearanceError] = useState('');
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const appearanceOptions = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Use device setting']] as const;
   const [nameOpen, setNameOpen] = useState(false);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState('');
@@ -47,12 +51,28 @@ export default function SettingsScreen() {
       <View><ThemedText type="smallBold">Your name</ThemedText><ThemedText type="small" themeColor="textSecondary">{displayName || 'Set your name'}</ThemedText></View>
       <ThemedText type="smallBold" themeColor="accent">Edit</ThemedText>
     </Pressable>
+    <ThemedText type="smallBold">Appearance</ThemedText>
+    <Pressable accessibilityRole="button" accessibilityLabel={'Appearance, ' + appearanceOptions.find(([value]) => value === mode)?.[1]} accessibilityState={{ expanded: appearanceOpen }} onPress={() => setAppearanceOpen(!appearanceOpen)}
+      style={{ minHeight: 48, paddingHorizontal: 12, borderRadius: 12, backgroundColor: theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <ThemedText type="small" style={{ flex: 1 }}>{appearanceOptions.find(([value]) => value === mode)?.[1]}</ThemedText>
+      <Ionicons name={appearanceOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textSecondary} />
+    </Pressable>
+    {appearanceOpen ? <View style={{ borderRadius: 12, padding: 4, backgroundColor: theme.background }}>
+      {appearanceOptions.map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: mode === value }} onPress={() => {
+        try { setMode(value); setAppearanceError(''); setAppearanceOpen(false); }
+        catch { setAppearanceError('Could not save appearance. Please try again.'); }
+      }} style={{ minHeight: 44, paddingHorizontal: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: mode === value ? theme.backgroundSelected : 'transparent' }}>
+        <ThemedText type="small" style={{ flex: 1 }}>{label}</ThemedText>
+        {mode === value ? <Ionicons name="checkmark" size={16} color={theme.accent} /> : null}
+      </Pressable>)}
+    </View> : null}
+    {appearanceError ? <ThemedText type="small" themeColor="error" accessibilityRole="alert">{appearanceError}</ThemedText> : null}
     <Modal visible={nameOpen} transparent animationType="fade" onRequestClose={() => { if (!namePending.current) setNameOpen(false); }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', padding: 24 }}>
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flexShrink: 1, width: '100%', maxWidth: 420, alignSelf: 'center' }} contentContainerStyle={{ paddingVertical: 12 }}>
         <View accessibilityViewIsModal style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 20, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' }}>
           <ThemedText type="smallBold" accessibilityRole="header">Your name</ThemedText>
-          <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
+          <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
           {nameError ? <ThemedText type="small" accessibilityRole="alert" themeColor="error">{nameError}</ThemedText> : null}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}><ActionButton label="Cancel" disabled={savingName || busy} onPress={() => setNameOpen(false)} /></View>
@@ -63,7 +83,6 @@ export default function SettingsScreen() {
       </KeyboardAvoidingView>
     </Modal>
     <ThemedText type="small" themeColor="textSecondary">Philippine Peso (PHP)</ThemedText>
-    <ActionButton label="Manage accounts" disabled={busy} onPress={() => router.navigate('/accounts')} />
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>

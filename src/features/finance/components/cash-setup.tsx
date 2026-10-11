@@ -1,4 +1,3 @@
-import { Colors } from '@/constants/theme';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -89,7 +88,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         </> : null}
         {step === 1 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Choose the name you want to see in your Home greeting.</ThemedText>
-          <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={inputStyle} />
+          <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={inputStyle} />
         </> : null}
         {step === 2 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Use the + button to record money activity.</ThemedText>
@@ -109,7 +108,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         {step === 4 ? <>
           <ThemedText type="smallBold">Currency: Philippine Peso (PHP)</ThemedText>
           <ThemedText type="smallBold">First account name</ThemedText>
-          <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="First account name" value={accountName} maxLength={50} editable={!locked} onChangeText={(value) => { setAccountName(value); setError(''); }} placeholder="Cash" placeholderTextColor={theme.textSecondary} autoCapitalize="words" style={inputStyle} />
+          <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="First account name" value={accountName} maxLength={50} editable={!locked} onChangeText={(value) => { setAccountName(value); setError(''); }} placeholder="Cash" placeholderTextColor={theme.textSecondary} autoCapitalize="words" style={inputStyle} />
           <ThemedText type="smallBold">Starting balance</ThemedText>
           <MoneyField accessibilityLabel="Starting balance in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={{ ...inputStyle, fontSize: 22 }}
             onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} />

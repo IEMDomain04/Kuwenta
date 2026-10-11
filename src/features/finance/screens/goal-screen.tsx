@@ -1,4 +1,3 @@
-import { Colors } from '@/constants/theme';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { SelectionSheet } from '../components/selection-sheet';
 import { useEffect, useRef, useState } from 'react';
@@ -88,7 +87,7 @@ export default function GoalScreen() {
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <FinanceScreen title={original ? 'Edit savings goal' : 'Add savings goal'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) leave(); }} />}>
       <ThemedText type="smallBold">Goal name</ThemedText>
-      <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Goal name" value={name} onChangeText={setName} editable={!locked} placeholder="Emergency fund" placeholderTextColor={theme.textSecondary} style={inputStyle} />
+      <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Goal name" value={name} onChangeText={setName} editable={!locked} placeholder="Emergency fund" placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="smallBold">Target amount</ThemedText>
       <MoneyField accessibilityLabel="Goal target amount in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle}
         onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} />
@@ -101,7 +100,7 @@ export default function GoalScreen() {
       {available.length === 0 && !createAccount ? <ThemedText type="small" themeColor="textSecondary">A goal needs a dedicated savings account. Open the selector to create one{original ? ' or unarchive the linked account' : ''}.</ThemedText> : null}
       {createAccount && !original ? <>
         <ThemedText type="small">New account name (optional)</ThemedText>
-        <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="New savings account name" value={newAccountName} onChangeText={setNewAccountName} editable={!locked} placeholder={name || 'Uses the goal name'} placeholderTextColor={theme.textSecondary} style={inputStyle} />
+        <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="New savings account name" value={newAccountName} onChangeText={setNewAccountName} editable={!locked} placeholder={name || 'Uses the goal name'} placeholderTextColor={theme.textSecondary} style={inputStyle} />
         <ThemedText type="small" themeColor="textSecondary">Created with this goal at zero balance. Add money by transferring from another account.</ThemedText>
       </> : null}
       <SelectionSheet visible={accountOpen} title="Savings account" selected={createAccount ? '__new__' : accountId} disabled={locked} options={[...available.map((account) => ({ value: account.id, label: account.name })), ...(!original ? [{ value: '__new__', label: '+ Create savings account' }] : [])]} onClose={() => setAccountOpen(false)} onSelect={(value) => { setCreateAccount(value === '__new__'); if (value !== '__new__') setAccountId(value); setError(''); }} />

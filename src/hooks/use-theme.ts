@@ -1,4 +1,3 @@
 import { Colors } from '@/constants/theme';
-export function useTheme() {
-  return Colors.light;
-}
+import { useColorScheme } from './use-color-scheme';
+export function useTheme() { return Colors[useColorScheme()]; }

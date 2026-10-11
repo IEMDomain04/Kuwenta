@@ -1,3 +1,4 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { formatMoney } from '../money';
@@ -12,7 +13,7 @@ const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof
   Meals: { color: '#A65313', icon: 'restaurant' },
   'Snacks & Drinks': { color: '#94620B', icon: 'fast-food' },
   Transport: { color: '#17658F', icon: 'bus' },
-  'Café': { color: '#805436', icon: 'cafe' },
+  'CafÃ©': { color: '#805436', icon: 'cafe' },
   'Mobile Load & Data': { color: '#0B6575', icon: 'phone-portrait' },
   'Games & Entertainment': { color: '#6543A0', icon: 'game-controller' },
   'Tech & Accessories': { color: '#033F77', icon: 'desktop' },
@@ -30,20 +31,27 @@ const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof
   Other: { color: '#7D929D', icon: 'ellipsis-horizontal' },
 };
 const incomeVisual = { color: Colors.light.income, icon: 'cash' as const };
-export function categoryVisual(category: string, income = false) {
-  return income ? incomeVisual : visuals[category] ?? visuals.Other;
+export function categoryVisual(category: string, income = false, dark = false) {
+  const visual = income ? incomeVisual : visuals[category] ?? visuals.Other;
+  if (!dark) return visual;
+  // Lift category colors against dark surfaces without changing their hue family.
+  const color = '#' + visual.color.slice(1).match(/../g)!.map((channel) =>
+    Math.round(parseInt(channel, 16) * 0.5 + 255 * 0.5).toString(16).padStart(2, '0')).join('');
+  return { ...visual, color };
 }
 export function svgSource(body: string, viewBox = '0 0 24 24') {
   return { uri: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + viewBox + '">' + body + '</svg>') };
 }
 export function CategoryIcon({ category, income = false, compact = false }: { category: string; income?: boolean; compact?: boolean }) {
-  const { color, icon } = categoryVisual(category, income);
+  const dark = useColorScheme() === 'dark';
+  const { color, icon } = categoryVisual(category, income, dark);
   return <View accessible={false} style={{ width: compact ? 26 : 36, height: compact ? 26 : 36, borderRadius: compact ? 9 : 12, alignItems: 'center', justifyContent: 'center', backgroundColor: color + '20' }}>
     <Ionicons name={icon} size={compact ? 16 : 22} color={color} />
   </View>;
 }
 export function SpendingDonut({ categories, total }: { categories: { category: string; amount: number }[]; total: number }) {
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
   const { fontScale } = useWindowDimensions();
   const formatted = formatMoney(total);
   const centerFits = formatted.length <= 9 && fontScale <= 1.2;
@@ -51,7 +59,7 @@ export function SpendingDonut({ categories, total }: { categories: { category: s
   return <View style={{ alignItems: 'center', gap: 8 }}>
     <View accessible={false}>
       <PieChart donut radius={56} innerRadius={40} innerCircleColor={theme.backgroundElement}
-        data={categories.map(({ category, amount }) => ({ value: amount, color: categoryVisual(category).color }))}
+        data={categories.map(({ category, amount }) => ({ value: amount, color: categoryVisual(category, false, dark).color }))}
         centerLabelComponent={() => centerFits
           ? <View style={{ alignItems: 'center', gap: 2 }}><ThemedText type="smallBold" style={{ fontSize: 15, lineHeight: 19, fontVariant: ['tabular-nums'] }}>{formatted}</ThemedText><ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 9, lineHeight: 12 }}>Total spent</ThemedText></View>
           : null} />

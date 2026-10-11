@@ -1,9 +1,11 @@
+import { useTheme } from '@/hooks/use-theme';
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 
 export function AnimatedSplashOverlay() {
+  const theme = useTheme();
   const opacity = useRef(new Animated.Value(1)).current;
   const [ready, setReady] = useState(false);
   const [visible, setVisible] = useState(true);
@@ -18,7 +20,7 @@ export function AnimatedSplashOverlay() {
   if (!visible) return null;
   return <Animated.View
     onLayout={() => { if (!ready) SplashScreen.hideAsync().finally(() => setReady(true)); }}
-    style={[styles.overlay, { opacity }]}>
+    style={[styles.overlay, { opacity, backgroundColor: theme.background }]}>
     <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
   </Animated.View>;
 }

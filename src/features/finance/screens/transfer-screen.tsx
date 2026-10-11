@@ -1,4 +1,3 @@
-import { Colors } from '@/constants/theme';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -104,7 +103,7 @@ export default function TransferScreen() {
         <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{isExternal ? 'External' : selected?.name ?? 'Choose account'}</ThemedText>
         <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
       </Pressable>
-      {isExternal ? <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel={side === 'from' ? 'External source name' : 'External destination name'} value={name} onChangeText={setName} editable={!locked} placeholder={side === 'from' ? 'External source name' : 'External destination name'} placeholderTextColor={theme.textSecondary} style={input} /> : null}
+      {isExternal ? <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel={side === 'from' ? 'External source name' : 'External destination name'} value={name} onChangeText={setName} editable={!locked} placeholder={side === 'from' ? 'External source name' : 'External destination name'} placeholderTextColor={theme.textSecondary} style={input} /> : null}
     </View>;
   }
   const input = { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, color: theme.text, fontSize: 12 };
@@ -117,7 +116,7 @@ export default function TransferScreen() {
       <ThemedText type="small">Amount (PHP)</ThemedText>
       <MoneyField accessibilityLabel="Transfer amount" value={amount} editable={!locked} onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} style={{ ...input, fontSize: 22 }} />
       <TransactionDateTime date={dateTime.transactionDate} time={dateTime.transactionTime} disabled={locked} onDateChange={(transactionDate) => setDateTime({ ...dateTime, transactionDate })} onTimeChange={(transactionTime) => setDateTime({ ...dateTime, transactionTime })} />
-      <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Optional transfer note" value={notes} onChangeText={setNotes} editable={!locked} placeholder="Optional note" placeholderTextColor={theme.textSecondary} style={input} />
+      <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Optional transfer note" value={notes} onChangeText={setNotes} editable={!locked} placeholder="Optional note" placeholderTextColor={theme.textSecondary} style={input} />
       {after !== undefined ? <View style={{ padding: 12, borderRadius: 12, backgroundColor: theme.infoSurface, gap: 4 }}>
         <ThemedText type="smallBold">After saving</ThemedText>
         <ThemedText type="small">{account?.name}: {formatMoney(after)}</ThemedText>

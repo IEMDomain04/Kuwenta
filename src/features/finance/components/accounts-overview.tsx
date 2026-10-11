@@ -1,3 +1,4 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -12,6 +13,7 @@ import { ActionButton } from './ui';
 export function AccountsOverview({ compact = false, showAdd = true }: { compact?: boolean; showAdd?: boolean }) {
   const { accounts, transactions, busy } = useFinance();
   const theme = useTheme();
+  const cardText = useColorScheme() === 'dark' ? '#082417' : '#FFFFFF';
   const { fontScale } = useWindowDimensions();
   const [showArchived, setShowArchived] = useState(false);
   const [layout, setLayout] = useState<'cards' | 'list'>('cards');
@@ -38,18 +40,18 @@ export function AccountsOverview({ compact = false, showAdd = true }: { compact?
             onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
             style={({ pressed }) => ({ ...(cards ? { flexBasis: fontScale > 1.3 ? '100%' : '47%', flexGrow: 0, minWidth: 135, minHeight: 154 } : { width: '100%' }), padding: 14, borderRadius: cards ? 20 : 16, borderWidth: 1, borderColor: account.archived || !cards ? theme.border : color, boxShadow: cards ? '0 3px 8px rgba(20, 36, 67, 0.08)' : undefined, flexDirection: cards ? 'column' : 'row', alignItems: cards ? 'stretch' : 'center', gap: 10, backgroundColor: cards && !account.archived ? color : theme.backgroundElement, opacity: pressed || busy ? 0.5 : 1 })}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: cards ? undefined : 1 }}>
-              <Ionicons name={purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={20} color={cards && !account.archived ? theme.onAccent : color} />
+              <Ionicons name={purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={20} color={cards && !account.archived ? cardText : color} />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: cards && !account.archived ? theme.onAccent : theme.text }}>{account.name}</ThemedText>
-                <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: cards && !account.archived ? theme.onAccent : theme.textSecondary }}>{account.archived ? 'Archived / PHP' : purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
+                <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: cards && !account.archived ? cardText : theme.text }}>{account.name}</ThemedText>
+                <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: cards && !account.archived ? cardText : theme.textSecondary }}>{account.archived ? 'Archived / PHP' : purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
               </View>
             </View>
             <View style={{ gap: 3, marginTop: cards ? 'auto' : 0 }}>
-              <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: cards && !account.archived ? theme.onAccent : theme.textSecondary }}>CURRENT BALANCE</ThemedText>
-              <ThemedText style={{ fontSize: cards ? 18 : 16, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: cards && !account.archived ? theme.onAccent : theme.text }}>{formatMoney(balance)}</ThemedText>
-              {balance < 0 ? <ThemedText type="small" accessibilityRole="alert" style={{ color: cards && !account.archived ? theme.onAccent : theme.text }}>Negative balance</ThemedText> : null}
+              <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: cards && !account.archived ? cardText : theme.textSecondary }}>CURRENT BALANCE</ThemedText>
+              <ThemedText style={{ fontSize: cards ? 18 : 16, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: cards && !account.archived ? cardText : theme.text }}>{formatMoney(balance)}</ThemedText>
+              {balance < 0 ? <ThemedText type="small" accessibilityRole="alert" style={{ color: cards && !account.archived ? cardText : theme.text }}>Negative balance</ThemedText> : null}
             </View>
-            {cards ? <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: account.archived ? theme.textSecondary : theme.onAccent }}>{account.includedInAvailable ? 'Included in Available Money' : 'Excluded from Available Money'}</ThemedText> : <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />}
+            {cards ? <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: account.archived ? theme.textSecondary : cardText }}>{account.includedInAvailable ? 'Included in Available Money' : 'Excluded from Available Money'}</ThemedText> : <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />}
           </Pressable>;
         })}</View>
       </View>;

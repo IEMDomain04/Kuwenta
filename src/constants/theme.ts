@@ -1,7 +1,4 @@
-/**
- * Shared Kuwenta colors for the light interface.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+/** Shared Kuwenta colors for light and dark appearance. */
 
 import '@/global.css';
 
@@ -22,8 +19,21 @@ const palette = {
   disabledBackground: '#E8EFEB', disabledText: '#4F6358',
   overlay: '#0A112966',
 } as const;
-// Kuwenta currently uses the light palette throughout.
-export const Colors = { light: palette, dark: palette } as const;
+const darkPalette = {
+  text: '#F1F7F3', background: '#0C1711', backgroundElement: '#192A21',
+  backgroundSelected: '#264937', textSecondary: '#B8CDC0',
+  accent: '#74DCA6', accentPressed: '#54C88D', onAccent: '#082417',
+  navy: '#ADC9FF', secondary: '#92BDFA', budget: '#7FD3E1', navigationInactive: '#ADC4B5',
+  income: '#74DCA6', expense: '#FF91A1', border: '#728E7D',
+  incomeSurface: '#203F2E', incomeEnd: '#294C37',
+  expenseSurface: '#42252E', expenseEnd: '#502D37', balanceEnd: '#25415C',
+  warning: '#F4CF7C', warningSurface: '#3C311D',
+  success: '#74DCA6', successSurface: '#203F2E',
+  info: '#92BDFA', infoSurface: '#203347',
+  error: '#FF91A1', errorSurface: '#42252E',
+  disabledBackground: '#29382F', disabledText: '#9EB2A5', overlay: '#00000099',
+} as const;
+export const Colors = { light: palette, dark: darkPalette } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
