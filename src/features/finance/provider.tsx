@@ -12,7 +12,7 @@ import { calculateFinanceSummary } from './calculations';
 import { isValidMonth, philippineDateTime } from './dates';
 import { openFinanceDatabase } from './storage/database';
 import { listGoals, saveGoal as saveGoalRecord, deleteGoal } from './storage/goals';
-import { deleteAccount, completeCashSetup, listAccounts, saveAccount as saveAccountRecords, updateOpeningBalance } from './storage/accounts';
+import { deleteAccount, saveDisplayName as saveDisplayNameRecord, completeCashSetup, listAccounts, saveAccount as saveAccountRecords, updateOpeningBalance } from './storage/accounts';
 import { resetFinancialData, readBackupJson, restoreBackup as restoreBackupRecords } from './storage/backup';
 import type { FinanceBackup } from './backup';
 import { createExternalTransfer, adjustAccountBalance, createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
@@ -21,6 +21,7 @@ import { FinanceScreen, ActionButton } from './components/ui';
 
 type Snapshot = { displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
+  saveDisplayName: (name: string) => Promise<void>;
   saveExternal: (record: Transaction) => Promise<void>;
   saveBudget: (budget: Budget, creating: boolean) => Promise<void>;
   removeBudget: (month: string, category: string) => Promise<void>;
@@ -110,6 +111,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       finally { locked = false; if (active) setBusy(false); }
     }
     actions.current = {
+      saveDisplayName: (name) => write((db) => saveDisplayNameRecord(db, name), 'Name updated.'),
       saveExternal: (record) => write((db) => createExternalTransfer(db, record.id, record), 'External transfer saved', record.id),
       refresh,
       saveBudget: (budget, creating) => write((db) => saveBudgetRecord(db, budget, creating), 'Budget saved.'),
@@ -170,6 +172,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
+    saveDisplayName: (name) => actions.current?.saveDisplayName(name) ?? unavailable(),
     saveExternal: (record) => actions.current?.saveExternal(record) ?? unavailable(),
     saveBudget: (budget, creating) => actions.current?.saveBudget(budget, creating) ?? unavailable(),
     removeBudget: (month, category) => actions.current?.removeBudget(month, category) ?? unavailable(),

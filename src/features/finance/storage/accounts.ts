@@ -71,3 +71,10 @@ export async function deleteAccount(db: FinanceDatabase, id: string): Promise<vo
     await transaction.runAsync('DELETE FROM accounts WHERE id = ?', id);
   });
 }
+
+/** Profile edits change only the local greeting preference. */
+export async function saveDisplayName(db: FinanceDatabase, name: string): Promise<void> {
+  if (typeof name !== 'string' || !name.trim()) throw new Error('Please enter your name.');
+  if (name.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error('Use a name up to 50 characters.');
+  await db.runAsync("INSERT INTO preferences(key, value) VALUES ('displayName', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", name.trim());
+}

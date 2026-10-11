@@ -1078,3 +1078,16 @@ test('external movements persist exactly once, exclude reports and History, and 
   assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 10000);
   await assert.rejects(() => createExternalTransfer(db, 'invalid', { ...incoming, id: 'invalid', externalName: '' }));
 });
+
+test('profile name edits persist, reject invalid input and preserve financial records', async (t) => {
+  const db = await setup(t);
+  const { saveDisplayName } = require('../../.expo/finance-tests/storage/accounts.js');
+  const before = await getCashAccount(db);
+  await saveDisplayName(db, ' Emman ');
+  await saveDisplayName(db, ' Ana ');
+  assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'displayName'")).value, 'Ana');
+  for (const invalid of ['', '   ', 'a'.repeat(51), 'Ana\n']) await assert.rejects(saveDisplayName(db, invalid));
+  assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'displayName'")).value, 'Ana');
+  assert.deepEqual(await getCashAccount(db), before);
+  assert.equal((await listTransactions(db)).length, 0);
+});

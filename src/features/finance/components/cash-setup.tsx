@@ -22,6 +22,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   const theme = useTheme();
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
+  const [skipIntro, setSkipIntro] = useState(false);
   const [accountName, setAccountName] = useState('Cash');
   const [amount, setAmount] = useState('');
   const [cents, setCents] = useState(0);
@@ -32,12 +33,12 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   const locked = busy || saving;
   function back() {
     if (locked || pending.current) return;
-    Keyboard.dismiss(); setStep(Math.max(0, step - 1)); setError('');
+    Keyboard.dismiss(); setStep(step === 4 && skipIntro ? 1 : Math.max(0, step - 1)); setError('');
   }
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (pending.current || locked) return true;
-      if (step > 0) { Keyboard.dismiss(); setStep(step - 1); setError(''); return true; }
+      if (step > 0) { Keyboard.dismiss(); setStep(step === 4 && skipIntro ? 1 : step - 1); setError(''); return true; }
       return false;
     });
     return () => listener.remove();
@@ -45,17 +46,19 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   function next() {
     if (locked || pending.current) return;
     try {
+      if (step === 1 && !name.trim()) throw new Error('Please enter your name.');
       if (step === 1 && (name.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(name))) throw new Error('Use a name up to 50 characters.');
       if (step === 4) {
         if (!accountName.trim() || accountName.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(accountName)) throw new Error('Enter an account name up to 50 characters.');
         if (rejected) return;
         setCents(parseMoney(amount.replace(/,/g, '') || '0', { allowZero: true }));
       }
-      Keyboard.dismiss(); setError(''); setStep(step + 1);
+      Keyboard.dismiss(); setError(''); setStep(step === 1 && skipIntro ? 4 : step + 1);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check your details.'); }
   }
   async function finish() {
     if (locked || pending.current) return;
+    if (!name.trim()) { setError('Please enter your name.'); setStep(1); return; }
     pending.current = true; setSaving(true); setError('');
     try { await onComplete(cents, name.trim(), accountName.trim()); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not finish setup. Your details are kept.'); }
@@ -68,7 +71,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         <View accessibilityRole="progressbar" accessibilityLabel="Onboarding progress" accessibilityValue={{ min: 1, max: titles.length, now: step + 1, text: 'Step ' + (step + 1) + ' of ' + titles.length }} style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
           {titles.map((title, index) => <View key={title} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: index <= step ? theme.accent : theme.border }} />)}
         </View>
-        {step < 4 ? <Pressable accessibilityRole="button" accessibilityLabel="Skip introduction and go to account setup" disabled={locked} onPress={() => { Keyboard.dismiss(); setError(''); setStep(4); }} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="textSecondary">Skip intro</ThemedText></Pressable> : null}
+        {step < 4 && !skipIntro ? <Pressable accessibilityRole="button" accessibilityLabel="Skip introduction and go to account setup" disabled={locked} onPress={() => { Keyboard.dismiss(); setError(''); setSkipIntro(true); setStep(1); }} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="textSecondary">Skip intro</ThemedText></Pressable> : null}
       </View>
       <ScrollView key={step} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, gap: 16, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
         <Image source={mascots[step]} contentFit="contain" accessible={false} style={{ width: '100%', height: step === 4 ? 120 : 190 }} />
@@ -78,8 +81,8 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Track spending, manage accounts, and work toward your goals. No sign-up needed.</ThemedText>
         </> : null}
         {step === 1 ? <>
-          <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Choose a name for your Home greeting. You can leave this blank.</ThemedText>
-          <TextInput accessibilityLabel="Your name (optional)" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={inputStyle} />
+          <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Choose the name you want to see in your Home greeting.</ThemedText>
+          <TextInput accessibilityLabel="Your name" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={inputStyle} />
         </> : null}
         {step === 2 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Use the + button to record money activity.</ThemedText>
@@ -97,9 +100,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
           </View>
         </> : null}
         {step === 4 ? <>
-          <ThemedText type="smallBold">Currency</ThemedText>
-          <View style={inputStyle}><ThemedText type="small">Philippine Peso (PHP)</ThemedText></View>
-          <ThemedText type="small" themeColor="textSecondary">Kuwenta currently supports pesos.</ThemedText>
+          <ThemedText type="smallBold">Currency: Philippine Peso (PHP)</ThemedText>
           <ThemedText type="smallBold">First account name</ThemedText>
           <TextInput accessibilityLabel="First account name" value={accountName} maxLength={50} editable={!locked} onChangeText={(value) => { setAccountName(value); setError(''); }} placeholder="Cash" placeholderTextColor={theme.textSecondary} autoCapitalize="words" style={inputStyle} />
           <ThemedText type="smallBold">Starting balance</ThemedText>
