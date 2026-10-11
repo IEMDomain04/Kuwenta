@@ -1,85 +1,63 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
-import { parseQuickEntry } from '../quick-entry';
-import { validateDraft } from '../validation';
-import type { TransactionDraft } from '../types';
-import { formatMoney, moneyInput, parseMoney } from '../money';
-import { formatEditableMoney } from '../inputs';
-import { formatTransactionDateTime } from '../dates';
 import { ActionButton, BackButton, FinanceScreen } from '../components/ui';
-
-
-
+import { answerAssistant, parseAssistantRequest, type AssistantRequest } from '../assistant';
 
 export default function ChatScreen() {
   const finance = useFinance();
   const theme = useTheme();
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([{ role: 'assistant', text: 'Describe one income or expense, such as Lunch 120. I will prepare a draft for your approval. This uses offline rules, not a conversational AI model.' }]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([
+    { role: 'assistant', text: 'Hi! We can check a purchase, everyday spending, or your savings using your recorded money. These checks do not change your records.' },
+  ]);
   const [text, setText] = useState('');
-  const [draft, setDraft] = useState<TransactionDraft>();
-  const [amount, setAmount] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const pending = useRef(false);
-  const submission = useRef<string | undefined>(undefined);
+  const [sending, setSending] = useState(false);
+  const [failed, setFailed] = useState('');
+  const pending = useRef<AssistantRequest | undefined>(undefined);
+  const busy = useRef(false);
   const scroll = useRef<ScrollView>(null);
-  const locked = saving || finance.busy;
-  useEffect(() => {
-    const listener = BackHandler.addEventListener('hardwareBackPress', () => pending.current || saving);
-    return () => listener.remove();
-  }, [saving]);
-  function reply(message: string) { setMessages((current) => [...current.slice(-39), { role: 'assistant', text: message }]); }
-  function send() {
-    if (locked || draft || !text.trim()) return;
-    const phrase = text.trim();
-    setMessages((current) => [...current.slice(-39), { role: 'user', text: phrase }]);
-    setText(''); setError('');
+  const locked = sending || finance.busy;
+  function reply(text: string) { setMessages((current) => [...current.slice(-19), { role: 'assistant', text }]); }
+  async function send(value = text, retry = false) {
+    if (busy.current || finance.busy || !value.trim()) return;
+    busy.current = true; setSending(true); setFailed('');
+    const phrase = value.trim();
+    if (!retry) setMessages((current) => [...current.slice(-19), { role: 'user', text: phrase }]);
+    setText('');
     try {
-      const result = parseQuickEntry(phrase, finance.accounts, new Date(), undefined, finance.lastEntryAccount);
-      submission.current = undefined;
-      setDraft(result.draft); setAmount(formatEditableMoney(moneyInput(result.draft.amount))!);
-      reply(result.warnings.join(' ') + ' Please confirm the transaction type and details below.');
-    } catch (cause) { reply((cause instanceof Error ? cause.message : 'Could not understand that.') + ' Send the complete corrected phrase to try again.'); }
-  }
-  async function save() {
-    if (!draft || locked || pending.current) return;
-    pending.current = true; setSaving(true); setError('');
-    try {
-      const candidate = { ...draft, amount: parseMoney(amount.replace(/,/g, '')) };
-      const account = finance.accounts.find((row) => row.id === candidate.accountId);
-      if (!account) throw new Error('Choose an active account.');
-      validateDraft(candidate, account);
-      const id = submission.current ??= await finance.newSubmissionId();
-      await finance.saveTransaction(id, candidate, false);
-      reply('Saved ' + candidate.category + ': ' + formatMoney(candidate.amount) + '. Use the notification Undo to remove it within 10 seconds.');
-      submission.current = undefined; setDraft(undefined);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save. Your draft is kept.'); }
-    finally { pending.current = false; setSaving(false); }
+      if (/^(stop|cancel|never mind|nevermind)[!. ]*$/i.test(phrase)) { pending.current = undefined; reply('Okay. What would you like to check next?'); return; }
+      if (/^(hi|hello|hey|thanks|thank you)[!. ]*$/i.test(phrase)) { reply(/thank/i.test(phrase) ? 'Happy to help!' : 'Hi! What would you like to understand about your money?'); return; }
+      const namedGoal = pending.current?.intent === 'savings' && finance.goals.some((goal) => goal.name.toLowerCase() === phrase.toLowerCase());
+      let request = namedGoal ? { ...pending.current!, text: phrase } : parseAssistantRequest(phrase, pending.current);
+      const answer = answerAssistant(request, finance);
+      pending.current = answer.pending;
+      reply(answer.text);
+    } catch (cause) {
+      setFailed(phrase);
+      reply(cause instanceof Error ? cause.message : 'I could not complete that check. Please try again.');
+    } finally {
+      busy.current = false; setSending(false);
+    }
   }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <FinanceScreen title="Chat" tabScreen={false} scroll={false} headerLeading={<BackButton disabled={locked} />} headerAccessory={<ActionButton compact label="Help" onPress={() => Alert.alert('Offline Quick Chat', 'Use one PHP income or expense per message. Try Lunch 120, Salary 25,000, or Pamasahe 30 kahapon from Cash. Review and approve every draft. Transfers use the Transfer screen. Messages are temporary and stay on this device.')} />}>
+    <FinanceScreen title="Money Check" tabScreen={false} scroll={false} headerLeading={<BackButton disabled={locked} />} headerAccessory={<ActionButton compact label="Help" onPress={() => Alert.alert('Money Check', 'Ask about purchases, daily or weekday costs, monthly spending, budgets, or savings. Give an explicit timeframe for recurring costs. Upcoming commitments are not tracked, so a balance comparison is incomplete. Checks are read-only. Quick Entry opens the separate transaction form. Messages are temporary and stays on this device.')} />}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <ActionButton compact label="Quick Entry" disabled={locked} onPress={() => router.push({ pathname: '/transaction', params: { quick: '1' } })} />
+      </View>
       <ScrollView ref={scroll} style={{ flex: 1 }} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })} contentContainerStyle={{ gap: 10, paddingBottom: 16 }}>
         {messages.map((message, index) => <View key={index} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%', padding: 12, borderRadius: 16, backgroundColor: message.role === 'user' ? theme.infoSurface : theme.backgroundElement }}><ThemedText type="small">{message.text}</ThemedText></View>)}
-        {draft ? <View style={{ padding: 14, borderRadius: 18, gap: 10, backgroundColor: theme.backgroundElement, borderWidth: 1, borderColor: theme.border }}>
-          <ThemedText type="smallBold">Review transaction</ThemedText>
-          <ThemedText type="small">{draft.type === 'INCOME' ? 'Income' : 'Expense'} / {draft.category}</ThemedText>
-          <ThemedText type="smallBold">{amount ? 'PHP ' + amount : 'Enter an amount'}</ThemedText>
-          <ThemedText type="small">{finance.accounts.find((row) => row.id === draft.accountId)?.name ?? 'Choose account'}</ThemedText>
-          <ThemedText type="small">{formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}</ThemedText>
-          {draft.notes ? <ThemedText type="small">{draft.notes}</ThemedText> : null}
-          {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error }}>{error}</ThemedText> : null}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}><ActionButton compact primary label={saving ? 'Saving...' : 'Save'} disabled={locked} onPress={() => { void save(); }} /></View>
-            <View style={{ flex: 1 }}><ActionButton compact label="Cancel" disabled={locked} onPress={() => { setDraft(undefined); setError(''); submission.current = undefined; reply('Draft canceled. Nothing was saved. Send a corrected message to try again.'); }} /></View>
-          </View>
-        </View> : null}
+        {sending ? <ThemedText type="small" accessibilityLiveRegion="polite" themeColor="textSecondary">Checking your recorded data...</ThemedText> : null}
+        {failed ? <ActionButton compact label="Retry" disabled={locked} onPress={() => { void send(failed, true); }} /> : null}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {['Can I afford this?', 'Where is my money going?', 'How much did I spend on food?', 'What if I save 500 every month?'].map((question) => <ActionButton key={question} compact label={question} disabled={locked} onPress={() => { pending.current = undefined; void send(question); }} />)}
+        </View>
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TextInput accessibilityLabel="Message" value={text} onChangeText={setText} editable={!locked && !draft} maxLength={250} placeholder={draft ? 'Review the draft above' : 'Describe an income or expense'} placeholderTextColor={theme.textSecondary} returnKeyType="send" onSubmitEditing={send} style={{ flex: 1, minHeight: 48, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border, color: theme.text, backgroundColor: theme.backgroundElement, fontSize: 12 }} />
-        <ActionButton compact label="Send" disabled={locked || Boolean(draft) || !text.trim()} onPress={send} />
+        <TextInput accessibilityLabel="Message" value={text} onChangeText={setText} editable={!locked} maxLength={250} placeholder="Ask about your money" placeholderTextColor={theme.textSecondary} returnKeyType="send" onSubmitEditing={() => { void send(); }} style={{ flex: 1, minHeight: 48, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border, color: theme.text, backgroundColor: theme.backgroundElement, fontSize: 12 }} />
+        <ActionButton compact label="Send" disabled={locked || !text.trim()} onPress={() => { void send(); }} />
       </View>
     </FinanceScreen>
   </KeyboardAvoidingView>;

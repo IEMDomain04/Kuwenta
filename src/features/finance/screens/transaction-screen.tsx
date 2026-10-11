@@ -44,8 +44,11 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
       finished.current = true;
       submissionId.current = undefined; // retire after commit; Undo cannot reuse this draft
       leave();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save. Your draft is preserved.'); }
-    finally { pending.current = false; setSaving(false); }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save. Your draft is preserved.');
+      // Keep the successful form disabled while its native screen exits.
+      if (!finished.current) { pending.current = false; setSaving(false); }
+    }
   }
   function submit(draft: TransactionDraft) {
     if (pending.current || finished.current || finance.busy) return;

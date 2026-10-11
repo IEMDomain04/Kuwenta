@@ -62,7 +62,7 @@ Phone checks: airplane mode, examples above, missing amounts, duplicate account 
 
 Completed focused fixes: Quick Entry scrolls on smaller screens, review avoids reopening the amount keyboard, and transaction back/cancel actions respect pending operations. Unavailable transaction screens now use the same back navigation as other detail screens.
 
-Next usability pass: test Home section density, discoverability of Accounts/Goals/Budgets, long names and large values, category/account picker sizing, budget editing with the keyboard, and Settings reset/restore clarity on a phone. Existing three tabs, light design, and financial workflows are retained. Broader layout changes and AI model selection should follow these checks.
+Next usability pass: test Home section density, discoverability of Accounts/Goals/Budgets, long names and large values, category/account picker sizing, budget editing with the keyboard, and Settings reset/restore clarity on a phone. Existing three tabs, light design, and financial workflows are retained. Broader layout changes should follow these checks.
 
 ## Product walkthrough and smaller typography
 

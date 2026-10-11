@@ -87,7 +87,7 @@ export function AddTransactionButton({ disabled }: { disabled: boolean }) {
     { label: 'Income', description: 'Record money received', icon: 'arrow-down-outline', type: 'INCOME' },
     { label: 'Expense', description: 'Record spending', icon: 'arrow-up-outline', type: 'EXPENSE' },
     { label: 'Transfer', description: 'Move money between accounts', icon: 'swap-horizontal', type: 'TRANSFER' },
-    { label: 'Chat', description: 'Describe and review a transaction', icon: 'chatbubble-outline', type: 'CHAT' },
+    { label: 'Money Check', description: 'Preview spending and review your money', icon: 'chatbubble-outline', type: 'CHAT' },
   ] as const;
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel="Add money activity" disabled={disabled} accessibilityState={{ disabled, expanded: open }} onPress={() => setOpen(true)} style={({ pressed }) => ({ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent, elevation: 4, opacity: disabled || pressed ? 0.5 : 1 })}><Ionicons name="add" size={30} color={theme.onAccent} /></Pressable>

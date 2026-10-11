@@ -83,8 +83,11 @@ export default function TransferScreen() {
             else await finance.saveTransaction(id, { type: 'TRANSFER', accountId, destinationAccountId: destinationId, category: 'Transfer', amount: cents, ...dateTime, notes: notes.trim() || undefined }, false);
             submission.current = undefined;
             if (router.canGoBack()) router.back(); else router.replace('/');
-          } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save. Draft kept.'); }
-          finally { pending.current = false; setSaving(false); }
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Could not save. Draft kept.');
+            pending.current = false; setSaving(false);
+          }
+          // On success, keep the form disabled throughout the exit transition.
         })();
       } },
     ], { cancelable: false });
