@@ -13,7 +13,8 @@
     "android": {
       "predictiveBackGestureEnabled": false,
       "package": "com.iemdomain04.Kuwenta",
-      "icon": "./assets/images/kuwenta-app-icon.png"
+      "icon": "./assets/images/kuwenta-app-icon.png",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "static",

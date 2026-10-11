@@ -23,6 +23,12 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [skipIntro, setSkipIntro] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   const [accountName, setAccountName] = useState('Cash');
   const [amount, setAmount] = useState('');
   const [cents, setCents] = useState(0);
@@ -66,15 +72,15 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   }
   const inputStyle = { color: theme.text, backgroundColor: theme.backgroundElement, padding: 14, borderWidth: 1, borderColor: theme.border, borderRadius: 16, fontSize: 12 };
   return <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingTop: 8 }}>
         <View accessibilityRole="progressbar" accessibilityLabel="Onboarding progress" accessibilityValue={{ min: 1, max: titles.length, now: step + 1, text: 'Step ' + (step + 1) + ' of ' + titles.length }} style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
           {titles.map((title, index) => <View key={title} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: index <= step ? theme.accent : theme.border }} />)}
         </View>
         {step < 4 && !skipIntro ? <Pressable accessibilityRole="button" accessibilityLabel="Skip introduction and go to account setup" disabled={locked} onPress={() => { Keyboard.dismiss(); setError(''); setSkipIntro(true); setStep(1); }} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="textSecondary">Skip intro</ThemedText></Pressable> : null}
       </View>
-      <ScrollView key={step} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, gap: 16, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
-        <Image source={mascots[step]} contentFit="contain" accessible={false} style={{ width: '100%', height: step === 4 ? 120 : 190 }} />
+      <ScrollView key={step} style={{ flex: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: keyboardVisible ? 'flex-start' : 'center', padding: 24, gap: 16, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
+        {!keyboardVisible ? <Image source={mascots[step]} contentFit="contain" accessible={false} style={{ width: '100%', height: step === 4 ? 120 : 190 }} /> : null}
         <ThemedText accessibilityRole="header" style={{ textAlign: 'center', fontSize: 23, lineHeight: 30, fontWeight: '600' }}>{titles[step]}</ThemedText>
         {step === 0 ? <>
           <ThemedText type="small" style={{ textAlign: 'center' }}>Your everyday money, made clearer.</ThemedText>

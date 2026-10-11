@@ -84,7 +84,7 @@ export default function GoalScreen() {
   }
   const inputStyle = { borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 12, color: theme.text };
   if (id && !original) return <FinanceScreen title="Goal unavailable" tabScreen={false}><ThemedText>This goal no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
-  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <FinanceScreen title={original ? 'Edit savings goal' : 'Add savings goal'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) leave(); }} />}>
       <ThemedText type="smallBold">Goal name</ThemedText>
       <TextInput accessibilityLabel="Goal name" value={name} onChangeText={setName} editable={!locked} placeholder="Emergency fund" placeholderTextColor={theme.textSecondary} style={inputStyle} />

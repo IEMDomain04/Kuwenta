@@ -64,7 +64,7 @@ export default function BudgetsScreen() {
     else confirm('Save budget changes?', budget.category + ' for ' + readableReportingMonth(month) + ': ' + formatMoney(budget.limitAmount) + '. Transactions remain unchanged.', () => finance.saveBudget(budget, false));
   }
   const unused = CATEGORIES.EXPENSE.filter((category) => !report.rows.some((row) => row.category === category));
-  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <FinanceScreen title="Budgets" tabScreen={false} headerLeading={<BackButton disabled={locked} />} headerAccessory={<HomeMonthPicker />}>
       <ThemedText type="small" themeColor="textSecondary">Monthly limits across all accounts. Budgets do not move money.</ThemedText>
       <ThemedText type="smallBold">Budgeted categories: {formatMoney(report.budgetedSpent)} spent of {formatMoney(report.totalLimit)}</ThemedText>

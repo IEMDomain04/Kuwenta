@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
@@ -39,7 +39,7 @@ export default function SettingsScreen() {
       } },
     ], { cancelable: false });
   }
-  return <FinanceScreen title="Settings">
+  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><FinanceScreen title="Settings">
     <View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Profile</ThemedText>
     <Pressable accessibilityRole="button" accessibilityLabel="Edit your name" disabled={busy} onPress={() => { setName(displayName ?? ''); setNameError(''); setNameOpen(true); }} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -47,7 +47,8 @@ export default function SettingsScreen() {
       <ThemedText type="smallBold" themeColor="accent">Edit</ThemedText>
     </Pressable>
     <Modal visible={nameOpen} transparent animationType="fade" onRequestClose={() => { if (!namePending.current) setNameOpen(false); }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', padding: 24 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', padding: 24 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flexShrink: 1, width: '100%', maxWidth: 420, alignSelf: 'center' }} contentContainerStyle={{ paddingVertical: 12 }}>
         <View accessibilityViewIsModal style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 20, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' }}>
           <ThemedText type="smallBold" accessibilityRole="header">Your name</ThemedText>
           <TextInput accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}><ActionButton primary label={savingName ? 'Saving...' : 'Save'} disabled={savingName || busy} onPress={() => { void saveName(); }} /></View>
           </View>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
     <ThemedText type="small" themeColor="textSecondary">Philippine Peso (PHP)</ThemedText>
@@ -75,5 +77,5 @@ export default function SettingsScreen() {
     </View>
     <ThemedText type="smallBold" accessibilityRole="header">About Kuwenta</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Track, move, and save money in Philippine pesos.</ThemedText>
-  </FinanceScreen>;
+  </FinanceScreen></KeyboardAvoidingView>;
 }

@@ -57,7 +57,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     onSubmit({ type, destinationAccountId: type === 'TRANSFER' ? destinationAccountId : undefined, amount: cents, accountId, category, transactionDate: date, transactionTime: time, notes: notes.trim() || undefined });
   }
   return <View style={{ flex: 1, gap: 12 }}>
-    <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ gap: 10, padding: 12, paddingBottom: 16, backgroundColor: theme.backgroundElement, borderRadius: 20 }}>
+    <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ gap: 10, padding: 12, paddingBottom: 32, backgroundColor: theme.backgroundElement, borderRadius: 20 }}>
 
     {!transferOnly ? <>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

@@ -18,7 +18,7 @@ export function FinanceScreen({ title, children, scroll = true, tabScreen = true
   const insets = useSafeAreaInsets();
   const content = <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, ...(centeredTitle ? { justifyContent: 'center' } : {}) }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>{headerLeading ?? (!tabScreen ? <BackButton /> : null)}<ThemedText type="subtitle" style={!tabScreen || centeredTitle ? { fontSize: 20, lineHeight: 28, flexShrink: 1 } : undefined} accessibilityRole="header">{title}</ThemedText></View>{headerAccessory}</View>{children}</>;
   return <SafeAreaView edges={tabScreen ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']} style={[styles.safe, { backgroundColor: theme.background }]}>
-    {scroll ? <ScrollView style={{ flex: 1 }} bounces={false} overScrollMode="never" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, !!floatingAction && { paddingBottom: 90 }, !tabScreen && { paddingBottom: 16 }]}>{content}</ScrollView>
+    {scroll ? <ScrollView style={{ flex: 1 }} bounces={false} overScrollMode="never" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, !!floatingAction && { paddingBottom: 90 }, !tabScreen && { paddingBottom: 32 }]}>{content}</ScrollView>
       : <ThemedView style={[styles.content, styles.fill, !tabScreen && { paddingBottom: 16 }]}>{content}</ThemedView>}
     {floatingAction && <View style={{ position: 'absolute', right: Math.max(insets.right, 16), bottom: tabScreen ? 16 : Math.max(insets.bottom, 16) }}>{floatingAction}</View>}
   </SafeAreaView>;
