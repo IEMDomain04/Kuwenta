@@ -2,8 +2,9 @@ import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { router } from 'expo-router';
 import { CategoryIcon } from './category-visual';
 import { formatTransactionDateTime } from '../dates';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -73,8 +74,32 @@ export function BackButton({ onPress, disabled = false }: { onPress?: () => void
 }
 export function AddTransactionButton({ disabled }: { disabled: boolean }) {
   const theme = useTheme();
-  return <Pressable accessibilityRole="button" accessibilityLabel="Add transaction" disabled={disabled} accessibilityState={{ disabled }}
-    onPress={() => router.push('/transaction')} style={({ pressed }) => ({ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent, elevation: 4, opacity: disabled || pressed ? 0.5 : 1 })}>
-    <Ionicons name="add" size={30} color={theme.onAccent} />
-  </Pressable>;
+  const insets = useSafeAreaInsets();
+  const [open, setOpen] = useState(false);
+  const items = [
+    { label: 'Income', description: 'Record money received', icon: 'arrow-down-outline', type: 'INCOME' },
+    { label: 'Expense', description: 'Record spending', icon: 'arrow-up-outline', type: 'EXPENSE' },
+    { label: 'Transfer', description: 'Move money between accounts', icon: 'swap-horizontal', type: 'TRANSFER' },
+    { label: 'Chat', description: 'Describe and review a transaction', icon: 'chatbubble-outline', type: 'CHAT' },
+  ] as const;
+  return <>
+    <Pressable accessibilityRole="button" accessibilityLabel="Add money activity" disabled={disabled} accessibilityState={{ disabled, expanded: open }} onPress={() => setOpen(true)} style={({ pressed }) => ({ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent, elevation: 4, opacity: disabled || pressed ? 0.5 : 1 })}><Ionicons name="add" size={30} color={theme.onAccent} /></Pressable>
+    <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'flex-end', padding: 16, paddingBottom: insets.bottom + 80, backgroundColor: theme.overlay }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close actions" onPress={() => setOpen(false)} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+        <View accessibilityViewIsModal style={{ width: '100%', maxWidth: 300, padding: 10, borderRadius: 20, backgroundColor: theme.backgroundElement }}>
+          {items.map((item) => <Pressable key={item.type} accessibilityRole="button" disabled={disabled} onPress={() => {
+            setOpen(false);
+            if (item.type === 'CHAT') router.push('/chat');
+            else if (item.type === 'TRANSFER') router.push('/transfer');
+            else router.push({ pathname: '/transaction', params: { type: item.type } });
+          }} style={{ minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}>
+            <Ionicons name={item.icon} size={20} color={item.type === 'INCOME' ? theme.income : theme.accentPressed} />
+            <View style={{ flex: 1 }}><ThemedText type="smallBold">{item.label}</ThemedText><ThemedText type="small" themeColor="textSecondary">{item.description}</ThemedText></View>
+          </Pressable>)}
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close actions" onPress={() => setOpen(false)} style={{ marginTop: 10, width: 58, height: 58, borderRadius: 29, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={28} color={theme.onAccent} /></Pressable>
+      </View>
+    </Modal>
+  </>;
 }

@@ -25,7 +25,7 @@ test('backup round trip preserves money, Philippine time, notes, IDs and audit t
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
   assert.deepEqual(previewBackup(restored), {
-    exportedAt, accountCount: 1, transactionCount: 2, incomeCount: 1, expenseCount: 1, adjustmentCount: 0, transferCount: 0, goalCount: 0, budgetCount: 0, cashBalance: 138000,
+    exportedAt, accountCount: 1, transactionCount: 2, incomeCount: 1, expenseCount: 1, adjustmentCount: 0, externalCount: 0, transferCount: 0, goalCount: 0, budgetCount: 0, cashBalance: 138000,
   });
 });
 
@@ -45,7 +45,7 @@ test('backdated records retain their reporting month after round trip', () => {
 
 test('malformed JSON, metadata, unknown versions and unsupported fields are rejected', () => {
   for (const value of ['{', 'null', '[]', '1']) assert.throws(() => parseBackup(value));
-  reject((v) => { v.version = 7; });
+  reject((v) => { v.version = 8; });
   reject((v) => { v.format = 'other'; });
   reject((v) => { v.currency = 'USD'; });
   reject((v) => { v.timezone = 'UTC'; });

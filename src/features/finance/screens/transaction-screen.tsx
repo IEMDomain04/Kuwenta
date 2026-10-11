@@ -2,6 +2,7 @@ import { QuickEntry } from '../components/quick-entry';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTransactionDateTime } from '../dates';
+import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -14,9 +15,9 @@ import { calculateFinanceSummary } from '../calculations';
 import { formatMoney } from '../money';
 import type { TransactionDraft, ManualTransactionType } from '../types';
 
-export default function TransactionScreen() {
+export default function TransactionScreen({ transferOnly = false, transferChoices }: { transferOnly?: boolean; transferChoices?: ReactNode } = {}) {
   const params = useLocalSearchParams<{ quick?: string; id?: string; type?: string; accountId?: string; destinationAccountId?: string }>();
-  const initialType = params.type === 'TRANSFER' ? 'TRANSFER' : params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+  const initialType = transferOnly || params.type === 'TRANSFER' ? 'TRANSFER' : params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const id = typeof params.id === 'string' ? params.id : undefined;
   const finance = useFinance();
   const theme = useTheme();
@@ -75,9 +76,10 @@ export default function TransactionScreen() {
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <FinanceScreen scroll={quickOpen} tabScreen={false} title={id ? 'Edit transaction' : entryType === 'TRANSFER' ? 'Add Transfer' : entryType === 'INCOME' ? 'Add Income' : 'Add Expense'} headerLeading={<Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving || finance.busy} onPress={() => { if (!pending.current) leave(); }} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="arrow-back" size={24} color={theme.text} /></Pressable>}>
       {quickOpen ? <QuickEntry disabled={saving || finance.busy} accountId={params.accountId} onCancel={() => setQuickOpen(false)} onReview={(draft, warnings) => { setQuickDraft(draft); setQuickWarnings(warnings); setEntryType(draft.type); setQuickOpen(false); }} /> : <>
-      {!id && !quickDraft && <ActionButton compact label="Quick Entry" disabled={saving || finance.busy} onPress={() => setQuickOpen(true)} />}
+
       {quickDraft && <ThemedText type="small" accessibilityLiveRegion="polite">Review Quick Entry: {quickWarnings.join(' ')}</ThemedText>}
-      <TransactionForm initialDraft={quickDraft} key={id ?? (quickDraft ? 'quick' : 'new')} original={original} initialType={initialType} initialAccountId={params.accountId} initialDestinationAccountId={params.destinationAccountId} onTypeChange={setEntryType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={() => { if (!pending.current) leave(); }} />
+      {transferChoices}
+      <TransactionForm transferOnly={transferOnly} initialDraft={quickDraft} key={id ?? (quickDraft ? 'quick' : 'new')} original={original} initialType={initialType} initialAccountId={params.accountId} initialDestinationAccountId={params.destinationAccountId} onTypeChange={setEntryType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={() => { if (!pending.current) leave(); }} />
       </>}
     </FinanceScreen>
   </KeyboardAvoidingView>;

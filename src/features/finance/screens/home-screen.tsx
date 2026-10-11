@@ -1,9 +1,10 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { moneyInsights } from '../insights';
 import { router } from 'expo-router';
 import { CategoryIcon } from '../components/category-visual';
 import { formatTransactionDateTime } from '../dates';
 import { useEffect, useState } from 'react';
-import { AppState, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -16,13 +17,15 @@ import { PeriodOverview } from '../components/period-overview';
 export default function HomeScreen() {
   const { displayName, accounts, transactions, budgets, goals, month, busy } = useFinance();
   const theme = useTheme();
+  const { height, fontScale } = useWindowDimensions();
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') setNow(new Date()); });
     return () => { clearInterval(timer); subscription.remove(); };
   }, []);
-  const recent = [...transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)).slice(0, 5);
+  const recent = transactions.filter((row) => row.type !== 'EXTERNAL').sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)).slice(0, 5);
   const hasActivity = transactions.some((record) => record.type === 'INCOME' || record.type === 'EXPENSE');
   const today = dashboardReport(transactions, 'day', month, now);
   const dateLabel = new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', weekday: 'long', month: 'long', day: 'numeric' }).format(now);
@@ -38,14 +41,30 @@ export default function HomeScreen() {
       <ThemedText type="small" themeColor="textSecondary">{dateLabel}</ThemedText>
       <ThemedText accessibilityRole="header" style={styles.heading}>{dashboardGreeting(displayName ?? '', now)}</ThemedText>
     </View>
-    <View style={[styles.insight, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-      <View style={[styles.icon, { backgroundColor: theme.incomeSurface }]}><Ionicons name="bulb-outline" size={24} color={theme.accent} /></View>
+    <Pressable accessibilityRole="button" accessibilityLabel="View money insights" accessibilityHint="Opens full insight details" onPress={() => setInsightsOpen(true)} style={({ pressed }) => [styles.insight, { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}>
+      <View style={[styles.icon, { backgroundColor: theme.incomeSurface }]}><Ionicons name="bulb-outline" size={20} color={theme.accent} /></View>
       <View style={{ flex: 1, gap: 4 }}>
         <ThemedText type="smallBold" style={{ fontSize: 13, lineHeight: 18 }}>Your money, at a glance</ThemedText>
-        <ThemedText style={styles.message}>{insights[0] ?? message}</ThemedText>
-        {insights.slice(1).map((insight) => <ThemedText key={insight} style={styles.message}>{insight}</ThemedText>)}
+        <ThemedText numberOfLines={fontScale > 1.3 ? undefined : 3} ellipsizeMode="tail" style={styles.message}>{insights[0] ?? message}</ThemedText>
       </View>
-    </View>
+      <Ionicons accessible={false} name="chevron-forward" size={16} color={theme.textSecondary} style={{ marginTop: 2 }} />
+    </Pressable>
+    <Modal visible={insightsOpen} transparent animationType="fade" onRequestClose={() => setInsightsOpen(false)}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close insights" onPress={() => setInsightsOpen(false)} style={{ flex: 1 }} />
+        <SafeAreaView edges={['bottom', 'left', 'right']} style={{ maxHeight: height * 0.8, backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+          <View accessibilityViewIsModal style={{ padding: 16, gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ThemedText type="smallBold" accessibilityRole="header" style={{ flex: 1 }}>Your money, at a glance</ThemedText>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close insights" onPress={() => setInsightsOpen(false)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={20} color={theme.text} /></Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: height * 0.55 }} contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
+              {(insights.length ? insights : [message]).map((insight, index) => <View key={insight} style={{ paddingTop: index ? 12 : 0, borderTopWidth: index ? 1 : 0, borderColor: theme.border }}><ThemedText type="small">{insight}</ThemedText></View>)}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </View>
+    </Modal>
     {hasActivity ? <PeriodOverview now={now} /> : null}
     {recent.length > 0 ? <View style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 12, gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -75,7 +94,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   greeting: { gap: 4, paddingTop: 6, paddingBottom: 12 },
   heading: { fontSize: 22, lineHeight: 30, fontWeight: '600' },
-  insight: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 22, borderWidth: 1, gap: 12 },
-  icon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  insight: { flexDirection: 'row', alignItems: 'flex-start', padding: 12, borderRadius: 22, borderWidth: 1, gap: 10 },
+  icon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   message: { fontSize: 12, lineHeight: 18 },
 });

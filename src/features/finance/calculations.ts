@@ -28,7 +28,7 @@ export function calculateAccountSummary(
     validateManualRecord(transaction);
     if (ids.has(transaction.id)) throw new Error('Duplicate transaction ID in financial records.');
     ids.add(transaction.id);
-    balance = addCentavos(balance, (transaction.type === 'TRANSFER' && transaction.destinationAccountId === account.id || transaction.type === 'INCOME' || (transaction.type === 'ADJUSTMENT' && transaction.adjustmentDirection === 'increase')) ? transaction.amount : -transaction.amount);
+    balance = addCentavos(balance, (transaction.type === 'TRANSFER' && transaction.destinationAccountId === account.id || transaction.type === 'INCOME' || ((transaction.type === 'ADJUSTMENT' || transaction.type === 'EXTERNAL') && transaction.adjustmentDirection === 'increase')) ? transaction.amount : -transaction.amount);
     if (transaction.transactionDate.slice(0, 7) !== month) continue;
     if (transaction.type === 'INCOME') monthlyIncome = addCentavos(monthlyIncome, transaction.amount);
     else if (transaction.type === 'EXPENSE') monthlyExpenses = addCentavos(monthlyExpenses, transaction.amount);

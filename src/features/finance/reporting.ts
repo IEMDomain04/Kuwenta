@@ -10,7 +10,7 @@ export function adjacentMonth(month: string, direction: -1 | 1): string {
 }
 export function filterTransactions(transactions: readonly Transaction[], month: string, type: 'ALL' | ManualTransactionType = 'ALL'): Transaction[] {
   if (!isValidMonth(month)) throw new Error('Invalid reporting month.');
-  return transactions.filter((row) => row.transactionDate.slice(0, 7) === month && (type === 'ALL' || row.type === type));
+  return transactions.filter((row) => row.type !== 'EXTERNAL' && row.transactionDate.slice(0, 7) === month && (type === 'ALL' || row.type === type));
 }
 
 /** Selected-month expense totals, in exact integer centavos. Input records are already validated by storage. */

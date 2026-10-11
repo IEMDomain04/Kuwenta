@@ -15,7 +15,7 @@ export const CATEGORIES = {
 } as const;
 
 export type ManualTransactionType = keyof typeof CATEGORIES | 'TRANSFER';
-export type TransactionType = ManualTransactionType | 'TRANSFER' | 'ADJUSTMENT';
+export type TransactionType = ManualTransactionType | 'TRANSFER' | 'ADJUSTMENT' | 'EXTERNAL';
 
 /** Date and time describe when money moved, always in Philippine time (UTC+8). */
 export type TransactionDraft = {
@@ -37,6 +37,7 @@ export type Transaction = Omit<TransactionDraft, 'type'> & {
   destinationAccountId?: string;
   sourcePurpose?: Account['purpose'];
   destinationPurpose?: Account['purpose'];
+  externalName?: string;
   adjustmentDirection?: 'increase' | 'decrease';
 };
 

@@ -55,7 +55,7 @@ export function SavingsOverview({ compact = false, goalsOnly = false }: { compac
           {progress.balance < 0 && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this savings account has a negative balance.</ThemedText>}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <ActionButton compact primary label="Add money" disabled={busy || account.archived || !accounts.some((row) => !row.archived && row.id !== account.id)}
-              onPress={() => router.push({ pathname: '/transaction', params: { type: 'TRANSFER', destinationAccountId: account.id } })} />
+              onPress={() => router.push({ pathname: '/transfer', params: { type: 'TRANSFER', destinationAccountId: account.id } })} />
             <ActionButton compact label="Edit goal" disabled={busy} onPress={() => router.push({ pathname: '/goal', params: { id: goal.id } })} />
           </View>
         </View>;

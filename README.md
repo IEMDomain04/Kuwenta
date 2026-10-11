@@ -1004,3 +1004,17 @@ Device verification still required:
 
 ### Kuwenta light palette
 Shared theme tokens define navy text, blue spending cards, teal actions, green income/savings, red expenses/errors, amber warnings, white surfaces, and pale backgrounds. Success notices use green; transfers and record replacement use blue information styling. Undo timing remains unchanged. Small white button labels use darker teal for contrast. Verified primary text/button/account/notification pairs meet 4.5:1; category visuals retain distinct colors.
+
+
+### Entry action menu, transfers, and offline chat
+The floating plus opens Income, Expense, Transfer, and Chat actions. Account and goal transfer shortcuts use a dedicated internal-transfer route with account selection before amount entry. External/held funds and receipt attachments are not enabled.
+
+Chat uses the existing offline phrase parser and displays an inline draft. Users can change type, amount, category, account, date/time, and note before explicitly saving. Cancel writes nothing; successful creation uses the existing 10-second Undo notification. Ambiguous phrases receive guidance to resend a corrected complete phrase. Chat history and unsaved drafts are temporary; no chat model or remote service is used.
+
+Phone checks: action-menu dismissal and navigation; account/goal transfer preselection; both transfer balances and Undo; chat ambiguous input, change-details, cancel, repeated Save taps, wrong amounts, and persistence after reopening. Large system text and keyboard layout need device verification.
+
+
+### External transfers
+Transfer allows My accounts or External on either side; choosing External keeps the other side a tracked account. External incoming increases that balance, outgoing decreases it, and neither counts as income, expense, or internal savings funding. External records are hidden from History and Home recent transactions but listed under account details. Use Income for salary/gifts and Expense for purchases. This does not model custody liabilities or money held for another person.
+SQLite schema 9 and backup payload 7 preserve external names, direction, amount, date/time, and notes. Older backups remain supported. External saves require confirmation and retain the existing creation Undo.
+Income/Expense entry no longer offers Transfer or Quick Entry. Dedicated Transfer and Chat remain in the plus menu. Stray fragment whitespace in the transaction form was removed.

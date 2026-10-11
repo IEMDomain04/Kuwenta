@@ -39,14 +39,15 @@ export function validateDraft(draft: TransactionDraft, account: Account, destina
 
 /** Stored income, expenses and explicit balance adjustments. Transfers move money between two accounts. */
 export function validateManualRecord(record: Transaction): void {
-  if (record.type === 'ADJUSTMENT') {
-    if (record.category !== 'Balance adjustment' || !['increase', 'decrease'].includes(record.adjustmentDirection ?? '')) throw new Error('Invalid balance adjustment.');
+  if (record.type === 'ADJUSTMENT' || record.type === 'EXTERNAL') {
+    if (record.category !== (record.type === 'EXTERNAL' ? 'External transfer' : 'Balance adjustment') || !['increase', 'decrease'].includes(record.adjustmentDirection ?? '')) throw new Error('Invalid balance adjustment.');
     validateTransactionFields({ ...record, type: 'EXPENSE', category: 'Other' });
   } else {
     if (record.type !== 'INCOME' && record.type !== 'EXPENSE' && record.type !== 'TRANSFER') throw new Error('Unsupported transaction type.');
     validateTransactionFields({ ...record, type: record.type });
     if (record.adjustmentDirection !== undefined) throw new Error('Income and expenses cannot contain adjustment fields.');
   }
+  if (record.type === 'EXTERNAL' ? typeof record.externalName !== 'string' || !record.externalName.trim() : record.externalName !== undefined) throw new Error('Invalid external transfer name.');
   const purposes = ['spending', 'savings'];
   if (record.type === 'TRANSFER') {
     if ((record.sourcePurpose === undefined) !== (record.destinationPurpose === undefined)

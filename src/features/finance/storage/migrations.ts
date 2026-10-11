@@ -1,6 +1,6 @@
 import type { FinanceDatabase } from './database';
 
-const VERSION = 8;
+const VERSION = 9;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -66,5 +66,16 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       await transaction.execAsync('PRAGMA user_version = 7;');
     }
     if (version < 8) await transaction.execAsync("CREATE TABLE IF NOT EXISTS budgets (month TEXT NOT NULL, category TEXT NOT NULL, limitAmount INTEGER NOT NULL CHECK(typeof(limitAmount) = 'integer' AND limitAmount BETWEEN 1 AND 9007199254740991), PRIMARY KEY(month, category)); PRAGMA user_version = 8;");
+
+    if (version < 9 && !(await transaction.getAllAsync<{ name: string }>('PRAGMA table_info(transactions)')).some((column) => column.name === 'externalName')) {
+      const current = await transaction.getFirstAsync<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'transactions'");
+      if (!current) throw new Error('Transaction schema is missing.');
+      const table = current.sql.replace(/CREATE TABLE "?transactions"?/, 'CREATE TABLE transactions_new')
+        .replace("'ADJUSTMENT', 'TRANSFER'", "'ADJUSTMENT', 'TRANSFER', 'EXTERNAL'")
+        .replace("type = 'ADJUSTMENT' AND destinationAccountId IS NULL AND category = 'Balance adjustment'", "(type = 'ADJUSTMENT' AND category = 'Balance adjustment' OR type = 'EXTERNAL' AND category = 'External transfer') AND destinationAccountId IS NULL");
+      await transaction.execAsync(table);
+      await transaction.execAsync('INSERT INTO transactions_new SELECT * FROM transactions; DROP TABLE transactions; ALTER TABLE transactions_new RENAME TO transactions; ALTER TABLE transactions ADD COLUMN externalName TEXT; CREATE INDEX transactions_history ON transactions(accountId, transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_all_history ON transactions(transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_destination ON transactions(destinationAccountId); PRAGMA user_version = 9;');
+    }
+    if (version < 9) await transaction.execAsync('PRAGMA user_version = 9;');
   });
 }

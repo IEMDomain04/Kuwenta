@@ -16,9 +16,9 @@ import { MoneyField } from './money-field';
 import { TransactionDateTime } from './transaction-date-time';
 import { ActionButton } from './ui';
 
-type Props = { initialDraft?: TransactionDraft; original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; error: string; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
+type Props = { transferOnly?: boolean; initialDraft?: TransactionDraft; original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; error: string; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
 type Field = 'amount' | 'date' | 'time';
-export function TransactionForm({ initialDraft, original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
+export function TransactionForm({ transferOnly = false, initialDraft, original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
   const theme = useTheme();
   const { accounts, transactions, lastEntryAccount } = useFinance();
   const [accountOpen, setAccountOpen] = useState(false);
@@ -59,11 +59,38 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
   return <View style={{ flex: 1, gap: 12 }}>
     <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ gap: 10, padding: 12, paddingBottom: 16, backgroundColor: theme.backgroundElement, borderRadius: 20 }}>
 
+    {!transferOnly ? <>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-      {(['EXPENSE', 'INCOME', 'TRANSFER'] as const).map((value) => <ActionButton key={value} selected={type === value}
+      {(original?.type === 'TRANSFER' ? ['TRANSFER'] as const : ['EXPENSE', 'INCOME'] as const).map((value) => <ActionButton key={value} selected={type === value}
         compact label={value === 'TRANSFER' ? 'Transfer' : value === 'INCOME' ? 'Income' : 'Expense'} disabled={disabled}
         onPress={() => { if (type !== value) { setType(value); onTypeChange(value); setCategory(value === 'TRANSFER' ? 'Transfer' : CATEGORIES[value][0]); } }} />)}
     </View>
+    </> : null}
+    {type === 'TRANSFER' ? <>
+      <ThemedText type="smallBold">{type === "TRANSFER" ? "From account" : "Account"}</ThemedText>
+    <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
+      onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
+      <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
+      <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} · PHP{selectedAccount?.archived ? ' · Archived' : ''}</ThemedText>
+      <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+    </Pressable>
+    {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
+    {!accounts.some((account) => !account.archived) && <ThemedText accessibilityRole="alert">Add or unarchive an account in Settings to record transactions.</ThemedText>}
+    {type === 'TRANSFER' && <>
+      <ThemedText type="smallBold">To account</ThemedText>
+      <Pressable accessibilityRole="button" accessibilityLabel="Choose destination account" disabled={disabled} onPress={() => { Keyboard.dismiss(); setChoosingDestination(true); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
+        <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} /><ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{accounts.find((account) => account.id === destinationAccountId)?.name ?? 'Choose destination account'}</ThemedText><Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+      </Pressable>
+      {transferPreview && <View style={{ gap: 6, backgroundColor: theme.background, borderRadius: 12, padding: 12 }}>
+        <ThemedText type="smallBold">Balances after saving</ThemedText>
+        <ThemedText type="small">{selectedAccount?.name}: {formatMoney(transferPreview.sourceBalance)}</ThemedText>
+        <ThemedText type="small">{accounts.find((account) => account.id === destinationAccountId)?.name}: {formatMoney(transferPreview.destinationBalance)}</ThemedText>
+        {(transferPreview.sourceBalance < 0 || transferPreview.destinationBalance < 0) && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: an account will have a negative balance.</ThemedText>}
+      </View>}
+      {previewError ? <ThemedText accessibilityRole="alert">{previewError}</ThemedText> : null}
+      {accounts.filter((account) => !account.archived).length < 2 && <ThemedText accessibilityRole="alert">Add or unarchive another account to make a transfer.</ThemedText>}
+    </>}
+</> : null}
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, backgroundColor: type === 'INCOME' ? theme.incomeSurface : theme.expenseSurface, padding: 12, minHeight: 108 }}>
       <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}
         onPress={() => { Keyboard.dismiss(); setCategoryOpen(true); }} style={({ pressed }) => ({ width: 56, height: 56, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: categoryVisual(category, type === 'INCOME').color + '20', opacity: pressed || disabled ? 0.5 : 1 })}>
@@ -91,7 +118,8 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />
     {errors.date ? <ThemedText accessibilityRole="alert">{errors.date}</ThemedText> : null}
     {errors.time ? <ThemedText accessibilityRole="alert">{errors.time}</ThemedText> : null}
-    <ThemedText type="smallBold">{type === "TRANSFER" ? "From account" : "Account"}</ThemedText>
+    {type !== 'TRANSFER' ? <>
+      <ThemedText type="smallBold">Account</ThemedText>
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
       onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
       <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
@@ -100,26 +128,13 @@ export function TransactionForm({ initialDraft, original, initialAccountId, init
     </Pressable>
     {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
     {!accounts.some((account) => !account.archived) && <ThemedText accessibilityRole="alert">Add or unarchive an account in Settings to record transactions.</ThemedText>}
-    {type === 'TRANSFER' && <>
-      <ThemedText type="smallBold">To account</ThemedText>
-      <Pressable accessibilityRole="button" accessibilityLabel="Choose destination account" disabled={disabled} onPress={() => { Keyboard.dismiss(); setChoosingDestination(true); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
-        <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} /><ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{accounts.find((account) => account.id === destinationAccountId)?.name ?? 'Choose destination account'}</ThemedText><Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
-      </Pressable>
-      {transferPreview && <View style={{ gap: 6, backgroundColor: theme.background, borderRadius: 12, padding: 12 }}>
-        <ThemedText type="smallBold">Balances after saving</ThemedText>
-        <ThemedText type="small">{selectedAccount?.name}: {formatMoney(transferPreview.sourceBalance)}</ThemedText>
-        <ThemedText type="small">{accounts.find((account) => account.id === destinationAccountId)?.name}: {formatMoney(transferPreview.destinationBalance)}</ThemedText>
-        {(transferPreview.sourceBalance < 0 || transferPreview.destinationBalance < 0) && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: an account will have a negative balance.</ThemedText>}
-      </View>}
-      {previewError ? <ThemedText accessibilityRole="alert">{previewError}</ThemedText> : null}
-      {accounts.filter((account) => !account.archived).length < 2 && <ThemedText accessibilityRole="alert">Add or unarchive another account to make a transfer.</ThemedText>}
-    </>}
+</> : null}
     {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     </ScrollView>
     <View style={{ gap: 6, paddingTop: 8, borderTopWidth: 1, borderColor: theme.border }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={original ? 'Review changes' : 'Save'} accessibilityState={{ disabled }} disabled={disabled} onPress={submit}>
+        <Pressable accessibilityRole="button" accessibilityLabel={original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'} accessibilityState={{ disabled }} disabled={disabled} onPress={submit}>
       <View style={{ backgroundColor: disabled ? theme.disabledBackground : theme.accentPressed, padding: 16, minHeight: 50, borderRadius: 14, alignItems: 'center', opacity: disabled ? 0.5 : 1 }}>
-        <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : theme.onAccent }}>{disabled ? 'Please wait…' : original ? 'Review changes' : 'Save'}</ThemedText>
+        <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : theme.onAccent }}>{disabled ? 'Please wait…' : original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'}</ThemedText>
       </View>
     </Pressable>
     <ActionButton compact label="Cancel" disabled={disabled} onPress={onCancel} />

@@ -116,6 +116,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       <ThemedText>Savings goals: {preview.summary.goalCount}</ThemedText>
       <ThemedText>Budgets: {preview.summary.budgetCount}</ThemedText>
       <ThemedText>Transfers: {preview.summary.transferCount}</ThemedText>
+      <ThemedText>External movements: {preview.summary.externalCount}</ThemedText>
       <ThemedText>Balance adjustments: {preview.summary.adjustmentCount}</ThemedText>
       <ThemedText>Expense records: {preview.summary.expenseCount}</ThemedText>
       <ThemedText>Cash balance: {formatMoney(preview.summary.cashBalance)}</ThemedText>

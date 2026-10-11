@@ -56,7 +56,7 @@ test('initialization creates Cash exactly once and preserves records/opening bal
   await createTransaction(db, 'expense', expense());
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync('SELECT count(*) AS total FROM accounts')).total, 1);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
   assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
@@ -176,9 +176,9 @@ test('migration failure rolls back schema and version; newer schema is rejected'
   assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'accounts'"), null);
   fail = false;
   await initializeDatabase(db);
-  await db.execAsync('PRAGMA user_version = 9');
+  await db.execAsync('PRAGMA user_version = 10');
   await assert.rejects(initializeDatabase(db), /newer version/);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
 });
 
 test('a failure after an edit write rolls back the original transaction', async (t) => {
@@ -278,7 +278,7 @@ test('invalid restore payloads fail before opening a write transaction and prese
     (v) => { v.transactions[0].amount = -1; },
     (v) => { v.transactions.push({ ...v.transactions[0] }); },
     (v) => { v.transactions[0].accountId = 'missing'; },
-    (v) => { v.version = 7; },
+    (v) => { v.version = 8; },
   ]) {
     const backup = backupFixture();
     mutate(backup);
@@ -382,7 +382,7 @@ test('version 1 migration preserves Cash amounts, IDs and timestamps and is repe
   await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.deepEqual(await listTransactions(db), before);
   assert.ok(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"));
@@ -521,7 +521,7 @@ test('version 3 table migration preserves records and rolls back failures', asyn
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
   db.execAsync = exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
 });
 
@@ -609,7 +609,7 @@ test('version 4 migration preserves existing adjustment and expense records', as
   await adjustAccountBalance(db, 'adjustment-kept', 'cash', 100, -12000);
   await db.execAsync('PRAGMA user_version = 3');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
   assert.equal((await getTransaction(db, 'adjustment-kept')).adjustmentDirection, 'increase');
   assert.equal((await getTransaction(db, 'expense-kept')).amount, 12000);
 });
@@ -806,7 +806,7 @@ test('preferences migration preserves financial records and is repeatable', asyn
   await db.execAsync('DROP TABLE preferences; PRAGMA user_version = 5');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
   assert.equal((await getTransaction(db, 'keep-six')).amount, 12000);
 });
 
@@ -1001,7 +1001,7 @@ test('budget schema migration preserves records and rolls back errors', async (t
   assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
   assert.equal((await listTransactions(db)).length, 1);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
 });
 
 
@@ -1047,4 +1047,31 @@ test('onboarding saves optional name and Cash atomically and never overwrites ex
   await resetFinancialData(db);
   await completeCashSetup(db, 0, '');
   assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'displayName'")).value, '');
+});
+
+test('external movements persist exactly once, exclude reports and History, and survive backup restore', async (t) => {
+  const db = await setup(t);
+  const { createExternalTransfer } = require('../../.expo/finance-tests/storage/transactions.js');
+  const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { filterTransactions } = require('../../.expo/finance-tests/reporting.js');
+  const incoming = record({ id: 'external-in', type: 'EXTERNAL', category: 'External transfer', externalName: 'Untracked wallet', adjustmentDirection: 'increase', amount: 10000 });
+  await createExternalTransfer(db, incoming.id, incoming);
+  await createExternalTransfer(db, incoming.id, incoming);
+  const outgoing = { ...incoming, id: 'external-out', adjustmentDirection: 'decrease', amount: 3000 };
+  await createExternalTransfer(db, outgoing.id, outgoing);
+  let rows = await listTransactions(db);
+  assert.equal(rows.length, 2);
+  let summary = calculateAccountSummary(await getCashAccount(db), rows, '2026-10');
+  assert.equal(summary.balance, 7000);
+  assert.equal(summary.monthlyIncome, 0);
+  assert.equal(summary.monthlyExpenses, 0);
+  assert.equal(filterTransactions(rows, '2026-10', 'ALL').length, 0);
+  const backup = parseBackup(await readBackupJson(db));
+  assert.equal(backup.version, 7);
+  await restoreBackup(db, backup);
+  assert.equal((await listTransactions(db))[0].externalName, 'Untracked wallet');
+  await deleteTransaction(db, 'external-out');
+  assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 10000);
+  await assert.rejects(() => createExternalTransfer(db, 'invalid', { ...incoming, id: 'invalid', externalName: '' }));
 });

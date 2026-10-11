@@ -5,12 +5,13 @@ import { getAccount, listAccounts } from './accounts';
 import { calculateFinanceSummary, calculateAccountSummary } from '../calculations';
 import type { FinanceDatabase } from './database';
 
-type TransactionRow = Omit<Transaction, 'notes' | 'destinationAccountId' | 'adjustmentDirection' | 'sourcePurpose' | 'destinationPurpose'> & {
+type TransactionRow = Omit<Transaction, 'notes' | 'destinationAccountId' | 'adjustmentDirection' | 'sourcePurpose' | 'destinationPurpose' | 'externalName'> & {
   sourcePurpose?: 'spending' | 'savings' | null; destinationPurpose?: 'spending' | 'savings' | null;
+  externalName: string | null;
   notes: string | null; destinationAccountId: string | null; adjustmentDirection: 'increase' | 'decrease' | null;
 };
 function fromRow(row: TransactionRow): Transaction {
-  const record = { ...row, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined };
+  const record = { ...row, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined };
   validateManualRecord(record);
   return record;
 }
@@ -112,5 +113,23 @@ export async function adjustAccountBalance(db: FinanceDatabase, id: string, acco
     const updatedRows = await listTransactions(transaction);
     calculateFinanceSummary(await listAccounts(transaction), updatedRows, dateTime.transactionDate.slice(0, 7));
     if (calculateAccountSummary(account, updatedRows, '1900-01').balance !== target) throw new Error('Could not apply the balance correction.');
+  });
+}
+
+export async function createExternalTransfer(db: FinanceDatabase, id: string, record: Transaction): Promise<void> {
+  validateId(id);
+  if (record.id !== id || record.type !== 'EXTERNAL') throw new Error('Invalid external movement.');
+  validateManualRecord(record);
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    const existing = await getTransaction(transaction, id);
+    if (existing) {
+      if (existing.type !== 'EXTERNAL' || existing.accountId !== record.accountId) throw new Error('Submission ID is already in use.');
+      return;
+    }
+    const account = await getAccount(transaction, record.accountId);
+    if (account.archived) throw new Error('Choose an active account.');
+    await transaction.runAsync('INSERT INTO transactions (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, adjustmentDirection, externalName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      id, record.accountId, record.type, record.amount, record.category, record.transactionDate, record.transactionTime, record.notes ?? null, record.createdAt, record.updatedAt, record.adjustmentDirection!, record.externalName!);
+    calculateFinanceSummary(await listAccounts(transaction), await listTransactions(transaction), record.transactionDate.slice(0, 7));
   });
 }

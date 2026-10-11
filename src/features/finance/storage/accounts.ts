@@ -32,7 +32,7 @@ export async function saveAccount(db: FinanceDatabase, account: Account, creatin
       const original = await getAccount(transaction, account.id);
       if (original.archived && account.archived) throw new Error('Unarchive the account before editing its details.');
       const rows = await transaction.getAllAsync<Transaction>('SELECT * FROM transactions WHERE accountId = ? OR destinationAccountId = ?', account.id, account.id);
-      calculateAccountSummary(account, rows.map((row) => ({ ...row, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined })), '1900-01');
+      calculateAccountSummary(account, rows.map((row) => ({ ...row, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined })), '1900-01');
       await transaction.runAsync('UPDATE accounts SET name = ?, openingBalance = ?, purpose = ?, includedInAvailable = ?, archived = ? WHERE id = ?',
         account.name.trim(), account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.id);
     }
