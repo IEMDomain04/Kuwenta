@@ -40,7 +40,7 @@ export default function TransactionsScreen() {
       } },
     ], { cancelable: false });
   }
-  return <FinanceScreen title="Transactions" centeredTitle scroll={false} floatingAction={<AddTransactionButton disabled={busy} />}>
+  return <FinanceScreen title="Transaction history" centeredTitle scroll={false} floatingAction={<AddTransactionButton disabled={busy} />}>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <View style={{ flexDirection: 'row', gap: 6 }}>
         {(['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)}

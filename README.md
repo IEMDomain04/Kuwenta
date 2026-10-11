@@ -937,3 +937,30 @@ Account details includes Transfer money with the source preselected. Goal Add mo
 SQLite schema and financial backup payload are version 5. Goals and transfer-purpose snapshots are included in encrypted backups; versions 1-4 remain importable. Restoring an older backup replaces and clears current goals as part of full replacement. The encryption envelope and password handling are unchanged. No new dependencies were added.
 
 Phone verification: create a savings account with zero opening, create a PHP 1,000 goal, then use Add money to transfer PHP 200 from Cash. Savings balance should be PHP 200, goal progress 20%, and remaining PHP 800. Monthly income/expenses and Total Money should not change. Test month switching, a return transfer, cancellation of goal edits/deletion, optional calendar date, restart, and encrypted backup restore. Confirm Add Account no longer crashes before entering its name.
+
+
+### Dashboard and navigation
+
+- Bottom tabs: Home, Accounts, History, Settings. Account creation/details remain separate screens above Accounts.
+- Home shows a Philippine date and time-based greeting, current Available Money and Total Money, and a local budget insight.
+- Day reports use Philippine today; Week uses Monday through today; Month uses the selected reporting month. Income and expense totals exclude transfers and adjustments. Monthly bars cover consecutive seven-day groups within the month.
+- Budgets, spending breakdown, savings, and five recent transactions continue to use the selected month independently of the Day/Week selector. Current money is not filtered by month.
+- Budget usage shows remaining/overspent money, with a bounded progress bar and the actual percentage even above 100%. Expenses/income shows a dash when income is zero.
+- No additional dependencies, cloud AI, or financial storage changes were introduced for this dashboard.
+
+Phone checks: switch all four tabs; add/edit an account and return; change the reporting month; compare Day/Week/Month totals; save/edit/delete an expense and check chart/budget refresh; try a zero-income and over-budget month; check large text and narrow screens; open Quick Entry and the transaction FAB.
+
+
+### Phase 1: focused Home refinement
+
+Home now follows greeting, a larger local insight card, and a compact chart beside income/expense totals. Activity is hidden until an income or expense exists; opening balances, adjustments, and transfers do not activate it. Day is the default; Week and Month retain the existing Philippine reporting ranges. The selected-month picker appears with Month. Empty periods show a clear empty state. Charts reuse the installed Gifted Charts library.
+
+Current Available Money and Total Money are in Accounts. Settings > Planning opens Budgets or Savings & Goals (including the existing savings summary). History retains transaction browsing and editing. Home keeps the transaction FAB and Quick Entry in its insight card. No storage or financial calculation changes.
+
+Phone checks: fresh/reset Home has no chart; an opening balance or transfer alone keeps it hidden; saving an income/expense reveals it; deleting the last income/expense hides it; Day/Week/Month and the month picker update totals; zero-activity periods show an empty state; narrow screens and larger text reflow; Settings opens both planning screens and Back returns correctly.
+
+
+Home compact layout: insight icon and text share a row; the Home Quick Entry button is removed. Expense chart and totals use two columns, stacking for larger accessibility text. Day/Week/Month controls live inside the totals card. Day chart shows the last seven days while totals show today; Week chart shows Monday-Sunday with future days empty; Month chart shows daily expenses for the selected month. Weekday labels are M, T, W, TH, F, S, Sun; tap a bar for the full date and exact amount. Income and expense calculations remain unchanged.
+
+
+Home now keeps its expense chart fixed to the current Philippine Monday-Sunday week. Day/Week/Month switches only the adjacent totals; Month always uses the current Philippine month and has no picker. History retains historical month selection. Recent transactions shows the five newest by transaction date/time across all months, including transfers and adjustments. Tap to edit, or view the account for an adjustment; See all opens History.

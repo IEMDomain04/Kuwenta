@@ -17,6 +17,11 @@ export function BudgetOverview() {
     <ThemedText type="smallBold">Budgets - {readableReportingMonth(month)}</ThemedText>
     {report.rows.length ? <>
       <ThemedText type="small">Budgeted categories: {formatMoney(report.budgetedSpent)} spent of {formatMoney(report.totalLimit)}</ThemedText>
+      <ThemedText type="small" style={{ color: report.remaining < 0 ? theme.expense : theme.income }}>{formatMoney(Math.abs(report.remaining))} {report.remaining < 0 ? 'over budget' : 'remaining'}</ThemedText>
+      <View accessibilityRole="progressbar" accessibilityLabel="Monthly budget usage" accessibilityValue={{ min: 0, max: 100, now: Math.min(100, Math.round(report.budgetedSpent / report.totalLimit * 100)), text: Math.round(report.budgetedSpent / report.totalLimit * 100) + '% used' }} style={{ height: 8, backgroundColor: theme.backgroundSelected, borderRadius: 4, overflow: 'hidden' }}>
+        <View style={{ height: 8, width: Math.min(100, report.budgetedSpent / report.totalLimit * 100) + '%' as `${number}%`, backgroundColor: report.remaining < 0 ? theme.expense : theme.income }} />
+      </View>
+      <ThemedText type="small">{Math.round(report.budgetedSpent / report.totalLimit * 100)}% used</ThemedText>
       <ThemedText type="small">{over ? over + ' categories over budget' : 'No categories over budget'}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">{report.unbudgeted.length} expense categories without budgets</ThemedText>
     </> : <ThemedText type="small" themeColor="textSecondary">Set monthly category limits to track spending.</ThemedText>}

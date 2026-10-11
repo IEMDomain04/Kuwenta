@@ -25,8 +25,10 @@ export default function SettingsScreen() {
   }
   return <FinanceScreen title="Settings">
     <ThemedText type="smallBold" accessibilityRole="header">Account Management</ThemedText>
-    <ActionButton label="Manage accounts" disabled={busy} onPress={() => router.push('/accounts')} />
-    <ActionButton label="Manage savings goals" disabled={busy} onPress={() => router.push('/goals')} />
+    <ActionButton label="Manage accounts" disabled={busy} onPress={() => router.navigate('/accounts')} />
+    <ThemedText type="smallBold" accessibilityRole="header">Planning</ThemedText>
+    <ActionButton label="Budgets" disabled={busy} onPress={() => router.push('/budgets')} />
+    <ActionButton label="Savings & Goals" disabled={busy} onPress={() => router.push('/goals')} />
     <ThemedText type="smallBold" accessibilityRole="header">Data and Backups</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
     <BackupExport disabled={busy} />

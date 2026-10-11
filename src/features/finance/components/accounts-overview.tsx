@@ -19,7 +19,7 @@ export function AccountsOverview({ compact = false }: { compact?: boolean }) {
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
       <ThemedText type="smallBold" accessibilityRole="header">Accounts</ThemedText>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {compact && <ActionButton compact label="View all" disabled={busy} onPress={() => router.push('/accounts')} />}
+        {compact && <ActionButton compact label="View all" disabled={busy} onPress={() => router.navigate('/accounts')} />}
         <ActionButton compact label="Add account" disabled={busy} onPress={() => router.push('/account')} />
       </View>
     </View>
