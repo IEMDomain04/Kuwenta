@@ -964,3 +964,19 @@ Home compact layout: insight icon and text share a row; the Home Quick Entry but
 
 
 Home now keeps its expense chart fixed to the current Philippine Monday-Sunday week. Day/Week/Month switches only the adjacent totals; Month always uses the current Philippine month and has no picker. History retains historical month selection. Recent transactions shows the five newest by transaction date/time across all months, including transfers and adjustments. Tap to edit, or view the account for an adjustment; See all opens History.
+
+
+### Phases 2 and 3: Accounts and transaction interfaces
+
+Accounts leads with Total Money and secondary Available Money, with Add Account in the heading. A local balance insight sits beside the current-week recorded-balance chart. Card/list controls change presentation without changing records. Spending/savings accounts have consistent purpose-based icons and colors; archived accounts remain behind the existing visibility toggle. No account styling fields or forecast model were added.
+
+The weekly balance chart reconstructs end-of-day aggregate balances using current undated opening balances plus transactions through each date. It includes archived balances and adjustments, cancels internal transfers across the aggregate, and leaves future days blank. It is not a snapshot of historical account creation, past opening-balance edits, or cash-flow forecasting. Tap a bar for the exact recorded amount.
+
+Account details show five recent account transactions, including both transfer endpoints. See all opens History filtered to that account (and all transaction types), where the visible month can be selected. Edit account details and Adjust balance remain separate, with existing confirmations and account-deletion restrictions.
+
+Transaction entry retains its fixed Save/Cancel footer, with a compact amount/category panel and matching source/destination selectors. Android keyboard avoidance now uses height adjustment; verify this on-device with the keyboard open. History uses compact shared transaction rows, readable date headings, existing filters, and separate confirmed deletion.
+
+Checks on phone: card/list switching, large balances and system text, account creation/editing/adjustment/archive/delete restrictions, negative-balance chart, cross-month week, account history navigation (source and destination), transfer preview, keyboard-visible Save/Cancel, repeat-save prevention, editing confirmation and cancellation, 10-second Undo, History filters and delete confirmation. Phase 4 Settings/budget/savings refinements remain next.
+
+
+Accounts visual refinement: Add Account lives inside the balance summary; the insight/chart row uses a 60/40 split and stacks on narrow screens or larger system text. Wallet cards retain their card width for an odd final account, with icon/name at the top and balance near the bottom. Compact typography is the default design direction: small supporting labels with clear headings and larger primary amounts, preserving system text scaling and comfortable touch targets.

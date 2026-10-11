@@ -29,7 +29,7 @@ export function ActionButton({ label, onPress, disabled = false, selected, prima
     <ThemedText type="smallBold" style={primary ? { color: theme.onAccent } : undefined}>{selected ? '✓ ' : ''}{label}</ThemedText>
   </Pressable>;
 }
-export function TransactionRow({ transaction, accountName, destinationName, disabled, onEdit, onDelete }: { transaction: Transaction; accountName: string; destinationName?: string; disabled: boolean; onEdit: () => void; onDelete: () => void }) {
+export function TransactionRow({ transaction, accountName, destinationName, disabled, onEdit, onDelete, showDate = false }: { transaction: Transaction; accountName: string; destinationName?: string; disabled: boolean; onEdit: () => void; onDelete?: () => void; showDate?: boolean }) {
   const theme = useTheme();
   const income = transaction.type === 'INCOME';
   return <ThemedView type="backgroundElement" style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 4 }}>
@@ -37,22 +37,22 @@ export function TransactionRow({ transaction, accountName, destinationName, disa
       accessibilityState={{ disabled }} disabled={disabled} onPress={onEdit}
       style={({ pressed }) => ({ flex: 1, minWidth: 0, paddingHorizontal: 12, paddingVertical: 10, opacity: pressed || disabled ? 0.5 : 1 })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <CategoryIcon category={transaction.category} income={income} />
+        <CategoryIcon category={transaction.category} income={income} compact />
         <View style={{ flex: 1, minWidth: 90, gap: 1 }}>
-          <ThemedText type="smallBold" numberOfLines={2} style={{ fontSize: 13, lineHeight: 18 }}>{transaction.notes || transaction.category}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{transaction.type === "TRANSFER" ? accountName + " to " + destinationName : transaction.category + " · " + accountName}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime).split(' · ')[1]}</ThemedText>
+          <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18 }}>{transaction.notes || transaction.category}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{transaction.type === "TRANSFER" ? accountName + ' → ' + destinationName : transaction.category + " · " + accountName}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{showDate ? formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime) : formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime).split(' · ')[1]}</ThemedText>
         </View>
         <ThemedText type="smallBold" style={{ color: income ? theme.income : theme.text, fontVariant: ['tabular-nums'], flexShrink: 1, fontSize: 14, lineHeight: 20 }}>
           {transaction.type === 'TRANSFER' ? '' : (income || transaction.type === 'ADJUSTMENT' && transaction.adjustmentDirection === 'increase') ? '+' : '−'}{formatMoney(transaction.amount)}
         </ThemedText>
       </View>
     </Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel={'Delete ' + transaction.category + ', ' + formatMoney(transaction.amount)}
+    {onDelete ? <Pressable accessibilityRole="button" accessibilityLabel={'Delete ' + transaction.category + ', ' + formatMoney(transaction.amount)}
       accessibilityState={{ disabled }} disabled={disabled} onPress={onDelete}
       style={({ pressed }) => ({ width: 44, minHeight: 48, alignItems: 'center', justifyContent: 'center', opacity: pressed || disabled ? 0.5 : 1 })}>
       <Ionicons name="trash-outline" size={18} color={theme.textSecondary} />
-    </Pressable>
+    </Pressable> : null}
   </ThemedView>;
 }
 const styles = StyleSheet.create({

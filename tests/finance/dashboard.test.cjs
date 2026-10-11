@@ -66,3 +66,16 @@ test('daily expense chart uses weekday labels and excludes income and future day
   assert.equal(dashboardSpending([],'month','2024-02',now).length,29);
   assert.equal(dashboardSpending([],'month','9999-12',now).length,31);
 });
+
+test('recorded weekly balances include starting balances and dated records without counting transfers twice', () => {
+  const { weeklyRecordedBalances } = require('../../.expo/finance-tests/dashboard.js');
+  const { cash } = require('./fixtures.cjs');
+  const bank={...cash,id:'bank',name:'Bank',openingBalance:0,archived:true};
+  const records=[record({type:'INCOME',category:'Salary',amount:50000,transactionDate:'2026-10-05'}),record({id:'expense',amount:12000,transactionDate:'2026-10-06'}),record({id:'transfer',type:'TRANSFER',category:'Transfer',destinationAccountId:'bank',amount:10000,transactionDate:'2026-10-06'}),record({id:'adjust',type:'ADJUSTMENT',category:'Balance adjustment',adjustmentDirection:'decrease',amount:1000,transactionDate:'2026-10-07'})];
+  const balances=weeklyRecordedBalances([cash,bank],records,new Date('2026-10-07T04:00:00Z'));
+  assert.deepEqual(balances.map(row=>row.balance),[150000,138000,137000,null,null,null,null]);
+  assert.equal(weeklyRecordedBalances([cash,bank],records.filter(row=>row.id!=='expense'),new Date('2026-10-07T04:00:00Z'))[2].balance,149000);
+  assert.equal(weeklyRecordedBalances([cash,bank],records.map(row=>row.id==='expense'?{...row,amount:13000}:row),new Date('2026-10-07T04:00:00Z'))[2].balance,136000);
+  assert.equal(weeklyRecordedBalances([{...cash,openingBalance:-100}],[],new Date('2026-10-07T04:00:00Z'))[0].balance,-100);
+  assert.throws(()=>weeklyRecordedBalances([cash],[record({accountId:'missing'})]));
+});

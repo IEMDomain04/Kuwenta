@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { AccountManager } from '../components/account-manager';
 import { MoneyField } from '../components/money-field';
-import { ActionButton, FinanceScreen, BackButton } from '../components/ui';
+import { ActionButton, FinanceScreen, BackButton, TransactionRow } from '../components/ui';
 import { calculateAccountSummary } from '../calculations';
 import { formatEditableMoney } from '../inputs';
 import { formatMoney, moneyInput, parseMoney } from '../money';
@@ -17,6 +17,7 @@ export default function AccountScreen() {
   const finance = useFinance();
   const theme = useTheme();
   const account = finance.accounts.find((row) => row.id === accountId);
+  const history = finance.transactions.filter((row) => row.accountId === accountId || row.destinationAccountId === accountId).sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt));
   const balance = account ? calculateAccountSummary(account, finance.transactions, finance.month).balance : 0;
   const [mode, setMode] = useState<'details' | 'edit' | 'adjust'>('details');
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -97,7 +98,7 @@ export default function AccountScreen() {
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 }}>
             <ThemedText type="smallBold">{account.name}{account.archived ? ' · Archived' : ''}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">Current balance</ThemedText>
-            <ThemedText style={{ fontSize: 30, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(balance)}</ThemedText>
+            <ThemedText style={{ fontSize: 28, lineHeight: 36, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(balance)}</ThemedText>
             {balance < 0 && <ThemedText accessibilityRole="alert">Warning: this account balance is negative.</ThemedText>}
             <ThemedText type="small">{account.currency} · {account.purpose === 'spending' ? 'Spending' : 'Savings'}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">{account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
@@ -114,17 +115,25 @@ export default function AccountScreen() {
             <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setMode('details'); setError(''); } }} />
           </> : <>
             {!account.archived && <>
-              <ActionButton label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setMode('adjust'); }} />
+              <ThemedText type="small" themeColor="textSecondary">Adjust balance records a correction. Edit account details changes the name and spending preferences.</ThemedText>
+              <ActionButton compact label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setMode('adjust'); }} />
               <ActionButton primary label="Transfer money" disabled={locked || finance.accounts.filter((row) => !row.archived).length < 2}
                 onPress={() => router.push({ pathname: '/transaction', params: { type: 'TRANSFER', accountId: account.id } })} />
               {finance.accounts.filter((row) => !row.archived).length < 2 && <ThemedText type="small">Add another active account to transfer money.</ThemedText>}
 
             </>}
             {account.archived && <ThemedText type="small">Unarchive this account in Account options before making changes.</ThemedText>}
+            <View style={{ padding: 12, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <ThemedText type="smallBold">Account transactions</ThemedText>
+                <ActionButton compact label="See all" disabled={locked} onPress={() => router.push({ pathname: '/transactions', params: { accountId: account.id } })} />
+              </View>
+              {history.length ? history.slice(0, 5).map((row) => <TransactionRow key={row.id} transaction={row} showDate accountName={finance.accounts.find((item) => item.id === row.accountId)?.name ?? 'Unknown account'} destinationName={finance.accounts.find((item) => item.id === row.destinationAccountId)?.name} disabled={locked || row.type === 'ADJUSTMENT'} onEdit={() => router.push({ pathname: '/transaction', params: { id: row.id } })} />) : <ThemedText type="small" themeColor="textSecondary">No transactions for this account yet.</ThemedText>}
+            </View>
             <ActionButton label={optionsOpen ? 'Close account options' : 'Account options'} selected={optionsOpen} disabled={locked} onPress={() => setOptionsOpen(!optionsOpen)} />
             {optionsOpen && <View style={{ gap: 8 }}>
               {!account.archived && <>
-                <ActionButton label="Edit account settings" disabled={locked} onPress={() => { setCorrectOpening(false); setMode('edit'); }} />
+                <ActionButton label="Edit account details" disabled={locked} onPress={() => { setCorrectOpening(false); setMode('edit'); }} />
                 <ActionButton label="Correct opening balance" disabled={locked} onPress={() => { setCorrectOpening(true); setMode('edit'); }} />
               </>}
               <ActionButton label="Delete account" disabled={locked} onPress={remove} />

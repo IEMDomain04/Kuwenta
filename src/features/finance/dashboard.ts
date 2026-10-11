@@ -1,5 +1,6 @@
 import { isValidMonth, philippineDateTime } from './dates';
-import type { Transaction } from './types';
+import type { Account, Transaction } from './types';
+import { calculateCurrentMoney } from './calculations';
 
 export type DashboardPeriod = 'day' | 'week' | 'month';
 
@@ -83,4 +84,14 @@ export function dashboardSpending(transactions: readonly Transaction[], period: 
     days.push({ date: key, label: period === 'month' ? String(date.getUTCDate()) : labels[date.getUTCDay()], expenses: amounts.get(key) ?? 0, isToday: key === today });
   }
   return days;
+}
+
+/** Opening balances are undated starting records, not a historical account-creation snapshot. */
+export function weeklyRecordedBalances(accounts: readonly Account[], transactions: readonly Transaction[], now = new Date()) {
+  calculateCurrentMoney(accounts, transactions); // Validate all records, including those outside this week.
+  const today = philippineDateTime(now).transactionDate;
+  return dashboardSpending([], 'week', today.slice(0, 7), now).map((day) => ({
+    date: day.date, label: day.label, isToday: day.isToday,
+    balance: day.date > today ? null : calculateCurrentMoney(accounts, transactions.filter((record) => record.transactionDate <= day.date)).totalMoney,
+  }));
 }

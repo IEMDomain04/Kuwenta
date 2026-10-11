@@ -1,9 +1,9 @@
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTransactionDateTime, readableReportingMonth, transactionDayHeading } from '../dates';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, SectionList, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { FinanceScreen, TransactionRow, ActionButton, AddTransactionButton } from '../components/ui';
 import { HomeMonthPicker } from '../components/home-month-picker';
@@ -15,9 +15,13 @@ import type { Transaction } from '../types';
 export default function TransactionsScreen() {
   const { accounts, transactions, month, refresh, busy, removeTransaction } = useFinance();
   const theme = useTheme();
+  const params = useLocalSearchParams<{ accountId?: string }>();
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER'>('ALL');
-  const [accountFilter, setAccountFilter] = useState<string | null>(null);
+  const [accountFilter, setAccountFilter] = useState<string | null>(typeof params.accountId === 'string' ? params.accountId : null);
+  useEffect(() => {
+    if (typeof params.accountId === 'string') { setAccountFilter(params.accountId); setFilter('ALL'); router.setParams({ accountId: undefined }); }
+  }, [params.accountId]);
   const visible = filterTransactions(transactions, month, filter).filter((row) => accountFilter === null || (row.accountId === accountFilter || row.destinationAccountId === accountFilter));
   const groups = new Map<string, Transaction[]>();
   for (const transaction of visible) {
@@ -56,8 +60,8 @@ export default function TransactionsScreen() {
         <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ fontSize: 12 }}>{accountFilter === account.id ? '✓ ' : ''}{account.name}{account.archived ? ' · Archived' : ''}</ThemedText>
       </Pressable>)}
     </ScrollView>
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 12, backgroundColor: theme.expenseSurface }}>
-      <Ionicons name="refresh-outline" size={20} color={theme.textSecondary} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 4 }}>
+      <Ionicons name="refresh-outline" size={16} color={theme.textSecondary} />
       <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>{busy ? 'Refreshing…' : 'Pull down to refresh'}</ThemedText>
     </View>
     {error ? <ThemedText accessibilityRole="alert">{error}</ThemedText> : null}
