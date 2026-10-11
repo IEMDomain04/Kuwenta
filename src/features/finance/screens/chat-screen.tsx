@@ -5,14 +5,14 @@ import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
 import { parseQuickEntry } from '../quick-entry';
 import { validateDraft } from '../validation';
-import { CATEGORIES, type TransactionDraft } from '../types';
+import type { TransactionDraft } from '../types';
 import { formatMoney, moneyInput, parseMoney } from '../money';
 import { formatEditableMoney } from '../inputs';
 import { formatTransactionDateTime } from '../dates';
 import { ActionButton, BackButton, FinanceScreen } from '../components/ui';
-import { MoneyField } from '../components/money-field';
-import { SelectionSheet } from '../components/selection-sheet';
-import { TransactionDateTime } from '../components/transaction-date-time';
+
+
+
 
 export default function ChatScreen() {
   const finance = useFinance();
@@ -21,9 +21,6 @@ export default function ChatScreen() {
   const [text, setText] = useState('');
   const [draft, setDraft] = useState<TransactionDraft>();
   const [amount, setAmount] = useState('');
-  const [rejected, setRejected] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [picker, setPicker] = useState<'account' | 'category' | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
@@ -44,12 +41,11 @@ export default function ChatScreen() {
       const result = parseQuickEntry(phrase, finance.accounts, new Date(), undefined, finance.lastEntryAccount);
       submission.current = undefined;
       setDraft(result.draft); setAmount(formatEditableMoney(moneyInput(result.draft.amount))!);
-      setRejected(false); setEditing(false);
       reply(result.warnings.join(' ') + ' Please confirm the transaction type and details below.');
     } catch (cause) { reply((cause instanceof Error ? cause.message : 'Could not understand that.') + ' Send the complete corrected phrase to try again.'); }
   }
   async function save() {
-    if (!draft || locked || pending.current || rejected) return;
+    if (!draft || locked || pending.current) return;
     pending.current = true; setSaving(true); setError('');
     try {
       const candidate = { ...draft, amount: parseMoney(amount.replace(/,/g, '')) };
@@ -59,7 +55,7 @@ export default function ChatScreen() {
       const id = submission.current ??= await finance.newSubmissionId();
       await finance.saveTransaction(id, candidate, false);
       reply('Saved ' + candidate.category + ': ' + formatMoney(candidate.amount) + '. Use the notification Undo to remove it within 10 seconds.');
-      submission.current = undefined; setDraft(undefined); setEditing(false);
+      submission.current = undefined; setDraft(undefined);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save. Your draft is kept.'); }
     finally { pending.current = false; setSaving(false); }
   }
@@ -74,25 +70,17 @@ export default function ChatScreen() {
           <ThemedText type="small">{finance.accounts.find((row) => row.id === draft.accountId)?.name ?? 'Choose account'}</ThemedText>
           <ThemedText type="small">{formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}</ThemedText>
           {draft.notes ? <ThemedText type="small">{draft.notes}</ThemedText> : null}
-          {editing ? <>
-            <View style={{ flexDirection: 'row', gap: 8 }}>{(['EXPENSE', 'INCOME'] as const).map((type) => <ActionButton key={type} compact label={type === 'INCOME' ? 'Income' : 'Expense'} selected={draft.type === type} disabled={locked} onPress={() => setDraft({ ...draft, type, category: CATEGORIES[type][0] })} />)}</View>
-            <MoneyField accessibilityLabel="Chat draft amount in pesos" value={amount} editable={!locked} onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} style={{ color: theme.text, fontSize: 22, padding: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
-            <ActionButton compact label={'Category: ' + draft.category} disabled={locked} onPress={() => setPicker('category')} />
-            <ActionButton compact label="Choose account" disabled={locked} onPress={() => setPicker('account')} />
-            <TransactionDateTime date={draft.transactionDate} time={draft.transactionTime} disabled={locked} onDateChange={(transactionDate) => setDraft({ ...draft, transactionDate })} onTimeChange={(transactionTime) => setDraft({ ...draft, transactionTime })} />
-            <TextInput accessibilityLabel="Chat draft note" value={draft.notes ?? ''} editable={!locked} onChangeText={(notes) => setDraft({ ...draft, notes })} placeholder="Optional note" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, padding: 12, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
-          </> : null}
           {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error }}>{error}</ThemedText> : null}
-          <ActionButton primary label={saving ? 'Saving...' : 'Save transaction'} disabled={locked || rejected} onPress={() => { void save(); }} />
-          <ActionButton compact label={editing ? 'Hide fields' : 'Change details'} disabled={locked} onPress={() => setEditing(!editing)} />
-          <ActionButton compact label="Cancel draft" disabled={locked} onPress={() => { setDraft(undefined); setError(''); submission.current = undefined; reply('Draft canceled. Nothing was saved.'); }} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}><ActionButton compact primary label={saving ? 'Saving...' : 'Save'} disabled={locked} onPress={() => { void save(); }} /></View>
+            <View style={{ flex: 1 }}><ActionButton compact label="Cancel" disabled={locked} onPress={() => { setDraft(undefined); setError(''); submission.current = undefined; reply('Draft canceled. Nothing was saved. Send a corrected message to try again.'); }} /></View>
+          </View>
         </View> : null}
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TextInput accessibilityLabel="Message" value={text} onChangeText={setText} editable={!locked && !draft} maxLength={250} placeholder={draft ? 'Review the draft above' : 'Describe an income or expense'} placeholderTextColor={theme.textSecondary} returnKeyType="send" onSubmitEditing={send} style={{ flex: 1, minHeight: 48, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border, color: theme.text, backgroundColor: theme.backgroundElement, fontSize: 12 }} />
         <ActionButton compact label="Send" disabled={locked || Boolean(draft) || !text.trim()} onPress={send} />
       </View>
-      <SelectionSheet visible={Boolean(picker && draft)} title={picker === 'account' ? 'Account' : 'Category'} selected={picker === 'account' ? draft?.accountId : draft?.category} disabled={locked} onClose={() => setPicker(null)} options={picker === 'account' ? finance.accounts.filter((row) => !row.archived).map((row) => ({ value: row.id, label: row.name })) : (draft?.type === 'INCOME' ? CATEGORIES.INCOME : CATEGORIES.EXPENSE).map((category) => ({ value: category, label: category }))} onSelect={(value) => { if (draft) setDraft(picker === 'account' ? { ...draft, accountId: value } : { ...draft, category: value }); }} />
     </FinanceScreen>
   </KeyboardAvoidingView>;
 }

@@ -27,7 +27,7 @@ export function ActionButton({ label, onPress, disabled = false, selected, prima
   const theme = useTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
     style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.secondary : theme.accentPressed : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.backgroundElement, borderWidth: 2, borderColor: selected ? theme.accent : theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
-    <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
+    <ThemedText type="smallBold" style={{ textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
   </Pressable>;
 }
 export function TransactionRow({ transaction, accountName, destinationName, disabled, onEdit, onDelete, showDate = false }: { transaction: Transaction; accountName: string; destinationName?: string; disabled: boolean; onEdit: () => void; onDelete?: () => void; showDate?: boolean }) {
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { padding: 16, paddingBottom: 16, gap: 12, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
   fill: { flex: 1 },
-  button: { padding: 16, minHeight: 48, borderRadius: 12, alignItems: 'center' },
+  button: { padding: 16, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   card: { padding: 16, borderRadius: 12, gap: 6 },
 });
 
