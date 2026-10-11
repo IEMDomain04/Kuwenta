@@ -7,11 +7,11 @@ const bank = { ...cash, id: 'bank', name: 'Bank 2' };
 const parse = (text, accounts = [cash, bank], context, last) => parseQuickEntry(text, accounts, now, context, last);
 
 test('Quick Entry prepares review drafts with exact amounts and documented English/Filipino categories', () => {
-  assert.deepEqual(parse('Lunch 120').draft, { type: 'EXPENSE', accountId: 'cash', amount: 12000, category: 'Food', transactionDate: '2026-10-11', transactionTime: '00:30:25', notes: 'Lunch' });
+  assert.deepEqual(parse('Lunch 120').draft, { type: 'EXPENSE', accountId: 'cash', amount: 12000, category: 'Meals', transactionDate: '2026-10-11', transactionTime: '00:30:25', notes: 'Lunch' });
   assert.equal(parse('Salary 25,000').draft.type, 'INCOME');
   assert.equal(parse('Salary 25,000').draft.amount, 2500000);
   assert.equal(parse('Sahod 1000').draft.category, 'Salary');
-  assert.equal(parse('Pamasahe 30 kahapon').draft.category, 'Transportation');
+  assert.equal(parse('Pamasahe 30 kahapon').draft.category, 'Transport');
   assert.equal(parse('Groceries 1,500.50 from Cash').draft.amount, 150050);
   assert.equal(parse('Kape 0.50').draft.amount, 50);
   assert.equal(parse('Lunch PHP120').draft.amount, 12000);
@@ -52,11 +52,11 @@ test('parsing is pure and never changes account records', () => {
 });
 
 
-test('load phrases create Bills expenses in the specified active account', () => {
+test('load phrases create Mobile Load & Data expenses in the specified active account', () => {
  for (const phrase of ['Mobile load 100 from Cash', 'Bought load 100 using Bank 2', 'Prepaid airtime 100', 'Data promo 100', 'Nagpaload 100']) {
   const result = parse(phrase).draft;
   assert.equal(result.type, 'EXPENSE'); assert.equal(result.amount, 10000);
-  if (!phrase.startsWith('Nagpaload')) assert.equal(result.category, 'Bills');
+  assert.equal(result.category, 'Mobile Load & Data');
  }
  assert.equal(parse('Bought load 50 using Bank 2').draft.accountId, 'bank');
 });
@@ -77,4 +77,17 @@ test('incomplete, invalid or external transfers require clarification instead of
  assert.throws(() => parse('Cash in 500 from Cash to Bank 2', [cash, bank, { ...bank, id: 'duplicate' }]));
  const frozen = Object.freeze([Object.freeze({ ...cash }), Object.freeze({ ...bank })]);
  const before = JSON.stringify(frozen); parse('Cash in 500 from Cash to Bank 2', frozen); assert.equal(JSON.stringify(frozen), before);
+});
+
+test('student expenses and income map to categories and remain valid review drafts', () => {
+ const { validateDraft } = require('../../.expo/finance-tests/validation.js');
+ for (const [phrase, category] of [
+  ['Chips 30','Snacks & Drinks'], ['Coffee 80','Café'], ['Keyboard 1000','Tech & Accessories'],
+  ['Bag 500','School & Personal Items'], ['Games 100','Games & Entertainment'], ['Cash-out fee 15','Fees'],
+  ['Part-time 500','Part-time Work'], ['Freelance 2000','Freelance'], ['Gift 500','Gifts'], ['Received 100','Other Income']
+ ]) {
+  const {draft} = parse(phrase);
+  assert.equal(draft.category, category, phrase);
+  validateDraft(draft, cash);
+ }
 });

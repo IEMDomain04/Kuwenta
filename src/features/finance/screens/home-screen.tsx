@@ -60,8 +60,8 @@ export default function HomeScreen() {
     </View>
     <LinearGradient colors={[theme.backgroundSelected, theme.background]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.insight}>
       <Image source={mascotImages[reaction]} contentFit="contain" accessible={false} style={styles.mascot} />
-      <Pressable accessibilityRole="button" accessibilityLabel="View money insights" accessibilityHint="Opens full insight details" onPress={() => setInsightsOpen(true)} style={({ pressed }) => [styles.bubble, { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 }]}>
-        <View style={[styles.bubbleTail, { backgroundColor: theme.backgroundElement }]} />
+      <Pressable accessibilityRole="button" accessibilityLabel="View money insights" accessibilityHint="Opens full insight details" onPress={() => setInsightsOpen(true)} style={({ pressed }) => [styles.bubble, { backgroundColor: theme.backgroundElement, borderColor: theme.accent, opacity: pressed ? 0.7 : 1 }]}>
+        <View style={[styles.bubbleTail, { backgroundColor: theme.backgroundElement, borderColor: theme.accent }]} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <ThemedText type="smallBold" style={{ flex: 1, color: theme.income, fontSize: 12, lineHeight: 17 }}>Kuwenta</ThemedText>
           <Ionicons accessible={false} name="chevron-forward" size={14} color={theme.textSecondary} />
@@ -118,6 +118,6 @@ const styles = StyleSheet.create({
   insight: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 22, gap: 10 },
   mascot: { width: 80, height: 94, flexShrink: 0 },
   bubble: { flex: 1, minWidth: 0, padding: 12, borderRadius: 18, borderWidth: 1, gap: 4 },
-  bubbleTail: { position: 'absolute', left: -5, top: 24, width: 10, height: 10, transform: [{ rotate: '45deg' }] },
+  bubbleTail: { position: 'absolute', left: -5, top: 24, width: 10, height: 10, borderLeftWidth: 1, borderBottomWidth: 1, transform: [{ rotate: '45deg' }] },
   message: { fontSize: 12, lineHeight: 18 },
 });

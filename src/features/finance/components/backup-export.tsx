@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -59,10 +60,10 @@ export function BackupExport({ disabled = false }: { disabled?: boolean }) {
     <ThemedText type="small" themeColor="textSecondary">Save a password-protected copy of all your financial records. Keep the password safe: a forgotten password cannot be recovered.</ThemedText>
     {open ? <>
       <ThemedText type="small">Use a strong passphrase of 12 to 128 characters. The password is not saved.</ThemedText>
-      <TextInput accessibilityLabel="Backup password" placeholder="Backup password" placeholderTextColor={theme.textSecondary}
+      <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Backup password" placeholder="Backup password" placeholderTextColor={theme.textSecondary}
         value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false}
         textContentType="newPassword" editable={!locked} maxLength={128} style={inputStyle} />
-      <TextInput accessibilityLabel="Confirm backup password" placeholder="Confirm password" placeholderTextColor={theme.textSecondary}
+      <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Confirm backup password" placeholder="Confirm password" placeholderTextColor={theme.textSecondary}
         value={confirmation} onChangeText={setConfirmation} secureTextEntry autoCapitalize="none" autoCorrect={false}
         textContentType="newPassword" editable={!locked} maxLength={128} style={inputStyle} />
       <ActionButton label={exporting ? 'Preparing backup...' : 'Encrypt and share backup'} disabled={locked} onPress={() => { void exportFile(); }} />

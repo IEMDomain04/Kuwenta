@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -99,7 +100,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
     <ActionButton label={working ? 'Checking backup...' : 'Choose backup file'} disabled={locked} onPress={() => { void chooseFile(); }} />
     {selected ? <>
       <ThemedText>Selected: {selected.name}</ThemedText>
-      <TextInput accessibilityLabel="Password for selected backup" placeholder="Backup password"
+      <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Password for selected backup" placeholder="Backup password"
         placeholderTextColor={theme.textSecondary} value={password} onChangeText={setPassword}
         secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={128} editable={!locked}
         style={{ color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 }} />

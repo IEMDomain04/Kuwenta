@@ -8,15 +8,15 @@ import '@/global.css';
 import { Platform } from 'react-native';
 
 const palette = {
-  text: '#0A1129', background: '#F2FAF5', backgroundElement: '#FFFFFF',
+  text: '#0A1129', background: '#F3F8F5', backgroundElement: '#FFFFFF',
   backgroundSelected: '#DDF3E5', textSecondary: '#3F5148',
-  accent: '#087F50', accentPressed: '#06633E', onAccent: '#FFFFFF',
-  navy: '#00205C', secondary: '#033F77', budget: '#0B7285', navigationInactive: '#4F6358',
-  income: '#087F50', expense: '#B4233C', border: '#7A8E81',
+  accent: '#06633E', accentPressed: '#044C30', onAccent: '#FFFFFF',
+  navy: '#00205C', secondary: '#033F77', budget: '#0B6575', navigationInactive: '#4F6358',
+  income: '#087443', expense: '#B4233C', border: '#73877A',
   incomeSurface: '#DDF3E5', incomeEnd: '#D2EBDD',
   expenseSurface: '#FDECEF', expenseEnd: '#F6D9DF', balanceEnd: '#033F77',
-  warning: '#925B08', warningSurface: '#FFF4D6',
-  success: '#087F50', successSurface: '#E5F5EB',
+  warning: '#855006', warningSurface: '#FFF4D6',
+  success: '#087443', successSurface: '#E5F5EB',
   info: '#033F77', infoSurface: '#EAF2FB',
   error: '#B4233C', errorSurface: '#FDECEF',
   disabledBackground: '#E8EFEB', disabledText: '#4F6358',

@@ -10,8 +10,8 @@ export type Account = {
 };
 
 export const CATEGORIES = {
-  INCOME: ['Salary', 'Allowance', 'Freelance', 'Gift', 'Business', 'Other'],
-  EXPENSE: ['Food', 'Transportation', 'Shopping', 'Bills', 'Entertainment', 'Health', 'Education', 'Family', 'Subscriptions', 'Other'],
+  INCOME: ['Allowance', 'Salary', 'Part-time Work', 'Freelance', 'Gifts', 'Other Income', 'Gift', 'Business', 'Other'],
+  EXPENSE: ['Meals', 'Snacks & Drinks', 'Transport', 'Café', 'Mobile Load & Data', 'Games & Entertainment', 'Tech & Accessories', 'School & Personal Items', 'Bills', 'Fees', 'Other', 'Food', 'Transportation', 'Shopping', 'Entertainment', 'Health', 'Education', 'Family', 'Subscriptions'],
 } as const;
 
 export type ManualTransactionType = keyof typeof CATEGORIES | 'TRANSFER';

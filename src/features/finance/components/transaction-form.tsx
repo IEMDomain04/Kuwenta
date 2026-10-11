@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useFinance } from '../provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -112,7 +113,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     </View>
     {errors.amount ? <ThemedText accessibilityRole="alert">{errors.amount}</ThemedText> : null}
     <ThemedText type="smallBold">Notes (optional)</ThemedText>
-    <TextInput ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note…" placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
+    <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note…" placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
     <TransactionDateTime date={date} time={time} disabled={disabled}
       onDateChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: undefined })); }}
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />

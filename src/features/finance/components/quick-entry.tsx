@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useState } from 'react';
 import { Keyboard, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -27,8 +28,10 @@ export function QuickEntry({ disabled, accountId, onReview, onCancel }: { disabl
         <ThemedText type="small" numberOfLines={1}>{account.name}</ThemedText>
       </Pressable>)}
     </ScrollView>
-    <TextInput autoFocus accessibilityLabel="Quick transaction phrase" value={text} maxLength={250} onChangeText={(value) => { setText(value); setError(''); }} editable={!disabled} placeholder="Type a transaction" placeholderTextColor={theme.textSecondary} returnKeyType="done" onSubmitEditing={review}
-      style={{ padding: 14, color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
+    <View style={{ borderWidth: 1, borderColor: theme.border, borderRadius: 12, overflow: 'hidden', backgroundColor: theme.backgroundElement }}>
+    <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" autoFocus accessibilityLabel="Quick transaction phrase" value={text} maxLength={250} onChangeText={(value) => { setText(value); setError(''); }} editable={!disabled} placeholder="Type a transaction" placeholderTextColor={theme.textSecondary} returnKeyType="done" onSubmitEditing={review}
+      style={{ padding: 14, minHeight: 48, color: theme.text, fontSize: 12, borderWidth: 0, backgroundColor: 'transparent' }} />
+    </View>
     {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     <ActionButton primary label="Review" disabled={disabled || !text.trim()} onPress={review} />
     <ActionButton label="Use regular form" disabled={disabled} onPress={onCancel} />

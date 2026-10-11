@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useRef, useState } from 'react';
 import { TextInput, type TextInputProps } from 'react-native';
 import { editMoneyInput } from '../inputs';
@@ -9,7 +10,7 @@ export function MoneyField({ value, signed = false, onValueChange, onRejected, .
   const caret = useRef({ start: value.length, end: value.length });
   const pendingCaret = useRef<{ start: number; end: number } | undefined>(undefined);
   const [selection, setSelection] = useState<{ start: number; end: number }>();
-  return <TextInput {...props} value={value} selection={selection} keyboardType="decimal-pad"
+  return <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" {...props} value={value} selection={selection} keyboardType="decimal-pad"
     selectTextOnFocus={/^-?0+(?:\.0{1,2})?$/.test(value.replace(/,/g, ''))}
     onSelectionChange={(event) => {
       const next = event.nativeEvent.selection;

@@ -4,18 +4,25 @@ import { parseMoney } from './money';
 import { defaultEntryAccount } from './workflows';
 
 const expenseKeywords: [string, RegExp][] = [
-  ['Food', /\b(lunch|breakfast|dinner|food|coffee|pagkain|kape|almusal|tanghalian|hapunan)\b/i],
-  ['Transportation', /\b(pamasahe|fare|jeep|bus|taxi|transport|transportation|gas|gasolina)\b/i],
+  ['Meals', /\b(lunch|breakfast|dinner|meal|meals|food|rice|mami|pagkain|almusal|tanghalian|hapunan)\b/i],
+  ['Snacks & Drinks', /\b(snack|snacks|chips|biscuit|biscuits|juice|soda|drink|drinks)\b/i],
+  ['Café', /\b(coffee|cafe|café|kape|latte)\b/i],
+  ['Mobile Load & Data', /\b(load|prepaid|airtime|reload|paload|nagpaload|data promo)\b/i],
+  ['Games & Entertainment', /\b(game|games|gaming|movie|cinema|entertainment|sine)\b/i],
+  ['Tech & Accessories', /\b(keyboard|mouse|gadget|gadgets|charger|tech|headphones|earphones)\b/i],
+  ['School & Personal Items', /\b(bag|backpack|school supplies|printing|notebook|pen)\b/i],
+  ['Fees', /\b(fee|fees|charge|charges)\b/i],
+  ['Transport', /\b(pamasahe|fare|jeep|bus|taxi|transport|transportation|gas|gasolina)\b/i],
   ['Shopping', /\b(groceries|grocery|shopping|clothes|damit)\b/i],
-  ['Bills', /\b(bill|bills|electricity|water|internet|rent|kuryente|tubig|upa|load|prepaid|airtime|reload|data promo)\b/i],
-  ['Entertainment', /\b(movie|cinema|entertainment|sine)\b/i],
+  ['Bills', /\b(bill|bills|electricity|water|internet|rent|kuryente|tubig|upa)\b/i],
   ['Health', /\b(medicine|doctor|health|gamot)\b/i],
   ['Education', /\b(tuition|school|education)\b/i],
   ['Subscriptions', /\b(subscription|netflix|spotify)\b/i],
 ];
 const incomeKeywords: [string, RegExp][] = [
+  ['Part-time Work', /\b(part[ -]?time|sideline)\b/i],
   ['Salary', /\b(salary|sahod|sweldo)\b/i], ['Allowance', /\b(allowance|baon)\b/i],
-  ['Freelance', /\b(freelance)\b/i], ['Gift', /\b(gift|regalo)\b/i], ['Business', /\b(business)\b/i],
+  ['Freelance', /\b(freelance)\b/i], ['Gifts', /\b(gift|regalo)\b/i], ['Business', /\b(business)\b/i],
 ];
 /** Pure, bounded phrase parsing. It never saves records or calls a service. */
 export function parseQuickEntry(text: string, accounts: readonly Account[], now = new Date(), context?: string, lastUsed?: string): { draft: TransactionDraft; warnings: string[] } {
@@ -24,7 +31,7 @@ export function parseQuickEntry(text: string, accounts: readonly Account[], now 
   if (/[\n;]|\b(?:usd|dollars|eur|euro)\b|\$/i.test(phrase)) throw new Error('Use one PHP transaction per phrase.');
   let accountId = defaultEntryAccount(accounts, context, lastUsed);
   let destinationAccountId: string | undefined;
-  const transfer = /\b(cash[ -]?in|cash[ -]?out|transfer|lipat|move)\b/i.test(phrase);
+  const transfer = /\b(cash[ -]?in|cash[ -]?out|transfer|lipat|move)\b/i.test(phrase) && !/\b(fee|fees|charge|charges)\b/i.test(phrase);
   function findAccount(name: string): Account {
     const matches = accounts.filter((account) => account.name.trim().toLowerCase() === name.trim().toLowerCase());
     if (matches.length !== 1) throw new Error('Use one exact account name.');
@@ -77,7 +84,7 @@ export function parseQuickEntry(text: string, accounts: readonly Account[], now 
   const type = explicitIncome || incomes.length ? 'INCOME' : 'EXPENSE';
   const matches = type === 'INCOME' ? incomes : expenses;
   if (matches.length > 1) throw new Error('More than one category matches. Use one transaction description or select a category in the regular form.');
-  const category = matches[0]?.[0] ?? 'Other';
+  const category = matches[0]?.[0] ?? (type === 'INCOME' ? 'Other Income' : 'Other');
   return { draft: { type, accountId, category, amount, transactionDate, transactionTime: defaults.transactionTime, notes: description || undefined },
-    warnings: category === 'Other' ? ['Choose a category before saving.'] : [] };
+    warnings: matches.length === 0 ? ['Choose a category before saving.'] : [] };
 }

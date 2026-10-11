@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -51,7 +52,7 @@ export default function SettingsScreen() {
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flexShrink: 1, width: '100%', maxWidth: 420, alignSelf: 'center' }} contentContainerStyle={{ paddingVertical: 12 }}>
         <View accessibilityViewIsModal style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 20, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' }}>
           <ThemedText type="smallBold" accessibilityRole="header">Your name</ThemedText>
-          <TextInput accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
+          <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
           {nameError ? <ThemedText type="small" accessibilityRole="alert" themeColor="error">{nameError}</ThemedText> : null}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}><ActionButton label="Cancel" disabled={savingName || busy} onPress={() => setNameOpen(false)} /></View>

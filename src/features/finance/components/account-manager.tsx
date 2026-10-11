@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Keyboard, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
@@ -103,7 +104,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       </View> : null}
       {savedAccount && <ThemedText type="smallBold">Current balance: {formatMoney(calculateAccountSummary(savedAccount, transactions, month).balance)}</ThemedText>}
       <ThemedText type="small">Account name</ThemedText>
-      <TextInput accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savings…" placeholderTextColor={theme.textSecondary} style={inputStyle} />
+      <TextInput selectionColor={Colors.light.accent} cursorColor={Colors.light.accent} selectionHandleColor={Colors.light.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savings…" placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="small">Purpose</ThemedText>
       <Pressable accessibilityRole="button" accessibilityLabel="Select account purpose" accessibilityState={{ disabled: locked, expanded: purposeOpen }} disabled={locked} onPress={() => { Keyboard.dismiss(); setPurposeOpen(true); }} style={{ minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={18} color={theme.accent} />
