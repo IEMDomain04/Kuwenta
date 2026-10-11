@@ -109,7 +109,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       <ThemedText type="smallBold">Backup contents</ThemedText>
       <ThemedText>Exported: {preview.exported}</ThemedText>
       <ThemedText>Accounts: {preview.summary.accountCount} (PHP)</ThemedText>
-      {preview.backup.accounts.map((account) => <ThemedText key={account.id} type="small">{account.name} Â· {account.purpose}{account.archived ? ' Â· Archived' : ''}</ThemedText>)}
+      {preview.backup.accounts.map((account) => <ThemedText key={account.id} type="small">{account.name} | {account.purpose}{account.archived ? ' | Archived' : ''}</ThemedText>)}
       <ThemedText>Opening balance: {formatMoney(preview.account.openingBalance)}</ThemedText>
       <ThemedText>Transactions: {preview.summary.transactionCount}</ThemedText>
       <ThemedText>Income records: {preview.summary.incomeCount}</ThemedText>

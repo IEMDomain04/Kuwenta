@@ -36,7 +36,7 @@ export default function TransactionsScreen() {
     deleting.current = true; setError('');
     const accountName = accounts.find((account) => account.id === transaction.accountId)?.name ?? '';
     const accountLabel = transaction.type === 'TRANSFER' ? accountName + ' to ' + (accounts.find((account) => account.id === transaction.destinationAccountId)?.name ?? '') : accountName;
-    Alert.alert('Delete transaction?', accountLabel + '\n' + `${transaction.category} · ${formatMoney(transaction.amount)}\n${formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime)}`, [
+    Alert.alert('Delete transaction?', accountLabel + '\n' + `${transaction.category} | ${formatMoney(transaction.amount)}\n${formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime)}`, [
       { text: 'Cancel', style: 'cancel', onPress: () => { deleting.current = false; } },
       { text: 'Delete', style: 'destructive', onPress: () => {
         void removeTransaction(transaction.id).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not delete.'))
@@ -48,21 +48,23 @@ export default function TransactionsScreen() {
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {(['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)}
-          style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filter === value ? theme.accentPressed : theme.infoSurface, opacity: pressed ? 0.5 : 1 })}>
-          <ThemedText type="small" style={{ fontSize: 11, color: filter === value ? theme.onAccent : theme.text }}>{filter === value ? '✓ ' : ''}{value === 'ALL' ? 'All' : value === 'INCOME' ? 'Income' : value === 'TRANSFER' ? 'Transfers' : 'Expenses'}</ThemedText>
+          style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: filter === value ? theme.accentPressed : theme.infoSurface, opacity: pressed ? 0.5 : 1 })}>
+          {filter === value ? <Ionicons accessible={false} name="checkmark" size={14} color={theme.onAccent} /> : null}
+          <ThemedText type="small" numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: filter === value ? theme.onAccent : theme.text }}>{value === 'ALL' ? 'All' : value === 'INCOME' ? 'Income' : value === 'TRANSFER' ? 'Transfers' : 'Expenses'}</ThemedText>
         </Pressable>)}
       </View>
       <HomeMonthPicker />
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6 }}>
       {[{ id: null, name: 'All accounts', archived: false }, ...accounts].map((account) => <Pressable key={account.id ?? 'all-accounts'} accessibilityRole="button" accessibilityLabel={account.name + (account.archived ? ', archived' : '')} accessibilityState={{ selected: accountFilter === account.id }} onPress={() => setAccountFilter(account.id)}
-        style={{ minHeight: 44, maxWidth: 170, paddingHorizontal: 12, borderRadius: 12, justifyContent: 'center', backgroundColor: accountFilter === account.id ? theme.backgroundSelected : theme.backgroundElement, borderWidth: 1, borderColor: accountFilter === account.id ? theme.accent : theme.border }}>
-        <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ fontSize: 12 }}>{accountFilter === account.id ? '✓ ' : ''}{account.name}{account.archived ? ' · Archived' : ''}</ThemedText>
+        style={{ minHeight: 44, maxWidth: 170, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', backgroundColor: accountFilter === account.id ? theme.backgroundSelected : theme.backgroundElement, borderWidth: 1, borderColor: accountFilter === account.id ? theme.accent : theme.border }}>
+        {accountFilter === account.id ? <Ionicons accessible={false} name="checkmark" size={14} color={theme.accent} /> : null}
+        <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, fontSize: 12 }}>{account.name}{account.archived ? ' | Archived' : ''}</ThemedText>
       </Pressable>)}
     </ScrollView>
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 4 }}>
       <Ionicons name="refresh-outline" size={16} color={theme.textSecondary} />
-      <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>{busy ? 'Refreshing…' : 'Pull down to refresh'}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>{busy ? 'Refreshing...' : 'Pull down to refresh'}</ThemedText>
     </View>
     {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     {accountFilter !== null && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>

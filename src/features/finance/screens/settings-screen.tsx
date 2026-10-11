@@ -1,3 +1,4 @@
+import { NotificationSettingsPanel } from '../components/notification-settings';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useAppearance } from '@/hooks/appearance-provider';
 import { useRef, useState } from 'react';
@@ -10,7 +11,7 @@ import { BackupImportPreview } from '../components/backup-import-preview';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
-  const { busy, resetData, displayName, saveDisplayName } = useFinance();
+  const { busy, resetData, displayName, saveDisplayName, refresh } = useFinance();
   const theme = useTheme();
   const { mode, setMode } = useAppearance();
   const [appearanceError, setAppearanceError] = useState('');
@@ -83,6 +84,9 @@ export default function SettingsScreen() {
       </KeyboardAvoidingView>
     </Modal>
     <ThemedText type="small" themeColor="textSecondary">Philippine Peso (PHP)</ThemedText>
+    </View><View style={section}>
+    <ThemedText type="smallBold" accessibilityRole="header">Notifications</ThemedText>
+    <NotificationSettingsPanel onChanged={refresh} />
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { CategoryIcon } from './category-visual';
 import { formatTransactionDateTime } from '../dates';
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
@@ -23,11 +23,14 @@ export function FinanceScreen({ title, children, scroll = true, tabScreen = true
     {floatingAction && <View style={{ position: 'absolute', right: Math.max(insets.right, 16), bottom: tabScreen ? 16 : Math.max(insets.bottom, 16) }}>{floatingAction}</View>}
   </SafeAreaView>;
 }
-export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
+export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false, icon }: { icon?: ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
   const theme = useTheme();
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
     style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.accentPressed : theme.accent : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.background, borderWidth: 0 }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
-    <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail" style={{ maxWidth: '100%', textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</ThemedText>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' }}>
+      {(selected || icon) ? <Ionicons accessible={false} name={selected ? 'checkmark' : icon!} size={16} color={disabled ? theme.disabledText : primary ? theme.onAccent : theme.text} /> : null}
+      <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{label}</ThemedText>
+    </View>
   </Pressable>;
 }
 export function IconButton({ icon, label, onPress, disabled = false, destructive = false }: { icon: 'pencil-outline' | 'trash-outline'; label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
@@ -48,7 +51,11 @@ export function TransactionRow({ transaction, accountName, destinationName, disa
         <CategoryIcon category={transaction.category} income={income} compact />
         <View style={{ flex: 1, minWidth: 90, gap: 1 }}>
           <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18 }}>{transaction.notes || transaction.category}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{transaction.type === "TRANSFER" ? accountName + ' → ' + destinationName : transaction.category + " · " + accountName}</ThemedText>
+          {transaction.type === 'TRANSFER' ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1, fontSize: 11, lineHeight: 16 }}>{accountName}</ThemedText>
+            <Ionicons accessible={false} name="arrow-forward" size={12} color={theme.textSecondary} />
+            <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1, fontSize: 11, lineHeight: 16 }}>{destinationName}</ThemedText>
+          </View> : <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{transaction.category + " | " + accountName}</ThemedText>}
           <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{showDate ? formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime) : formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime).split(' · ')[1]}</ThemedText>
         </View>
         <ThemedText type="smallBold" style={{ color: income ? theme.income : theme.text, fontVariant: ['tabular-nums'], flexShrink: 1, fontSize: 14, lineHeight: 20 }}>

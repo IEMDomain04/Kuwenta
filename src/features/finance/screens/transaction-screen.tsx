@@ -42,7 +42,7 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
       const saveId = id ?? (submissionId.current ??= await finance.newSubmissionId());
       await finance.saveTransaction(saveId, draft, Boolean(id));
       finished.current = true;
-      submissionId.current = undefined; // retire after commit; Undo cannot reuse this draft
+      submissionId.current = undefined; // retire after commit; subsequent entries need a new submission ID
       leave();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save. Your draft is preserved.');
@@ -69,7 +69,7 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
       return row.type === 'TRANSFER' ? source + ' to ' + (finance.accounts.find((account) => account.id === row.destinationAccountId)?.name ?? '') : source;
     };
     const accountChange = accountLabel(original) + ' -> ' + accountLabel(draft) + '\n';
-    Alert.alert('Save transaction changes?', accountChange + `${original.category} ${formatMoney(original.amount)} → ${draft.category} ${formatMoney(draft.amount)}\n${draft.type} · ${formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}\n${draft.notes ?? ''}`, [
+    Alert.alert('Save transaction changes?', accountChange + `${original.category} ${formatMoney(original.amount)} to ${draft.category} ${formatMoney(draft.amount)}\n${draft.type} | ${formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}\n${draft.notes ?? ''}`, [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Confirm', onPress: () => { void save(draft); } },
     ], { cancelable: false });

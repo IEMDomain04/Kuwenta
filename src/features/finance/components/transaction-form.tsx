@@ -73,7 +73,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
       onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
       <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
-      <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} Ã‚Â· PHP{selectedAccount?.archived ? ' Ã‚Â· Archived' : ''}</ThemedText>
+      <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} | PHP{selectedAccount?.archived ? ' | Archived' : ''}</ThemedText>
       <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
     </Pressable>
     {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
@@ -100,7 +100,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
       </Pressable>
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <View onLayout={(event) => setAmountWidth(event.nativeEvent.layout.width)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', minHeight: 52 }}>
-          <ThemedText style={{ fontSize: amountFontSize, lineHeight: Math.ceil(amountFontSize * 1.3), fontWeight: '700' }}>Ã¢â€šÂ±</ThemedText>
+          <ThemedText style={{ fontSize: amountFontSize, lineHeight: Math.ceil(amountFontSize * 1.3), fontWeight: '700' }}>₱</ThemedText>
           <MoneyField accessibilityLabel="Amount in pesos" value={amount} onValueChange={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: undefined })); }} onRejected={() => setErrors((current) => ({ ...current, amount: 'Use digits and up to two decimal places. Input was not accepted.' }))} editable={!disabled}
             autoFocus={!original && !initialDraft} keyboardType="decimal-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => notesRef.current?.focus()}
             placeholder="0" placeholderTextColor={theme.textSecondary} style={{ flex: 1, minWidth: 0, color: theme.text, paddingVertical: 4, paddingHorizontal: 0, fontSize: amountFontSize, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] }} />
@@ -114,7 +114,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     </View>
     {errors.amount ? <ThemedText accessibilityRole="alert">{errors.amount}</ThemedText> : null}
     <ThemedText type="smallBold">Notes (optional)</ThemedText>
-    <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a noteÃ¢â‚¬Â¦" placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
+    <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note..." placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
     <TransactionDateTime date={date} time={time} disabled={disabled}
       onDateChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: undefined })); }}
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />
@@ -125,7 +125,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
       onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
       <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
-      <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} Ã‚Â· PHP{selectedAccount?.archived ? ' Ã‚Â· Archived' : ''}</ThemedText>
+      <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} | PHP{selectedAccount?.archived ? ' | Archived' : ''}</ThemedText>
       <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
     </Pressable>
     {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
@@ -136,7 +136,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     <View style={{ gap: 6, paddingTop: 8, borderTopWidth: 1, borderColor: theme.border }}>
         <Pressable accessibilityRole="button" accessibilityLabel={original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'} accessibilityState={{ disabled }} disabled={disabled} onPress={submit}>
       <View style={{ backgroundColor: disabled ? theme.disabledBackground : theme.accentPressed, padding: 16, minHeight: 50, borderRadius: 14, alignItems: 'center', opacity: disabled ? 0.5 : 1 }}>
-        <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : theme.onAccent }}>{disabled ? 'Please waitÃ¢â‚¬Â¦' : original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'}</ThemedText>
+        <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : theme.onAccent }}>{disabled ? 'Please wait...' : original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'}</ThemedText>
       </View>
     </Pressable>
     <ActionButton compact label="Cancel" disabled={disabled} onPress={onCancel} />

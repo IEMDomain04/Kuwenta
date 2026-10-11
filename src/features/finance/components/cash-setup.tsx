@@ -1,3 +1,4 @@
+import { NotificationSettingsPanel } from './notification-settings';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,13 +10,14 @@ import { MoneyField } from './money-field';
 import { ActionButton } from './ui';
 import { parseMoney, formatMoney } from '../money';
 
-const titles = ['Welcome to Kuwenta', 'What should we call you?', 'See where your money goes', 'Make room for your plans', 'Your starting money', 'You are ready!'];
+const titles = ['Welcome to Kuwenta', 'What should we call you?', 'See where your money goes', 'Make room for your plans', 'Your starting money', 'Keep your records on track', 'You are ready!'];
 const mascots = [
   require('../../../../assets/images/mascot/friendly.png'),
   require('../../../../assets/images/mascot/friendly.png'),
   require('../../../../assets/images/mascot/thinking.png'),
   require('../../../../assets/images/mascot/encouraging.png'),
   require('../../../../assets/images/mascot/thinking.png'),
+  require('../../../../assets/images/mascot/encouraging.png'),
   require('../../../../assets/images/mascot/celebrating.png'),
 ];
 export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (cents: number, name: string, accountName: string) => Promise<void> }) {
@@ -115,6 +117,9 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
           <ThemedText type="small" themeColor="textSecondary">Your current money, not income. Leave blank to start with zero.</ThemedText>
         </> : null}
         {step === 5 ? <>
+          <NotificationSettingsPanel onboarding />
+        </> : null}
+        {step === 6 ? <>
           <ThemedText type="small" style={{ textAlign: 'center' }}>{name.trim() ? 'Welcome, ' + name.trim() + '!' : 'Welcome!'} {accountName.trim()} starts with {formatMoney(cents)}.</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Your records stay on this device. Export a backup from Settings to keep a safe copy.</ThemedText>
         </> : null}
@@ -122,7 +127,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
       </ScrollView>
       <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 12, width: '100%', maxWidth: 520, alignSelf: 'center' }}>
         {step > 0 ? <View style={{ flex: 1 }}><ActionButton label="Back" disabled={locked} onPress={back} /></View> : null}
-        <View style={{ flex: 2 }}><ActionButton primary label={saving ? 'Saving...' : step === 5 ? 'Start tracking' : 'Next'} disabled={locked || step === 4 && rejected} onPress={() => { if (step === 5) void finish(); else next(); }} /></View>
+        <View style={{ flex: 2 }}><ActionButton primary label={saving ? 'Saving...' : step === 6 ? 'Start tracking' : 'Next'} disabled={locked || step === 4 && rejected} onPress={() => { if (step === 6) void finish(); else next(); }} /></View>
       </View>
     </KeyboardAvoidingView>
   </SafeAreaView>;

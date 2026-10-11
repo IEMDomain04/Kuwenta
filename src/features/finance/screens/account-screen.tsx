@@ -98,13 +98,13 @@ export default function AccountScreen() {
         : <>
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <ThemedText type="smallBold" numberOfLines={1} style={{ flex: 1 }}>{account.name}{account.archived ? ' · Archived' : ''}</ThemedText>
+            <ThemedText type="smallBold" numberOfLines={1} style={{ flex: 1 }}>{account.name}{account.archived ? ' | Archived' : ''}</ThemedText>
             <Pressable accessibilityRole="button" accessibilityLabel="Account options" disabled={locked} onPress={() => setOptionsOpen(true)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="ellipsis-horizontal" size={20} color={theme.accent} /></Pressable>
             </View>
             <ThemedText type="small" themeColor="textSecondary">Current balance</ThemedText>
             <ThemedText style={{ fontSize: 24, lineHeight: 32, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(balance)}</ThemedText>
             {balance < 0 && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this account balance is negative.</ThemedText>}
-            <ThemedText type="small">{account.currency} · {account.purpose === 'spending' ? 'Spending' : 'Savings'}</ThemedText>
+            <ThemedText type="small">{account.currency} | {account.purpose === 'spending' ? 'Spending' : 'Savings'}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">{account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">Original opening balance: {formatMoney(account.openingBalance)}</ThemedText>
           </View>
@@ -115,7 +115,7 @@ export default function AccountScreen() {
               onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }}
               style={{ color: theme.text, fontSize: 24, borderWidth: 1, borderColor: theme.border, padding: 14, borderRadius: 12 }} />
             <ActionButton compact label={amount.startsWith('-') ? 'Make positive' : 'Make negative'} disabled={locked} onPress={() => { setAmount(amount.startsWith('-') ? amount.slice(1) : '-' + amount); setRejected(false); setError(''); }} />
-            <ActionButton primary label={working ? 'Saving…' : 'Review adjustment'} disabled={locked || rejected} onPress={review} />
+            <ActionButton primary label={working ? 'Saving...' : 'Review adjustment'} disabled={locked || rejected} onPress={review} />
             <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setMode('details'); setError(''); } }} />
           </> : <>
             {!account.archived && <>

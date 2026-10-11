@@ -13,7 +13,7 @@ const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof
   Meals: { color: '#A65313', icon: 'restaurant' },
   'Snacks & Drinks': { color: '#94620B', icon: 'fast-food' },
   Transport: { color: '#17658F', icon: 'bus' },
-  'CafÃ©': { color: '#805436', icon: 'cafe' },
+  'Café': { color: '#805436', icon: 'cafe' },
   'Mobile Load & Data': { color: '#0B6575', icon: 'phone-portrait' },
   'Games & Entertainment': { color: '#6543A0', icon: 'game-controller' },
   'Tech & Accessories': { color: '#033F77', icon: 'desktop' },

@@ -30,7 +30,7 @@ export function HomeMonthPicker() {
         <SafeAreaView edges={['bottom', 'left', 'right']} style={{ backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: height * 0.85 }}>
           <View accessibilityViewIsModal style={{ padding: 20, gap: 12 }}>
             <ThemedText type="smallBold" accessibilityRole="header">Choose reporting month</ThemedText>
-            <ActionButton label={choosingYear ? 'Back to months · ' + year : 'Year: ' + year + ' ▾'} onPress={() => setChoosingYear(!choosingYear)} />
+            <ActionButton icon={choosingYear ? 'arrow-back' : 'chevron-down'} label={choosingYear ? 'Back to months | ' + year : 'Year: ' + year} onPress={() => setChoosingYear(!choosingYear)} />
             {choosingYear ? <FlatList style={{ height: Math.min(height * 0.45, 320) }} data={years} keyExtractor={String}
               initialScrollIndex={year - 1900} getItemLayout={(_, index) => ({ length: rowHeight, offset: rowHeight * index, index })}
               renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityState={{ selected: item === year }} onPress={() => { setYear(item); setChoosingYear(false); }}

@@ -84,7 +84,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
   const previewColor = editor?.purpose === 'savings' ? theme.income : theme.secondary;
   const inputStyle = { color: theme.text, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 12, fontSize: 12 };
   return <View style={{ gap: 12 }}>
-    <ThemedText type="smallBold" accessibilityRole="header">Accounts Â· PHP</ThemedText>
+    <ThemedText type="smallBold" accessibilityRole="header">Accounts | PHP</ThemedText>
     {editor ? <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
       <ThemedText type="smallBold">{editor.id ? 'Edit account' : 'Add account'}</ThemedText>
       {!editor.id ? <View accessibilityLabel="New account preview" style={{ padding: 16, minHeight: 150, borderRadius: 20, backgroundColor: previewColor, gap: 12, boxShadow: '0 3px 8px rgba(20, 36, 67, 0.08)' }}>
@@ -97,13 +97,13 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
         </View>
         <View style={{ marginTop: 'auto', gap: 3 }}>
           <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: theme.onAccent }}>STARTING BALANCE</ThemedText>
-          <ThemedText style={{ fontSize: 18, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: theme.onAccent }}>{previewBalance === undefined ? 'â€”' : formatMoney(previewBalance)}</ThemedText>
+          <ThemedText style={{ fontSize: 18, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: theme.onAccent }}>{previewBalance === undefined ? '—' : formatMoney(previewBalance)}</ThemedText>
           {previewBalance !== undefined && previewBalance < 0 ? <ThemedText type="small" style={{ fontSize: 10, color: theme.onAccent }}>Negative starting balance</ThemedText> : null}
         </View>
       </View> : null}
       {savedAccount && <ThemedText type="smallBold">Current balance: {formatMoney(calculateAccountSummary(savedAccount, transactions, month).balance)}</ThemedText>}
       <ThemedText type="small">Account name</ThemedText>
-      <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savingsâ€¦" placeholderTextColor={theme.textSecondary} style={inputStyle} />
+      <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savings..." placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="small">Purpose</ThemedText>
       <Pressable accessibilityRole="button" accessibilityLabel="Select account purpose" accessibilityState={{ disabled: locked, expanded: purposeOpen }} disabled={locked} onPress={() => { Keyboard.dismiss(); setPurposeOpen(true); }} style={{ minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={18} color={theme.accent} />
@@ -117,7 +117,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
         onRejected={() => { setRejected(true); setError('Use digits, up to two decimal places, and an optional minus sign.'); }} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="small" themeColor="textSecondary">A starting balance adjustment, separate from income.</ThemedText>
       </>}
-      <ActionButton primary label={working ? 'Savingâ€¦' : editor.id ? 'Save changes' : 'Save account'} disabled={locked || rejected} onPress={review} />
+      <ActionButton primary label={working ? 'Saving...' : editor.id ? 'Save changes' : 'Save account'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setEditor(null); setError(''); newId.current = undefined; onClose?.(); } }} />
     </View> : !onClose ? <ActionButton label="Add account" primary disabled={locked} onPress={() => edit()} /> : null}
     {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
@@ -125,10 +125,10 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       const summary = calculateAccountSummary(account, transactions, month);
       const count = transactions.filter((row) => (row.accountId === account.id || row.destinationAccountId === account.id)).length;
       return <View key={account.id} style={{ backgroundColor: theme.backgroundElement, borderRadius: 18, padding: 14, gap: 8 }}>
-        <ThemedText type="smallBold">{account.name}{account.archived ? ' Â· Archived' : ''}</ThemedText>
+        <ThemedText type="smallBold">{account.name}{account.archived ? ' | Archived' : ''}</ThemedText>
         <ThemedText style={{ fontSize: 22, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(summary.balance)}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">{account.purpose === 'spending' ? 'Spending' : 'Savings'} Â· {count} {count === 1 ? 'transaction' : 'transactions'}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">Opening: {formatMoney(account.openingBalance)} Â· {account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{account.purpose === 'spending' ? 'Spending' : 'Savings'} | {count} {count === 1 ? 'transaction' : 'transactions'}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">Opening: {formatMoney(account.openingBalance)} | {account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
         {summary.hasNegativeBalance && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this account balance is negative.</ThemedText>}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {!account.archived && <IconButton icon="pencil-outline" label={'Edit account ' + account.name} disabled={locked || Boolean(editor)} onPress={() => edit(account)} />}

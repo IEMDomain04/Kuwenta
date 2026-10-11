@@ -105,7 +105,11 @@ export default function HomeScreen() {
           <CategoryIcon category={transaction.category} income={transaction.type === 'INCOME'} compact />
           <View style={{ flex: 1, minWidth: 100, gap: 2 }}>
             <ThemedText type="smallBold" numberOfLines={1}>{transaction.notes || transaction.category}</ThemedText>
-            <ThemedText type="small" numberOfLines={1} themeColor="textSecondary">{transfer ? account + ' → ' + destination : transaction.category + ' / ' + account}</ThemedText>
+            {transfer ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1 }}>{account}</ThemedText>
+              <Ionicons accessible={false} name="arrow-forward" size={12} color={theme.textSecondary} />
+              <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1 }}>{destination}</ThemedText>
+            </View> : <ThemedText type="small" numberOfLines={1} themeColor="textSecondary">{transaction.category + ' / ' + account}</ThemedText>}
             <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime)}</ThemedText>
           </View>
           <ThemedText type="smallBold" style={{ color: transaction.type === 'INCOME' ? theme.income : theme.text, fontVariant: ['tabular-nums'], flexShrink: 1 }}>{transfer ? '' : increase ? '+' : '−'}{formatMoney(transaction.amount)}</ThemedText>
