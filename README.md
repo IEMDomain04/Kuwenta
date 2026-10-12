@@ -68,3 +68,9 @@ Account dragging previews neighboring positions and saves only on release, witho
 Backup export accepts passwords of 8 to 128 characters and reports reading, encryption, file writing, and sharing separately. Preparation can be cancelled and times out after two minutes; late preparation cannot open the share sheet after cancellation. Encryption retains the existing AES-256-GCM / PBKDF2 settings, so older backups remain readable. The share sheet cannot confirm whether a destination saved the file.
 
 Android backup password derivation uses the small inline `KuwentaBackupCrypto` module and the platform PBKDF2-HMAC-SHA256 provider, off the JavaScript thread. The existing 600,000 iterations and encrypted format are unchanged. Export serializes the fully loaded financial snapshot rather than opening another SQLite transaction. Rebuild/install the APK (or development client) to enable native acceleration; Expo Go, iOS, and older builds use the compatible JavaScript fallback. No additional dependency is needed.
+
+## Android home-screen widget
+
+Kuwenta Quick Entry is a small green home-screen widget with Expense, Income, and Quick Entry shortcuts. Each opens its entry screen; saving still requires user approval. It stores no financial information and runs no periodic background tasks. The local config plugin generates the Android receiver, Kotlin provider, and XML resources during prebuild, with no extra dependencies.
+
+Build and install a new APK, then hold an empty area of the phone home screen, choose Widgets, and add Kuwenta Quick Entry. Launcher sizes may vary. Expo Go and older APKs cannot display it. Test each shortcut with the app closed and already open, cancellation, and multiple widget instances on the installed build.

@@ -1,0 +1,8 @@
+<resources>
+ <string name="kuwenta_widget_name">Kuwenta Quick Entry</string>
+ <string name="kuwenta_widget_description">Add an expense, income, or Quick Entry.</string>
+ <string name="kuwenta_widget_title">Kuwenta</string>
+ <string name="kuwenta_widget_expense">Expense</string>
+ <string name="kuwenta_widget_income">Income</string>
+ <string name="kuwenta_widget_quick">Quick Entry</string>
+</resources>
