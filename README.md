@@ -53,11 +53,11 @@ Settings offers Light, Dark, and Use device setting. Appearance saves locally us
 
 ## Local notifications
 
-Onboarding and Settings offer optional daily reminders and budget alerts. Notifications use `expo-notifications`, with no push server, AI, or network dependency. Kuwenta skips notification setup in Expo Go to avoid the package entry point's Android push-registration error; test reminders in an installed APK or development build. Reminder windows use Philippine time. One stable varied time is selected per day, scheduled 30 days ahead and refreshed on launch and record changes. Recording a transaction cancels the pending reminder for that recording day, including backdated entries. If the app stays unopened longer than 30 days, reopen it to refresh reminders. Phone power-saving and notification settings can delay or block delivery.
+Onboarding and Settings offer optional tracking reminders and budget alerts. Notifications use `expo-notifications`, with no push server, AI, or network dependency. Kuwenta skips notification setup in Expo Go to avoid the package entry point's Android push-registration error; test reminders in an installed APK or development build. Tracking reminders are scheduled automatically at 8 AM, 2 PM, and 8 PM Philippine time, with quiet hours overnight. Schedule details are omitted from the UI; users retain opt-in and tracking/budget toggles. Entries recorded within six hours of a reminder suppress that slot, including backdated entries; balance adjustments alone do not. At most 42 reminder slots are planned 14 days ahead and refreshed on launch and record changes. Reopen the app after a prolonged absence to refresh the schedule. Legacy one-per-day reminders are replaced automatically. Phone power-saving and notification settings can delay or block delivery.
 
 Budget alerts report 80% usage and spending above the limit, once per category/threshold/month. Existing spending is baselined when enabling alerts or restoring data. Device notifications hide category names and amounts; tapping them opens Home or Budgets. Save confirmations appear as top toasts with no Undo. Edit/delete remains available in History.
 
-A new APK is required for the native notification module and splash changes. Device checks: permission allow/deny, enabling and disabling, all reminder windows, cancellation after a save, budget threshold deduplication after restart/edit/restore, cold-launch notification taps, and both appearance modes.
+A new APK is required for the native notification module and splash changes. Device checks: permission allow/deny, enabling and disabling, quiet hours and recent-activity suppression, cancellation after a save, budget threshold deduplication after restart/edit/restore, cold-launch notification taps, and both appearance modes.
 
 Build uploads use `.easignore` to exclude tests, local tools, unused starter artwork, and the original design export. Active mascot assets and the Kuwenta app icon remain included. Android release minification and resource shrinking are enabled. Final APK size and device behavior must be checked after building.
 
@@ -74,3 +74,15 @@ Android backup password derivation uses the small inline `KuwentaBackupCrypto` m
 Kuwenta Quick Entry is a small green home-screen widget with Expense, Income, and Quick Entry shortcuts. Each opens its entry screen; saving still requires user approval. It stores no financial information and runs no periodic background tasks. The local config plugin generates the Android receiver, Kotlin provider, and XML resources during prebuild, with no extra dependencies.
 
 Build and install a new APK, then hold an empty area of the phone home screen, choose Widgets, and add Kuwenta Quick Entry. Launcher sizes may vary. Expo Go and older APKs cannot display it. Test each shortcut with the app closed and already open, cancellation, and multiple widget instances on the installed build.
+
+
+Budget cards use category icons and separate lines for names, amounts, and progress. Tap the feedback to see context about available spending money and remaining allowances. Historical/future budgets are not compared with today's balances; this is recorded-data feedback, not a forecast of unrecorded bills. Accounts with a balance, history, or linked goal cannot be deleted; their options menu explains the restriction and offers Archive.
+
+In-app notices are centered below the header, leaving navigation controls accessible. Success notices dismiss after four seconds; errors allow seven seconds and can be dismissed manually. Surrounding touches pass through.
+
+Android additionally offers My Cash and Available Money widgets. They display the last loaded balances with an update timestamp, refresh after app loads/saves/restores/resets, and open Accounts when tapped. The optional inline KuwentaWidgets module updates a small local cache; it never reads the database in the background. All widget providers have launcher labels/icons and legacy preview images. Install a newly rebuilt APK to test visibility in the phone launcher; Expo Go and older APKs cannot provide these widgets. Launcher-specific visibility remains a device check.
+
+Foreground clock/month timers stop while the app is inactive and restart on return. No background polling, wake locks, or periodic widget updates are introduced. Local reminders are scheduled with the operating system. Actual battery consumption must be measured on the phone.
+
+
+Budget dashboard uses a single limit/spent/remaining summary, month selection and Add in the header, compact category/amount rows, thin progress bars, and expandable recorded-data feedback. Edit/Delete icons share the feedback row. Spending without a budget starts collapsed. Notices use translucent green-tinted surfaces with readable theme colors and a subtle border, with an opaque fallback for reduced transparency (iOS) or high text contrast (Android). No blur dependency or background service is added.

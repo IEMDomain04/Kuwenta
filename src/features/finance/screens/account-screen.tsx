@@ -49,13 +49,14 @@ export default function AccountScreen() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not adjust the balance.'); }
     finally { pending.current = false; setWorking(false); }
   }
-  function remove() {
-    if (!account || locked || pending.current) return;
-    const reason = account.id === 'cash' ? 'The default Cash account cannot be deleted. Use Reset all data to start over.'
+  const deletionReason = !account ? '' : account.id === 'cash' ? 'The default Cash account cannot be deleted. Use Reset all data to start over.'
       : finance.transactions.some((row) => row.accountId === account.id || row.destinationAccountId === account.id) ? 'This account has transaction history. Archive it instead to preserve your records.'
       : finance.goals.some((goal) => goal.accountId === account.id) ? 'Delete or relink the savings goal before deleting this account.'
-      : balance !== 0 ? 'This account still has a balance. Resolve it before deleting the account.' : '';
-    if (reason) { setError(reason); return; }
+      : balance !== 0 ? 'This account has a balance. Archive it to keep your money and records.' : '';
+
+  function remove() {
+    if (!account || locked || pending.current) return;
+    if (deletionReason) { setError(deletionReason); return; }
     pending.current = true;
     Alert.alert('Delete account?', 'Permanently delete ' + account.name + '? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
@@ -152,13 +153,14 @@ export default function AccountScreen() {
                     <Pressable accessibilityRole="button" accessibilityLabel="Close account options" onPress={() => setOptionsOpen(false)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={20} color={theme.text} /></Pressable>
                   </View>
                   {[
-                    ...(!account.archived ? [{ label: 'Edit account', icon: 'create-outline' as const, action: () => { setOptionsOpen(false); setMode('edit'); } }] : []),
-                    { label: account.archived ? 'Unarchive account' : 'Archive account', icon: 'archive-outline' as const, action: () => { setOptionsOpen(false); archive(); } },
-                    { label: 'Delete account', icon: 'trash-outline' as const, action: () => { setOptionsOpen(false); remove(); } },
-                  ].map((option) => <Pressable key={option.label} accessibilityRole="button" disabled={locked} onPress={option.action} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8 }}>
+                    ...(!account.archived ? [{ disabled: false, label: 'Edit account', icon: 'create-outline' as const, action: () => { setOptionsOpen(false); setMode('edit'); } }] : []),
+                    { disabled: false, label: account.archived ? 'Unarchive account' : 'Archive account', icon: 'archive-outline' as const, action: () => { setOptionsOpen(false); archive(); } },
+                    { label: 'Delete account', disabled: Boolean(deletionReason), icon: 'trash-outline' as const, action: () => { setOptionsOpen(false); remove(); } },
+                  ].map((option) => <Pressable key={option.label} accessibilityRole="button" accessibilityState={{ disabled: locked || option.disabled }} disabled={locked || option.disabled} onPress={option.action} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, opacity: locked || option.disabled ? 0.45 : 1 }}>
                     <Ionicons name={option.icon} size={18} color={option.icon === 'trash-outline' ? theme.expense : theme.accent} />
                     <ThemedText type="small" style={{ color: option.icon === 'trash-outline' ? theme.expense : theme.text }}>{option.label}</ThemedText>
                   </Pressable>)}
+                  {deletionReason ? <ThemedText type="small" themeColor="textSecondary">{deletionReason}</ThemedText> : null}
                 </View>
               </View>
             </Modal>

@@ -4,30 +4,39 @@ const { reminderPlan, budgetAlertPlan } = require('../../.expo/finance-tests/not
 const { philippineDateTime } = require('../../.expo/finance-tests/dates.js');
 const now = new Date('2026-10-12T02:00:00Z');
 function expense(amount, overrides = {}) { return { id: 'one', type: 'EXPENSE', amount, category: 'Food', accountId: 'cash', transactionDate: '2026-10-12', transactionTime: '10:00:00', createdAt: now.toISOString(), updatedAt: now.toISOString(), ...overrides }; }
-test('reminders vary within the PH window, once per day, and never schedule in the past', () => {
-  const plan = reminderPlan(now, 19, 21, [], day => Number(day.slice(-2)) / 32);
-  assert.equal(plan.length, 30);
-  assert.equal(new Set(plan.map(p => p.day)).size, 30);
+test('reminders use six-hour waking slots, stay bounded and never schedule in the past', () => {
+  const plan = reminderPlan(now, []);
+  assert.equal(plan.length, 41);
+  assert.equal(new Set(plan.map(p => p.key)).size, 41);
   for (const item of plan) {
     const ph = philippineDateTime(item.date);
     assert.equal(ph.transactionDate, item.day);
-    assert.ok(ph.transactionTime >= '19:00:00' && ph.transactionTime < '21:00:00');
+    assert.ok(['08:00:00', '14:00:00', '20:00:00'].includes(ph.transactionTime));
     assert.ok(item.date > now);
   }
-  assert.notEqual(plan[0].date.toISOString().slice(11,16), plan[1].date.toISOString().slice(11,16));
-  assert.equal(reminderPlan(new Date('2026-10-12T14:00:00Z'), 19, 21, [], () => .5)[0].day, '2026-10-13');
+  const full = reminderPlan(new Date('2026-10-11T16:00:00Z'), []);
+  assert.equal(full.length, 42);
+  assert.equal(full[1].date - full[0].date, 6 * 3600000);
+  assert.equal(full[2].date - full[1].date, 6 * 3600000);
+  assert.equal(full[3].date - full[2].date, 12 * 3600000);
 });
-test('logging a backdated entry skips the recording day, but adjustments alone do not', () => {
+
+test('recent recording suppresses the next slot even for backdated entries, but not adjustments or future audit times', () => {
   const record = expense(100, { transactionDate: '2026-09-01' });
-  assert.equal(reminderPlan(now, 19, 21, [record], () => .5)[0].day, '2026-10-13');
-  assert.equal(reminderPlan(now, 19, 21, [expense(100, { type: 'ADJUSTMENT' })], () => .5)[0].day, '2026-10-12');
+  assert.equal(reminderPlan(now, [record])[0].key, '2026-10-12-20');
+  assert.equal(reminderPlan(now, [expense(100, { type: 'ADJUSTMENT' })])[0].key, '2026-10-12-14');
+  assert.equal(reminderPlan(now, [expense(100, { createdAt: '2026-10-12T05:00:00Z' })]).length, 41);
+  const sixHoursAgo = expense(100, { createdAt: '2026-10-12T00:00:00Z' });
+  assert.equal(reminderPlan(now, [sixHoursAgo])[0].key, '2026-10-12-14');
 });
-test('stable day randomness keeps the same reminder after refresh and across months', () => {
-  const plan = reminderPlan(new Date('2026-12-31T01:00:00Z'), 12, 14, [], () => .25);
-  const again = reminderPlan(new Date('2026-12-31T02:00:00Z'), 12, 14, [], () => .25);
+
+test('slot identities remain stable across refreshes and year boundaries', () => {
+  const plan = reminderPlan(new Date('2026-12-31T01:00:00Z'), []);
+  const again = reminderPlan(new Date('2026-12-31T02:00:00Z'), []);
   assert.deepEqual(plan, again);
-  assert.equal(plan[1].day, '2027-01-01');
+  assert.equal(plan[2].day, '2027-01-01');
 });
+
 test('budget alerts use exact 80% and exceeded thresholds and exclude transfers', () => {
   const budgets = [{ month: '2026-10', category: 'Food', limitAmount: 1000 }];
   assert.deepEqual(budgetAlertPlan(budgets, [expense(799)], '2026-10'), []);
@@ -85,12 +94,12 @@ test('notification bridge cancels logged-day reminders, avoids duplicates, and r
   const h = notificationHarness();
   await h.api.saveNotificationSettings({ enabled: true, daily: true, budgets: true, start: 19 });
   await h.api.syncNotifications([], []);
-  assert.equal(h.scheduled.size, 30);
+  assert.equal(h.scheduled.size, 41);
   await h.api.syncNotifications([], []);
-  assert.equal(h.scheduled.size, 30);
+  assert.equal(h.scheduled.size, 41);
   await h.api.syncNotifications([], [expense(100)]);
-  assert.equal(h.scheduled.size, 29);
-  assert.equal(h.scheduled.has('kuwenta-reminder-2026-10-12'), false);
+  assert.equal(h.scheduled.size, 40);
+  assert.equal(h.scheduled.has('kuwenta-reminder-2026-10-12-14'), false);
   await h.api.saveNotificationSettings({ enabled: false, daily: true, budgets: true, start: 19 });
   assert.equal(h.scheduled.size, 0);
 });
@@ -134,4 +143,18 @@ test('Expo Go never loads the push module and safely skips notification observer
   assert.equal(h.api.getNotificationSettings().enabled, false);
   await assert.rejects(h.api.saveNotificationSettings({ enabled: true, daily: true, budgets: true, start: 19 }), /Expo Go/);
   assert.equal(h.scheduled.size, 0);
+});
+
+test('old reminder windows migrate without losing opt-in or retaining duplicate schedules', async () => {
+  const store = new Map([['kuwenta.notifications', JSON.stringify({ enabled: true, daily: true, budgets: true, start: 19 })]]);
+  const h = notificationHarness(store);
+  h.scheduled.set('kuwenta-reminder-2026-10-12', { identifier: 'kuwenta-reminder-2026-10-12' });
+  await h.api.syncNotifications([], []);
+  assert.equal(h.scheduled.size, 41);
+  assert.equal(h.scheduled.has('kuwenta-reminder-2026-10-12'), false);
+  assert.equal(h.api.getNotificationSettings().enabled, true);
+  assert.equal('start' in h.api.getNotificationSettings(), false);
+  await h.api.saveNotificationSettings({ enabled: true, daily: false, budgets: true });
+  assert.equal(h.scheduled.size, 0);
+  assert.equal(JSON.parse(store.get('kuwenta.notifications')).start, undefined);
 });

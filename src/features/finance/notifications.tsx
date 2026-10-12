@@ -11,16 +11,16 @@ import type { Budget, Transaction } from './types';
 export const notificationsAvailable = Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 const Notifications: typeof import('expo-notifications') | null = notificationsAvailable ? require('expo-notifications') : null;
 
-export type NotificationSettings = { enabled: boolean; daily: boolean; budgets: boolean; start: number };
+export type NotificationSettings = { enabled: boolean; daily: boolean; budgets: boolean };
 const key = 'kuwenta.notifications';
-const defaults: NotificationSettings = { enabled: false, daily: true, budgets: true, start: 19 };
+const defaults: NotificationSettings = { enabled: false, daily: true, budgets: true };
 let queue: Promise<unknown> = Promise.resolve();
 Notifications?.setNotificationHandler({ handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }) });
 export function getNotificationSettings(): NotificationSettings {
   try {
     if (!Notifications) return { ...defaults };
     const saved = JSON.parse(localStorage.getItem(key) || '{}');
-    return { enabled: saved.enabled === true, daily: saved.daily !== false, budgets: saved.budgets !== false, start: [12, 17, 19].includes(saved.start) ? saved.start : 19 };
+    return { enabled: saved.enabled === true, daily: saved.daily !== false, budgets: saved.budgets !== false };
   } catch { return { ...defaults }; }
 }
 function serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -48,11 +48,11 @@ export async function saveNotificationSettings(settings: NotificationSettings) {
   await serialize(async () => {
     const previous = getNotificationSettings();
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    if (!settings.enabled || !settings.daily || previous.start !== settings.start) {
+    if (!settings.enabled || !settings.daily) {
       for (const item of scheduled) if (item.identifier.startsWith('kuwenta-reminder-') || !settings.enabled && item.identifier.startsWith('kuwenta-budget-')) await Notifications.cancelScheduledNotificationAsync(item.identifier);
     }
     if ((!previous.enabled && settings.enabled) || (!previous.budgets && settings.budgets)) localStorage.setItem(key + '.baseline', '1');
-    localStorage.setItem(key, JSON.stringify(settings));
+    localStorage.setItem(key, JSON.stringify({ enabled: settings.enabled, daily: settings.daily, budgets: settings.budgets }));
   });
 }
 export function syncNotifications(budgets: readonly Budget[], transactions: readonly Transaction[], baseline = false) {
@@ -61,21 +61,14 @@ export function syncNotifications(budgets: readonly Budget[], transactions: read
     const settings = getNotificationSettings();
     const allowed = settings.enabled && await permitted();
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    let seed = localStorage.getItem(key + '.seed');
-    if (!seed) { seed = String(Math.random()); localStorage.setItem(key + '.seed', seed); }
-    const random = (day: string) => {
-      let hash = 2166136261;
-      for (const char of day + seed) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-      return (hash >>> 0) / 4294967296;
-    };
-    const plan = allowed && settings.daily ? reminderPlan(new Date(), settings.start, settings.start + 2, transactions, random) : [];
-    const wanted = new Set(plan.map(item => 'kuwenta-reminder-' + item.day));
+    const plan = allowed && settings.daily ? reminderPlan(new Date(), transactions) : [];
+    const wanted = new Set(plan.map(item => 'kuwenta-reminder-' + item.key));
     for (const item of scheduled) if (item.identifier.startsWith('kuwenta-reminder-') && !wanted.has(item.identifier)) await Notifications.cancelScheduledNotificationAsync(item.identifier);
     const existing = new Set(scheduled.map(item => item.identifier));
     for (const item of plan) {
-      const identifier = 'kuwenta-reminder-' + item.day;
+      const identifier = 'kuwenta-reminder-' + item.key;
       if (!existing.has(identifier)) await Notifications.scheduleNotificationAsync({ identifier,
-        content: { title: 'Daily reminder', body: "Record today's spending in Kuwenta.", sound: false, data: { screen: 'home' } },
+        content: { title: 'Tracking reminder', body: "Record today's spending in Kuwenta.", sound: false, data: { screen: 'home' } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: 'kuwenta' },
       });
     }

@@ -32,9 +32,12 @@ export default function HomeScreen() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
-    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') setNow(new Date()); });
-    return () => { clearInterval(timer); subscription.remove(); };
+    let timer: ReturnType<typeof setInterval> | undefined;
+    function stop() { if (timer) clearInterval(timer); timer = undefined; }
+    function start() { stop(); setNow(new Date()); timer = setInterval(() => setNow(new Date()), 60000); }
+    if (AppState.currentState === 'active') start();
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') start(); else stop(); });
+    return () => { stop(); subscription.remove(); };
   }, []);
   const recent = transactions.filter((row) => row.type !== 'EXTERNAL').sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)).slice(0, 5);
   const hasActivity = transactions.some((record) => record.type === 'INCOME' || record.type === 'EXPENSE');

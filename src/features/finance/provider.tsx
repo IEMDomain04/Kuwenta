@@ -1,3 +1,5 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { syncWidgets } from './widgets';
 import { syncNotifications, observeNotificationTaps } from './notifications';
 import { formatMoney } from './money';
 import { router, useRootNavigationState } from 'expo-router';
@@ -6,12 +8,12 @@ import { CashSetup } from './components/cash-setup';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, AppState, Pressable, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, AppState, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { calculateFinanceSummary } from './calculations';
+import { calculateFinanceSummary, calculateCurrentMoney } from './calculations';
 import { isValidMonth, philippineDateTime } from './dates';
 import { openFinanceDatabase } from './storage/database';
 import { listGoals, saveGoal as saveGoalRecord, deleteGoal } from './storage/goals';
@@ -50,6 +52,15 @@ const Context = createContext<FinanceState | null>(null);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
+  const [opaqueNotice, setOpaqueNotice] = useState(true);
+  useEffect(() => {
+    let active = true;
+    const check = Platform.OS === 'ios' ? AccessibilityInfo.isReduceTransparencyEnabled() : AccessibilityInfo.isHighTextContrastEnabled();
+    void check.then(value => { if (active) setOpaqueNotice(value); }).catch(() => {});
+    const subscription = Platform.OS === 'ios' ? AccessibilityInfo.addEventListener('reduceTransparencyChanged', setOpaqueNotice) : undefined;
+    return () => { active = false; subscription?.remove(); };
+  }, []);
   const insets = useSafeAreaInsets();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const loadedSnapshot = useRef<Snapshot | null>(null);
@@ -90,6 +101,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const month = philippineDateTime().transactionDate.slice(0, 7);
       const summary = calculateFinanceSummary(accounts, transactions, month);
       void syncNotifications(budgets, transactions, baseline).catch(cause => console.warn('Could not sync Kuwenta notifications:', cause));
+      try { await syncWidgets(summary.balance, calculateCurrentMoney(accounts, transactions).availableMoney, needsCashSetup); }
+      catch (cause) { console.warn('Could not update Kuwenta widgets:', cause); }
       loadedMonth = month;
       if (active) {
         const next = { displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
@@ -116,7 +129,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       })();
       running = pending.catch(() => {});
       try { await pending; }
-      catch (cause) { if (active) setNotice({ message: cause instanceof Error ? cause.message : 'Could not save changes.', tone: 'error', expiresAt: Date.now() + 5000 }); throw cause; }
+      catch (cause) { if (active) setNotice({ message: cause instanceof Error ? cause.message : 'Could not save changes.', tone: 'error', expiresAt: Date.now() + 7000 }); throw cause; }
       finally { locked = false; if (active) setBusy(false); }
     }
     actions.current = {
@@ -152,12 +165,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       removeTransaction: (id) => write((db) => deleteTransaction(db, id), 'Transaction removed.'),
     };
     void refresh();
-    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void refresh(); });
-    const timer = setInterval(() => {
-      if (AppState.currentState === 'active' && loadedMonth !== philippineDateTime().transactionDate.slice(0, 7)) void refresh();
-    }, 60_000);
+    let timer: ReturnType<typeof setInterval> | undefined;
+    function stopMonthTimer() { if (timer) clearInterval(timer); timer = undefined; }
+    function startMonthTimer() {
+      stopMonthTimer();
+      timer = setInterval(() => { if (loadedMonth !== philippineDateTime().transactionDate.slice(0, 7)) void refresh(); }, 60_000);
+    }
+    if (AppState.currentState === 'active') startMonthTimer();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') { void refresh(); startMonthTimer(); } else stopMonthTimer();
+    });
     return () => {
-      active = false; subscription.remove(); clearInterval(timer); actions.current = null;
+      active = false; subscription.remove(); stopMonthTimer(); actions.current = null;
       void running.finally(async () => { await connection?.closeAsync(); }).catch(() => {});
     };
   }, []);
@@ -168,10 +187,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   </FinanceScreen>;
   if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? Promise.reject(new Error('App is closing.'))} />;
   if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
-  const noticeColor = notice?.tone === 'expense' || notice?.tone === 'error' ? '#FF91A1' : notice?.tone === 'info' ? '#92BDFA' : '#74DCA6';
+  const noticeColor = notice?.tone === 'expense' || notice?.tone === 'error' ? theme.error : notice?.tone === 'info' ? theme.secondary : theme.income;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
-    showNotice: (message, error = false) => setNotice({ message, tone: error ? 'error' : 'success', expiresAt: Date.now() + (error ? 5000 : 4000) }),
+    showNotice: (message, error = false) => setNotice({ message, tone: error ? 'error' : 'success', expiresAt: Date.now() + (error ? 7000 : 4000) }),
     saveAccountOrder: (ids) => actions.current?.saveAccountOrder(ids) ?? unavailable(),
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
     saveDisplayName: (name) => actions.current?.saveDisplayName(name) ?? unavailable(),
@@ -198,16 +217,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} /></ThemedView> : null}
     {children}
     <NotificationTapObserver />
-    {notice ? <View pointerEvents="box-none" style={{ position: 'absolute', top: insets.top + 8, left: Math.max(16, insets.left), right: Math.max(16, insets.right), zIndex: 1000, alignItems: 'center' }}>
-      <View style={{ width: '100%', maxWidth: 340, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 24, backgroundColor: '#0A1129', elevation: 6, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: noticeColor + '25', justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name={notice.tone === 'error' ? 'alert-circle-outline' : notice.tone === 'income' ? 'arrow-up' : notice.tone === 'expense' ? 'arrow-down' : 'checkmark'} size={20} color={noticeColor} />
+    {notice ? <View pointerEvents="box-none" style={{ position: 'absolute', top: insets.top + 80, left: Math.max(16, insets.left), right: Math.max(16, insets.right), zIndex: 1000, alignItems: 'center' }}>
+      <View style={{ width: '100%', maxWidth: 300, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: opaqueNotice ? theme.backgroundElement : dark ? 'rgba(17,36,27,0.92)' : 'rgba(240,250,244,0.92)', borderWidth: 1, borderColor: dark ? 'rgba(255,255,255,0.24)' : 'rgba(6,99,62,0.25)', elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: noticeColor + '25', justifyContent: 'center', alignItems: 'center' }}>
+          <Ionicons name={notice.tone === 'error' ? 'alert-circle-outline' : notice.tone === 'income' ? 'arrow-up' : notice.tone === 'expense' ? 'arrow-down' : 'checkmark'} size={16} color={noticeColor} />
         </View>
         <View style={{ flex: 1, gap: 2 }} accessibilityLiveRegion="polite">
-          <ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>{notice.message}</ThemedText>
-          {notice.detail ? <ThemedText type="small" style={{ color: '#D5E4DC' }}>{notice.detail}</ThemedText> : null}
+          <ThemedText type="smallBold" style={{ color: theme.text, fontSize: 12 }}>{notice.message}</ThemedText>
+          {notice.detail ? <ThemedText type="small" numberOfLines={2} style={{ color: theme.textSecondary, fontSize: 11 }}>{notice.detail}</ThemedText> : null}
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss confirmation" onPress={() => setNotice(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={16} color="#D5E4DC" /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notice" onPress={() => setNotice(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={16} color={theme.textSecondary} /></Pressable>
       </View>
     </View> : null}
   </ThemedView></Context.Provider>;

@@ -2,17 +2,21 @@ import { philippineDateTime } from './dates';
 import { budgetReport } from './budgets';
 import type { Budget, Transaction } from './types';
 
-export function reminderPlan(now: Date, start: number, end: number, transactions: readonly Transaction[], random: (day: string) => number) {
+/** Six-hour waking-hour spacing; no overnight delivery or background polling. */
+export function reminderPlan(now: Date, transactions: readonly Transaction[]) {
   const today = philippineDateTime(now).transactionDate;
-  const logged = new Set(transactions.filter(t => t.type !== 'ADJUSTMENT').map(t => philippineDateTime(new Date(t.createdAt)).transactionDate));
   const base = Date.parse(today + 'T00:00:00+08:00');
-  const result: { day: string; date: Date }[] = [];
-  for (let index = 0; index < 30; index++) {
+  const activity = transactions.filter(t => t.type !== 'ADJUSTMENT').map(t => Date.parse(t.createdAt)).filter(time => time <= now.getTime());
+  const result: { key: string; day: string; date: Date }[] = [];
+  // At most 42 pending reminders, leaving room for alerts on iOS.
+  for (let index = 0; index < 14; index++) {
     const day = philippineDateTime(new Date(base + index * 86400000)).transactionDate;
-    if (logged.has(day)) continue;
-    const minute = start * 60 + Math.floor(Math.max(0, Math.min(0.999999, random(day))) * (end - start) * 60);
-    const date = new Date(base + index * 86400000 + minute * 60000);
-    if (date.getTime() > now.getTime()) result.push({ day, date });
+    for (const hour of [8, 14, 20]) {
+      const timestamp = base + index * 86400000 + hour * 3600000;
+      if (timestamp <= now.getTime()) continue;
+      if (activity.some(time => time <= timestamp && timestamp - time < 6 * 3600000)) continue;
+      result.push({ key: `${day}-${hour}`, day, date: new Date(timestamp) });
+    }
   }
   return result;
 }

@@ -1,5 +1,5 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
  android:minWidth="250dp" android:minHeight="100dp" android:minResizeWidth="250dp" android:minResizeHeight="100dp"
  android:targetCellWidth="4" android:targetCellHeight="2" android:updatePeriodMillis="0" android:resizeMode="horizontal"
- android:initialLayout="@layout/kuwenta_quick_widget" android:previewLayout="@layout/kuwenta_quick_widget"
+ android:initialLayout="@layout/kuwenta_quick_widget" android:previewImage="@mipmap/ic_launcher" android:previewLayout="@layout/kuwenta_quick_widget"
  android:description="@string/kuwenta_widget_description" android:widgetCategory="home_screen" />

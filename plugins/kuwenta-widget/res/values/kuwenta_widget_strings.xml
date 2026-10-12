@@ -5,4 +5,12 @@
  <string name="kuwenta_widget_expense">Expense</string>
  <string name="kuwenta_widget_income">Income</string>
  <string name="kuwenta_widget_quick">Quick Entry</string>
+ <string name="kuwenta_quick_widget_info_name">Kuwenta Quick Entry</string>
+ <string name="kuwenta_cash_widget_info_name">Kuwenta My Cash</string>
+ <string name="kuwenta_available_widget_info_name">Kuwenta Available Money</string>
+ <string name="kuwenta_cash_widget_description">Your last recorded Cash balance. Tap to open Accounts.</string>
+ <string name="kuwenta_available_widget_description">Your last recorded available spending money. Tap to open Accounts.</string>
+ <string name="kuwenta_widget_cash">My Cash</string>
+ <string name="kuwenta_widget_available">Available Money</string>
+ <string name="kuwenta_widget_open">Open Kuwenta to update</string>
 </resources>

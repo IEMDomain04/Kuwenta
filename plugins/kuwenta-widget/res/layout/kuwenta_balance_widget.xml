@@ -1,0 +1,7 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+ android:id="@+id/kuwenta_balance_root" android:layout_width="match_parent" android:layout_height="match_parent"
+ android:orientation="vertical" android:gravity="center_vertical" android:padding="16dp" android:background="@drawable/kuwenta_widget_background">
+ <TextView android:id="@+id/kuwenta_balance_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/kuwenta_widget_title" android:textColor="#D4F0DF" android:textSize="12sp" android:maxLines="2" />
+ <TextView android:id="@+id/kuwenta_balance_amount" android:layout_width="match_parent" android:layout_height="40dp" android:text="--" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="24sp" android:maxLines="1" android:ellipsize="end" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12sp" android:autoSizeMaxTextSize="24sp" android:autoSizeStepGranularity="1sp" />
+ <TextView android:id="@+id/kuwenta_balance_updated" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/kuwenta_widget_open" android:textColor="#D4F0DF" android:textSize="10sp" android:maxLines="2" />
+</LinearLayout>

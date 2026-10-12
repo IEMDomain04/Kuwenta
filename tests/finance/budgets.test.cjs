@@ -39,3 +39,25 @@ test('budget payloads round trip, reject malformed data and support all older ve
     assert.doesNotThrow(() => parseBackup(JSON.stringify(parsed)));
   }
 });
+
+const { budgetFeedback } = require('../../.expo/finance-tests/budgets.js');
+test('budget feedback distinguishes allowances from available cash and other months', () => {
+  const row = budgetReport([budget], [], budget.month).rows[0];
+  assert.match(budgetFeedback(row, 30000, row.remaining, true).details.join(' '), /but spending accounts/);
+  assert.match(budgetFeedback(row, 0, row.remaining, true).details.join(' '), /not cash/);
+  assert.match(budgetFeedback(row, -100, row.remaining, true).details.join(' '), /negative/);
+  assert.match(budgetFeedback(row, 600000, 700000, true).details.join(' '), /Prioritize/);
+  assert.match(budgetFeedback(row, 600000, row.remaining, true).details.join(' '), /upcoming bills/);
+  assert.match(budgetFeedback(row, 0, row.remaining, false).details.join(' '), /not compared/);
+  assert.doesNotMatch(budgetFeedback(row, 0, row.remaining, false).details.join(' '), /No available/);
+  assert.match(budgetFeedback(row, 600000, row.remaining, true).details.join(' '), /No spending/);
+});
+test('budget feedback covers near-limit, reached and overspent categories with exact amounts', () => {
+  const near = budgetReport([budget], [record({ amount: 400000 })], budget.month).rows[0];
+  assert.match(budgetFeedback(near, 600000, near.remaining, true).message, /close to the limit/);
+  const reached = budgetReport([budget], [record({ amount: 500000 })], budget.month).rows[0];
+  assert.match(budgetFeedback(reached, 600000, 0, true).message, /limit reached/);
+  const over = budgetReport([budget], [record({ amount: 500001 })], budget.month).rows[0];
+  assert.match(budgetFeedback(over, 600000, 0, true).message, /0\.01 over/);
+  assert.match(budgetFeedback(over, 600000, 0, true).details.join(' '), /does not change your balance/);
+});
