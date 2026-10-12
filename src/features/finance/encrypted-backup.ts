@@ -7,55 +7,86 @@ export const BACKUP_KEY_ITERATIONS = 600_000;
 export const MAX_BACKUP_FILE_BYTES = 10 * 1024 * 1024;
 
 export function validateBackupPassword(password: string): void {
-  if (password.trim().length < 12 || password.length > 128) {
-    throw new Error('Use a password or passphrase of 12 to 128 characters.');
+  if (password.trim().length < 8 || password.length > 128) {
+    throw new Error('Use a password or passphrase of 8 to 128 characters.');
   }
 }
 
+/** The native and JS implementations produce the same version-1 backup key. */
+async function deriveBackupKey(password: string, salt: Uint8Array): Promise<Uint8Array> {
+  const { requireOptionalNativeModule } = await import('expo');
+  const native = requireOptionalNativeModule<{ deriveKey: (password: string, salt: string, iterations: number) => Promise<string> }>('KuwentaBackupCrypto');
+  if (native) {
+    const hex = await native.deriveKey(password, bytesToHex(salt), BACKUP_KEY_ITERATIONS);
+    if (!/^[a-f0-9]{64}$/.test(hex)) throw new Error('Could not protect the backup. Please try again.');
+    return hexToBytes(hex);
+  }
+  // Expo Go, iOS, and older builds retain the compatible JS implementation.
+  const passwordBytes = utf8ToBytes(password);
+  try {
+    return await pbkdf2Async(sha256, passwordBytes, salt, { c: BACKUP_KEY_ITERATIONS, dkLen: 32, asyncTick: 10 });
+  } finally { passwordBytes.fill(0); }
+}
+
 /** Version-1 envelope. Its header is authenticated along with the ciphertext. */
-export async function encryptBackup(json: string, password: string): Promise<string> {
+export async function encryptBackup(json: string, password: string, signal?: AbortSignal): Promise<string> {
+  checkCancelled(signal);
   validateBackupPassword(password);
   parseBackup(json);
   const { getRandomBytesAsync, AESEncryptionKey, aesEncryptAsync } = await import('expo-crypto');
   const salt = await getRandomBytesAsync(16);
+  checkCancelled(signal);
   const header = {
     format: 'kuwenta-encrypted', version: 1, cipher: 'AES-256-GCM',
     kdf: 'PBKDF2-HMAC-SHA256', iterations: BACKUP_KEY_ITERATIONS, salt: bytesToHex(salt),
   };
-  const passwordBytes = utf8ToBytes(password);
   const plaintext = utf8ToBytes(json);
   let keyBytes: Uint8Array | undefined;
   try {
-    // Async derivation yields to the UI while performing the password work factor.
-    keyBytes = await pbkdf2Async(sha256, passwordBytes, salt, {
-      c: BACKUP_KEY_ITERATIONS, dkLen: 32, asyncTick: 20,
-    });
+    keyBytes = await deriveBackupKey(password, salt);
+    checkCancelled(signal);
     const key = await AESEncryptionKey.import(keyBytes);
+    checkCancelled(signal);
     const sealed = await aesEncryptAsync(plaintext, key, {
       nonce: { length: 12 }, tagLength: 16,
       additionalData: utf8ToBytes(JSON.stringify(header)),
     });
+    checkCancelled(signal);
     const sealedData = await sealed.combined('base64');
+    checkCancelled(signal);
     return JSON.stringify({ ...header, sealedData }, null, 2);
   } finally {
-    passwordBytes.fill(0);
     plaintext.fill(0);
     keyBytes?.fill(0);
   }
 }
 
+function checkCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) throw signal.reason ?? new Error('Backup cancelled.');
+}
+
 /** The share sheet cannot confirm whether the recipient actually saved the file. */
-export async function shareEncryptedBackup(json: string, password: string): Promise<void> {
+export async function shareEncryptedBackup(json: string, password: string, onProgress?: (message: string) => void, signal?: AbortSignal): Promise<void> {
+  checkCancelled(signal);
+  onProgress?.('Checking file sharing...');
   const Sharing = await import('expo-sharing');
   if (!await Sharing.isAvailableAsync()) throw new Error('File sharing is unavailable on this device.');
-  const encrypted = await encryptBackup(json, password);
+  checkCancelled(signal);
+  onProgress?.('Protecting your backup...');
+  // Give the progress message a frame before starting password derivation.
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const encrypted = await encryptBackup(json, password, signal);
   parseEncryptedBackup(encrypted);
   const { File, Paths } = await import('expo-file-system');
   const { randomUUID } = await import('expo-crypto');
+  checkCancelled(signal);
+  onProgress?.('Writing backup file...');
   const file = new File(Paths.cache, 'kuwenta-' + randomUUID() + '.kuwenta');
   try {
     file.create();
     file.write(encrypted);
+    checkCancelled(signal);
+    onProgress?.('Choose where to save your backup.');
     await Sharing.shareAsync(file.uri, {
       mimeType: 'application/octet-stream', UTI: 'public.data', dialogTitle: 'Save encrypted Kuwenta backup',
     });
@@ -101,13 +132,10 @@ export async function decryptBackup(json: string, password: string): Promise<Fin
   const { header, sealedData } = parseEncryptedBackup(json);
   validateBackupPassword(password);
   const { AESEncryptionKey, AESSealedData, aesDecryptAsync } = await import('expo-crypto');
-  const passwordBytes = utf8ToBytes(password);
   let keyBytes: Uint8Array | undefined;
   let plaintext: Uint8Array | undefined;
   try {
-    keyBytes = await pbkdf2Async(sha256, passwordBytes, hexToBytes(header.salt), {
-      c: BACKUP_KEY_ITERATIONS, dkLen: 32, asyncTick: 20,
-    });
+    keyBytes = await deriveBackupKey(password, hexToBytes(header.salt));
     const key = await AESEncryptionKey.import(keyBytes);
     try {
       plaintext = await aesDecryptAsync(AESSealedData.fromCombined(sealedData, { ivLength: 12, tagLength: 16 }), key, {
@@ -118,7 +146,6 @@ export async function decryptBackup(json: string, password: string): Promise<Fin
     }
     return parseBackup(new TextDecoder('utf-8', { fatal: true }).decode(plaintext));
   } finally {
-    passwordBytes.fill(0);
     keyBytes?.fill(0);
     plaintext?.fill(0);
   }

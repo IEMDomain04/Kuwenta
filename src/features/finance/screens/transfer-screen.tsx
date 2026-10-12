@@ -19,6 +19,7 @@ export default function TransferScreen() {
   const finance = useFinance();
   const theme = useTheme();
   const [external, setExternal] = useState<'increase' | 'decrease' | null>(null);
+  const nameInput = useRef<TextInput>(null);
   const [name, setName] = useState('');
   const [accountId, setAccountId] = useState(params.accountId ?? '');
   const [amount, setAmount] = useState('');
@@ -28,7 +29,8 @@ export default function TransferScreen() {
   const [picker, setPicker] = useState<'from' | 'to' | null>(null);
   const [saving, setSaving] = useState(false);
   const [rejected, setRejected] = useState(false);
-  const [error, setError] = useState('');
+  function setError(message: string) { if (message) finance.showNotice(message, true); }
+  const amountInput = useRef<TextInput>(null);
   const pending = useRef(false);
   const submission = useRef<string | undefined>(undefined);
   const locked = saving || finance.busy;
@@ -58,6 +60,7 @@ export default function TransferScreen() {
   } catch { /* Incomplete inputs are validated on Save. */ }
   function save() {
     if (locked || pending.current || rejected) return;
+    if (external && !name.trim()) { setError('Enter the external source or destination name.'); nameInput.current?.focus(); return; }
     let cents: number;
     try {
       cents = parseMoney(amount.replace(/,/g, ''));
@@ -69,7 +72,7 @@ export default function TransferScreen() {
         calculateFinanceSummary(finance.accounts, [...finance.transactions, { ...draft, id: 'preview', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }], dateTime.transactionDate.slice(0, 7));
       }
       if (external && after === undefined) throw new Error('Balance exceeds the supported range.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the inputs.'); return; }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the inputs.'); amountInput.current?.focus(); return; }
     pending.current = true;
     Alert.alert('Save transfer?', (external === 'increase' ? name.trim() + ' to ' + account.name : account.name + ' to ' + (external ? name.trim() : finance.accounts.find((row) => row.id === destinationId)?.name)) + '\n' + formatMoney(cents) + (external ? '\nExcluded from History, income, and expenses. An internal record is kept for balances and backups.' : '\nIncome and expense totals stay unchanged.'), [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
@@ -103,7 +106,7 @@ export default function TransferScreen() {
         <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{isExternal ? 'External' : selected?.name ?? 'Choose account'}</ThemedText>
         <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
       </Pressable>
-      {isExternal ? <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel={side === 'from' ? 'External source name' : 'External destination name'} value={name} onChangeText={setName} editable={!locked} placeholder={side === 'from' ? 'External source name' : 'External destination name'} placeholderTextColor={theme.textSecondary} style={input} /> : null}
+      {isExternal ? <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel={side === 'from' ? 'External source name' : 'External destination name'} value={name} onChangeText={setName} editable={!locked} placeholder={side === 'from' ? 'External source name' : 'External destination name'} placeholderTextColor={theme.textSecondary} style={input} /> : null}
     </View>;
   }
   const input = { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, color: theme.text, fontSize: 12 };
@@ -114,7 +117,7 @@ export default function TransferScreen() {
       {endpoint('to')}
       <ThemedText type="small" themeColor="textSecondary">{external ? 'Moves money ' + (external === 'increase' ? 'into' : 'out of') + ' your account. Excluded from History, income, and expenses; kept in balances and backups. Use Income or Expense for salary or purchases.' : 'Moves money between your accounts without changing income or expense totals.'}</ThemedText>
       <ThemedText type="small">Amount (PHP)</ThemedText>
-      <MoneyField accessibilityLabel="Transfer amount" value={amount} editable={!locked} onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} style={{ ...input, fontSize: 22 }} />
+      <MoneyField ref={amountInput} accessibilityLabel="Transfer amount" value={amount} editable={!locked} onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} style={{ ...input, fontSize: 22 }} />
       <TransactionDateTime date={dateTime.transactionDate} time={dateTime.transactionTime} disabled={locked} onDateChange={(transactionDate) => setDateTime({ ...dateTime, transactionDate })} onTimeChange={(transactionTime) => setDateTime({ ...dateTime, transactionTime })} />
       <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Optional transfer note" value={notes} onChangeText={setNotes} editable={!locked} placeholder="Optional note" placeholderTextColor={theme.textSecondary} style={input} />
       {after !== undefined ? <View style={{ padding: 12, borderRadius: 12, backgroundColor: theme.infoSurface, gap: 4 }}>
@@ -123,7 +126,7 @@ export default function TransferScreen() {
         {destinationAfter !== undefined ? <ThemedText type="small">{destination?.name}: {formatMoney(destinationAfter)}</ThemedText> : null}
       </View> : null}
       {after !== undefined && after < 0 ? <ThemedText type="small" accessibilityRole="alert" themeColor="warning">Warning: this account will have a negative balance.</ThemedText> : null}
-      {error ? <ThemedText accessibilityRole="alert" themeColor="error">{error}</ThemedText> : null}
+
       <ActionButton primary label={saving ? 'Saving...' : 'Save transfer'} disabled={locked || rejected} onPress={save} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } }} />
       </View>

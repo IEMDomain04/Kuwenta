@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import { decryptBackup, pickBackupFile } from '../encrypted-backup';
+import { decryptBackup, pickBackupFile, validateBackupPassword } from '../encrypted-backup';
 import { previewBackup, type FinanceBackup } from '../backup';
 import { formatMoney } from '../money';
 import { philippineDateTime } from '../dates';
@@ -11,8 +11,9 @@ import { useFinance } from '../provider';
 
 export function BackupImportPreview({ disabled = false }: { disabled?: boolean }) {
   const theme = useTheme();
-  const { busy, restoreBackup } = useFinance();
+  const { busy, restoreBackup, showNotice } = useFinance();
   const confirming = useRef(false);
+  const passwordInput = useRef<TextInput>(null);
   const [restoring, setRestoring] = useState(false);
   const [selected, setSelected] = useState<{ name: string; json: string } | null>(null);
   const [password, setPassword] = useState('');
@@ -40,7 +41,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
       const file = await pickBackupFile();
       if (mounted.current && token === generation.current) setSelected(file);
     } catch (error) {
-      if (mounted.current && token === generation.current) setMessage(error instanceof Error ? error.message : 'Could not open backup.');
+      if (mounted.current && token === generation.current) { setMessage(''); showNotice(error instanceof Error ? error.message : 'Could not open backup.', true); }
     } finally {
       pending.current = false;
       if (mounted.current) setWorking(false);
@@ -48,6 +49,8 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
   }
   async function unlock() {
     if (pending.current || disabled || !selected) return;
+    try { validateBackupPassword(password); }
+    catch (error) { showNotice(error instanceof Error ? error.message : 'Enter your backup password.', true); passwordInput.current?.focus(); return; }
     pending.current = true; setWorking(true); setMessage('Unlocking and checking backup...');
     const token = generation.current;
     const enteredPassword = password;
@@ -63,7 +66,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
         setPreview(result); setSelected(null); setMessage('');
       }
     } catch (error) {
-      if (mounted.current && token === generation.current) setMessage(error instanceof Error ? error.message : 'Could not preview backup.');
+      if (mounted.current && token === generation.current) { setMessage(''); showNotice(error instanceof Error ? error.message : 'Could not preview backup.', true); }
     } finally {
       pending.current = false;
       if (mounted.current) setWorking(false);
@@ -82,9 +85,9 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
           if (!mounted.current) { confirming.current = false; return; }
           pending.current = true; setRestoring(true); setMessage('Restoring backup...');
           void restoreBackup(backup).then(() => {
-            if (mounted.current) { clear(); setMessage('Backup restored.'); }
+            if (mounted.current) { clear(); setMessage(''); }
           }).catch((error: unknown) => {
-            if (mounted.current) setMessage(error instanceof Error ? error.message : 'Restore failed. Your original records are unchanged.');
+            if (mounted.current) { setMessage(''); showNotice(error instanceof Error ? error.message : 'Could not restore backup.', true); }
           }).finally(() => {
             confirming.current = false; pending.current = false;
             if (mounted.current) setRestoring(false);
@@ -99,7 +102,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
     <ActionButton label={working ? 'Checking backup...' : 'Choose backup file'} disabled={locked} onPress={() => { void chooseFile(); }} />
     {selected ? <>
       <ThemedText>Selected: {selected.name}</ThemedText>
-      <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Password for selected backup" placeholder="Backup password"
+      <TextInput ref={passwordInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Password for selected backup" placeholder="Backup password"
         placeholderTextColor={theme.textSecondary} value={password} onChangeText={setPassword}
         secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={128} editable={!locked}
         style={{ color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 }} />

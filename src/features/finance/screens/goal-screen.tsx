@@ -20,6 +20,7 @@ export default function GoalScreen() {
   const finance = useFinance();
   const theme = useTheme();
   const original = finance.goals.find((row) => row.id === id);
+  const nameInput = useRef<TextInput>(null);
   const [name, setName] = useState(original?.name ?? '');
   const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.targetAmount))! : '');
   const [date, setDate] = useState(original?.targetDate ?? '');
@@ -28,9 +29,10 @@ export default function GoalScreen() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
   const accountSubmission = useRef<string | undefined>(undefined);
-  const [error, setError] = useState('');
+  function setError(message: string) { if (message) finance.showNotice(message, true); }
   const [rejected, setRejected] = useState(false);
   const [working, setWorking] = useState(false);
+  const amountInput = useRef<TextInput>(null);
   const pending = useRef(false);
   const submission = useRef<string | undefined>(undefined);
   const locked = finance.busy || working;
@@ -52,6 +54,7 @@ export default function GoalScreen() {
   }
   function review() {
     if (pending.current || locked || rejected) return;
+    if (!name.trim()) { setError('Enter a goal name.'); nameInput.current?.focus(); return; }
     let goal: SavingsGoal;
     let newAccount: Account | undefined;
     try {
@@ -64,7 +67,7 @@ export default function GoalScreen() {
       validateGoal(goal, newAccount ? [...finance.accounts, newAccount] : finance.accounts);
       if (!newAccount && !available.some((account) => account.id === accountId)) throw new Error('Choose an active, dedicated savings account.');
       calculateGoalProgress(goal, newAccount ? [...finance.accounts, newAccount] : finance.accounts, finance.transactions);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid goal.'); return; }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid goal.'); amountInput.current?.focus(); return; }
     Keyboard.dismiss(); pending.current = true;
     Alert.alert(original ? 'Save goal changes?' : 'Create savings goal?', goal.name + '\nTarget: ' + formatMoney(goal.targetAmount) + '\nAccount: ' + (newAccount?.name ?? finance.accounts.find((account) => account.id === accountId)!.name) + (newAccount ? '\nA new dedicated savings account will be created with a zero balance, excluded from Available Money.' : '\nAccount funds are unchanged.'), [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
@@ -87,9 +90,9 @@ export default function GoalScreen() {
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <FinanceScreen title={original ? 'Edit savings goal' : 'Add savings goal'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) leave(); }} />}>
       <ThemedText type="smallBold">Goal name</ThemedText>
-      <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Goal name" value={name} onChangeText={setName} editable={!locked} placeholder="Emergency fund" placeholderTextColor={theme.textSecondary} style={inputStyle} />
+      <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Goal name" value={name} onChangeText={setName} editable={!locked} placeholder="Emergency fund" placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="smallBold">Target amount</ThemedText>
-      <MoneyField accessibilityLabel="Goal target amount in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle}
+      <MoneyField ref={amountInput} accessibilityLabel="Goal target amount in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle}
         onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} />
       <ThemedText type="smallBold">Dedicated savings account</ThemedText>
       <Pressable accessibilityRole="button" accessibilityLabel="Choose dedicated savings account" disabled={locked} onPress={() => { Keyboard.dismiss(); setAccountOpen(true); }} style={{ minHeight: 48, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -106,7 +109,7 @@ export default function GoalScreen() {
       <SelectionSheet visible={accountOpen} title="Savings account" selected={createAccount ? '__new__' : accountId} disabled={locked} options={[...available.map((account) => ({ value: account.id, label: account.name })), ...(!original ? [{ value: '__new__', label: '+ Create savings account' }] : [])]} onClose={() => setAccountOpen(false)} onSelect={(value) => { setCreateAccount(value === '__new__'); if (value !== '__new__') setAccountId(value); setError(''); }} />
       <TransactionDateTime dateOnly optional date={date} time="00:00:00" disabled={locked} onDateChange={setDate} onTimeChange={() => {}} />
       {date ? <Pressable accessibilityRole="button" accessibilityLabel="Clear target date" disabled={locked} onPress={() => setDate('')} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="accent">Clear date</ThemedText></Pressable> : null}
-      {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
+
       <ActionButton primary label={working ? 'Saving...' : original ? 'Save changes' : 'Save goal'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) leave(); }} />
       {original && <IconButton icon="trash-outline" destructive label="Delete goal" disabled={locked} onPress={remove} />}

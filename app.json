@@ -50,7 +50,12 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "inlineModules": {
+        "watchedDirectories": [
+          "src/features/finance/native"
+        ]
+      }
     },
     "extra": {
       "router": {},

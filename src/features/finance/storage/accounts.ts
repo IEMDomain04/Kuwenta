@@ -11,7 +11,16 @@ function fromRow(row: AccountRow): Account {
   return account;
 }
 export async function listAccounts(db: FinanceDatabase): Promise<Account[]> {
-  return (await db.getAllAsync<AccountRow>("SELECT * FROM accounts ORDER BY CASE WHEN id = 'cash' THEN 0 ELSE 1 END, name COLLATE NOCASE, id")).map(fromRow);
+  const accounts = (await db.getAllAsync<AccountRow>("SELECT * FROM accounts ORDER BY CASE WHEN id = 'cash' THEN 0 ELSE 1 END, name COLLATE NOCASE, id")).map(fromRow);
+  const preference = await db.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'accountOrder'");
+  try {
+    const ids: unknown = JSON.parse(preference?.value ?? '[]');
+    if (Array.isArray(ids) && ids.every(id => typeof id === 'string')) {
+      const rank = new Map(ids.map((id, index) => [id, index]));
+      accounts.sort((a, b) => (rank.get(a.id) ?? ids.length) - (rank.get(b.id) ?? ids.length));
+    }
+  } catch { /* Invalid display preferences must not block financial records. */ }
+  return accounts;
 }
 export async function getAccount(db: FinanceDatabase, id: string): Promise<Account> {
   const row = await db.getFirstAsync<AccountRow>('SELECT * FROM accounts WHERE id = ?', id);
@@ -77,4 +86,13 @@ export async function saveDisplayName(db: FinanceDatabase, name: string): Promis
   if (typeof name !== 'string' || !name.trim()) throw new Error('Please enter your name.');
   if (name.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error('Use a name up to 50 characters.');
   await db.runAsync("INSERT INTO preferences(key, value) VALUES ('displayName', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", name.trim());
+}
+
+/** Display order only; account balances and transaction records remain unchanged. */
+export async function saveAccountOrder(db: FinanceDatabase, ids: readonly string[]): Promise<void> {
+  await db.withExclusiveTransactionAsync(async transaction => {
+    const accounts = await transaction.getAllAsync<{ id: string }>('SELECT id FROM accounts');
+    if (ids.length !== accounts.length || new Set(ids).size !== ids.length || accounts.some(account => !ids.includes(account.id))) throw new Error('Accounts changed. Try rearranging them again.');
+    await transaction.runAsync("INSERT INTO preferences(key, value) VALUES ('accountOrder', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", JSON.stringify(ids));
+  });
 }

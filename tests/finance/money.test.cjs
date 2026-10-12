@@ -29,3 +29,10 @@ test('formats exact cents including negatives', () => {
   assert.equal(moneyInput(0), '0.00');
   assert.throws(() => formatMoney(1.5));
 });
+
+test('notice amounts omit zero decimals without losing fractional centavos', () => {
+  assert.equal(formatMoney(10000, true), '₱100');
+  assert.equal(formatMoney(10050, true), '₱100.50');
+  assert.equal(formatMoney(-10000, true), '-₱100');
+  assert.equal(formatMoney(0, true), '₱0');
+});

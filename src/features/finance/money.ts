@@ -32,9 +32,9 @@ export function moneyInput(cents: number): string {
   return `${cents < 0 ? '-' : ''}${digits.slice(0, -2)}.${digits.slice(-2)}`;
 }
 
-export function formatMoney(cents: number): string {
+export function formatMoney(cents: number, trimWhole = false): string {
   const [whole, fraction] = moneyInput(cents).split('.');
   const negative = whole.startsWith('-');
   const grouped = whole.replace(/^-/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${negative ? '-' : ''}₱${grouped}.${fraction}`;
+  return `${negative ? '-' : ''}₱${grouped}${trimWhole && fraction === '00' ? '' : '.' + fraction}`;
 }

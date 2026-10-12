@@ -75,7 +75,7 @@ export function syncNotifications(budgets: readonly Budget[], transactions: read
     for (const item of plan) {
       const identifier = 'kuwenta-reminder-' + item.day;
       if (!existing.has(identifier)) await Notifications.scheduleNotificationAsync({ identifier,
-        content: { title: 'A quick money check-in', body: 'Have you recorded your spending today? Open Kuwenta to keep your records up to date.', sound: false, data: { screen: 'home' } },
+        content: { title: 'Daily reminder', body: "Record today's spending in Kuwenta.", sound: false, data: { screen: 'home' } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: 'kuwenta' },
       });
     }

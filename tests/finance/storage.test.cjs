@@ -1091,3 +1091,44 @@ test('profile name edits persist, reject invalid input and preserve financial re
   assert.deepEqual(await getCashAccount(db), before);
   assert.equal((await listTransactions(db)).length, 0);
 });
+
+test('account display order survives restart without changing balances or records', async () => {
+  const { saveAccount, saveAccountOrder, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const directory = mkdtempSync(join(tmpdir(), 'kuwenta-order-'));
+  const filename = join(directory, 'finance.db');
+  let db = connect(filename);
+  try {
+    await initializeDatabase(db);
+    const cash = await getCashAccount(db);
+    await saveAccount(db, { ...cash, id: 'bank', name: 'Bank', openingBalance: 10000 }, true);
+    await createTransaction(db, 'expense', expense());
+    const before = await listTransactions(db);
+    await saveAccountOrder(db, ['bank', 'cash']);
+    db.close(); db = connect(filename);
+    const accounts = await listAccounts(db);
+    assert.deepEqual(accounts.map(account => account.id), ['bank', 'cash']);
+    assert.equal(accounts[0].openingBalance, 10000);
+    assert.deepEqual(await listTransactions(db), before);
+    await saveAccount(db, { ...cash, id: 'new', name: 'Another account' }, true);
+    assert.deepEqual((await listAccounts(db)).map(account => account.id), ['bank', 'cash', 'new']);
+    await db.runAsync("DELETE FROM accounts WHERE id = 'bank'");
+    assert.deepEqual((await listAccounts(db)).map(account => account.id), ['cash', 'new']);
+  } finally {
+    db.close();
+    for (const name of readdirSync(directory)) unlinkSync(join(directory, name));
+    rmdirSync(directory);
+  }
+});
+
+test('invalid account order is rejected and broken stored preferences do not hide accounts', async t => {
+  const { saveAccount, saveAccountOrder, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const db = await setup(t);
+  await saveAccount(db, { ...await getCashAccount(db), id: 'bank', name: 'Bank' }, true);
+  await saveAccountOrder(db, ['bank', 'cash']);
+  for (const ids of [[], ['bank'], ['cash', 'cash'], ['cash', 'missing']]) await assert.rejects(saveAccountOrder(db, ids), /Accounts changed/);
+  assert.deepEqual((await listAccounts(db)).map(account => account.id), ['bank', 'cash']);
+  for (const value of ['invalid JSON', '{}', '[42]']) {
+    await db.runAsync("UPDATE preferences SET value = ? WHERE key = 'accountOrder'", value);
+    assert.deepEqual((await listAccounts(db)).map(account => account.id), ['cash', 'bank']);
+  }
+});

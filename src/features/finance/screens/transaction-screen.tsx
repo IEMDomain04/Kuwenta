@@ -26,7 +26,7 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
   const [quickOpen, setQuickOpen] = useState(!id && params.quick === '1');
   const [quickDraft, setQuickDraft] = useState<TransactionDraft>();
   const [quickWarnings, setQuickWarnings] = useState<string[]>([]);
-  const [error, setError] = useState('');
+  function setError(message: string) { if (message) finance.showNotice(message, true); }
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const finished = useRef(false);
@@ -82,7 +82,7 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
 
       {quickDraft && quickWarnings.length > 0 ? <ThemedText type="small" accessibilityLiveRegion="polite">{quickWarnings.join(' ')}</ThemedText> : null}
       {transferChoices}
-      <TransactionForm transferOnly={transferOnly || quickDraft?.type === 'TRANSFER'} initialDraft={quickDraft} key={id ?? (quickDraft ? 'quick' : 'new')} original={original} initialType={initialType} initialAccountId={params.accountId} initialDestinationAccountId={params.destinationAccountId} onTypeChange={setEntryType} disabled={saving || finance.busy} error={error} onSubmit={submit} onCancel={() => { if (!pending.current) leave(); }} />
+      <TransactionForm transferOnly={transferOnly || quickDraft?.type === 'TRANSFER'} initialDraft={quickDraft} key={id ?? (quickDraft ? 'quick' : 'new')} original={original} initialType={initialType} initialAccountId={params.accountId} initialDestinationAccountId={params.destinationAccountId} onTypeChange={setEntryType} disabled={saving || finance.busy} onSubmit={submit} onCancel={() => { if (!pending.current) leave(); }} />
       </>}
     </FinanceScreen>
   </KeyboardAvoidingView>;

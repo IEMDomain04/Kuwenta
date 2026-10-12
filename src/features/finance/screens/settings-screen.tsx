@@ -11,10 +11,10 @@ import { BackupImportPreview } from '../components/backup-import-preview';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
-  const { busy, resetData, displayName, saveDisplayName, refresh } = useFinance();
+  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice } = useFinance();
   const theme = useTheme();
   const { mode, setMode } = useAppearance();
-  const [appearanceError, setAppearanceError] = useState('');
+  function setAppearanceError(message: string) { if (message) showNotice(message, true); }
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearanceOptions = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Use device setting']] as const;
   const [nameOpen, setNameOpen] = useState(false);
@@ -22,9 +22,10 @@ export default function SettingsScreen() {
   const [nameError, setNameError] = useState('');
   const [savingName, setSavingName] = useState(false);
   const namePending = useRef(false);
+  const nameInput = useRef<TextInput>(null);
   async function saveName() {
     if (namePending.current || busy) return;
-    if (!name.trim()) { setNameError('Please enter your name.'); return; }
+    if (!name.trim()) { setNameError('Enter your name.'); nameInput.current?.focus(); return; }
     namePending.current = true; setSavingName(true); setNameError('');
     try { await saveDisplayName(name); setNameOpen(false); }
     catch (cause) { setNameError(cause instanceof Error ? cause.message : 'Could not save your name.'); }
@@ -33,7 +34,7 @@ export default function SettingsScreen() {
   const section = { padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 };
   const pending = useRef(false);
   const [resetting, setResetting] = useState(false);
-  const [error, setError] = useState('');
+  function setError(message: string) { if (message) showNotice(message, true); }
   function confirmReset() {
     if (pending.current || busy) return;
     pending.current = true;
@@ -67,14 +68,14 @@ export default function SettingsScreen() {
         {mode === value ? <Ionicons name="checkmark" size={16} color={theme.accent} /> : null}
       </Pressable>)}
     </View> : null}
-    {appearanceError ? <ThemedText type="small" themeColor="error" accessibilityRole="alert">{appearanceError}</ThemedText> : null}
+
     <Modal visible={nameOpen} transparent animationType="fade" onRequestClose={() => { if (!namePending.current) setNameOpen(false); }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', padding: 24 }}>
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flexShrink: 1, width: '100%', maxWidth: 420, alignSelf: 'center' }} contentContainerStyle={{ paddingVertical: 12 }}>
         <View accessibilityViewIsModal style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 20, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' }}>
           <ThemedText type="smallBold" accessibilityRole="header">Your name</ThemedText>
-          <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
           {nameError ? <ThemedText type="small" accessibilityRole="alert" themeColor="error">{nameError}</ThemedText> : null}
+          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}><ActionButton label="Cancel" disabled={savingName || busy} onPress={() => setNameOpen(false)} /></View>
             <View style={{ flex: 1 }}><ActionButton primary label={savingName ? 'Saving...' : 'Save'} disabled={savingName || busy} onPress={() => { void saveName(); }} /></View>
@@ -86,7 +87,7 @@ export default function SettingsScreen() {
     <ThemedText type="small" themeColor="textSecondary">Philippine Peso (PHP)</ThemedText>
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Notifications</ThemedText>
-    <NotificationSettingsPanel onChanged={refresh} />
+    <NotificationSettingsPanel onChanged={async () => { await refresh(); showNotice('Notifications updated.'); }} />
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
@@ -97,7 +98,7 @@ export default function SettingsScreen() {
     <ThemedText type="smallBold" accessibilityRole="header">Reset App</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Permanently clear Kuwenta records on this device and restart with Cash at zero. Export a backup above before resetting. There is no Undo.</ThemedText>
     <ActionButton label={resetting ? 'Resetting...' : 'Reset all data'} disabled={busy || resetting} onPress={confirmReset} />
-    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
+
     </View>
     <ThemedText type="smallBold" accessibilityRole="header">About Kuwenta</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Track, move, and save money in Philippine pesos.</ThemedText>

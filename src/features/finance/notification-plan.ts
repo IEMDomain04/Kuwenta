@@ -23,7 +23,7 @@ export function budgetAlertPlan(budgets: readonly Budget[], transactions: readon
     level: row.spent > row.limitAmount ? 2 : 1,
     title: row.spent > row.limitAmount ? 'Budget exceeded' : 'Budget check-in',
     body: row.spent > row.limitAmount
-      ? 'Recorded spending has exceeded a monthly budget. Open Plans to review it.'
-      : 'You have used at least 80% of a monthly budget. Open Plans to check what remains.',
+      ? 'A monthly budget is over its limit. Open Plans to review.'
+      : 'A monthly budget is at least 80% used. Check it in Plans.',
   }));
 }

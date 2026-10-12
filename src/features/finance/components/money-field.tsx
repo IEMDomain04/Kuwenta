@@ -1,10 +1,10 @@
 import { useTheme } from '@/hooks/use-theme';
-import { useRef, useState } from 'react';
+import { useRef, useState, type Ref } from 'react';
 import { TextInput, type TextInputProps } from 'react-native';
 import { editMoneyInput } from '../inputs';
 
 type Props = Omit<TextInputProps, 'value' | 'onChangeText' | 'selection' | 'onSelectionChange'> & {
-  value: string; signed?: boolean; onValueChange: (value: string) => void; onRejected: () => void;
+  ref?: Ref<TextInput>; value: string; signed?: boolean; onValueChange: (value: string) => void; onRejected: () => void;
 };
 export function MoneyField({ value, signed = false, onValueChange, onRejected, ...props }: Props) {
   const theme = useTheme();

@@ -17,12 +17,12 @@ import { MoneyField } from './money-field';
 import { TransactionDateTime } from './transaction-date-time';
 import { ActionButton } from './ui';
 
-type Props = { transferOnly?: boolean; initialDraft?: TransactionDraft; original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; error: string; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
+type Props = { transferOnly?: boolean; initialDraft?: TransactionDraft; original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
 type Field = 'amount' | 'date' | 'time';
-export function TransactionForm({ transferOnly = false, initialDraft, original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, error, onSubmit, onCancel, onTypeChange }: Props) {
+export function TransactionForm({ transferOnly = false, initialDraft, original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, onSubmit, onCancel, onTypeChange }: Props) {
   const theme = useTheme();
   const dark = useColorScheme() === 'dark';
-  const { accounts, transactions, lastEntryAccount } = useFinance();
+  const { accounts, transactions, lastEntryAccount, showNotice } = useFinance();
   const [accountOpen, setAccountOpen] = useState(false);
   const [choosingDestination, setChoosingDestination] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState(original?.destinationAccountId ?? initialDraft?.destinationAccountId ?? initialDestinationAccountId ?? '');
@@ -40,6 +40,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
   const [time, setTime] = useState(original?.transactionTime ?? initialDraft?.transactionTime ?? defaults.transactionTime);
   const [notes, setNotes] = useState(original?.notes ?? initialDraft?.notes ?? '');
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
+  const amountRef = useRef<TextInput>(null);
   const notesRef = useRef<TextInput>(null);
   let transferPreview: ReturnType<typeof previewTransfer> | undefined;
   let previewError = '';
@@ -55,7 +56,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     if (!isValidDate(date)) issues.date = 'Enter a real date as YYYY-MM-DD (1900-9999).';
     if (!isValidTime(time)) issues.time = 'Enter a valid 24-hour time as HH:mm:ss.';
     setErrors(issues);
-    if (Object.values(issues).some(Boolean)) return;
+    if (Object.values(issues).some(Boolean)) { showNotice(Object.values(issues).find(Boolean)!, true); if (issues.amount) amountRef.current?.focus(); return; }
     onSubmit({ type, destinationAccountId: type === 'TRANSFER' ? destinationAccountId : undefined, amount: cents, accountId, category, transactionDate: date, transactionTime: time, notes: notes.trim() || undefined });
   }
   return <View style={{ flex: 1, gap: 12 }}>
@@ -101,7 +102,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <View onLayout={(event) => setAmountWidth(event.nativeEvent.layout.width)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', minHeight: 52 }}>
           <ThemedText style={{ fontSize: amountFontSize, lineHeight: Math.ceil(amountFontSize * 1.3), fontWeight: '700' }}>₱</ThemedText>
-          <MoneyField accessibilityLabel="Amount in pesos" value={amount} onValueChange={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: undefined })); }} onRejected={() => setErrors((current) => ({ ...current, amount: 'Use digits and up to two decimal places. Input was not accepted.' }))} editable={!disabled}
+          <MoneyField ref={amountRef} accessibilityLabel="Amount in pesos" value={amount} onValueChange={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: undefined })); }} onRejected={() => { setErrors((current) => ({ ...current, amount: 'Use digits and up to two decimal places.' })); showNotice('Use digits and up to two decimal places.', true); }} editable={!disabled}
             autoFocus={!original && !initialDraft} keyboardType="decimal-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => notesRef.current?.focus()}
             placeholder="0" placeholderTextColor={theme.textSecondary} style={{ flex: 1, minWidth: 0, color: theme.text, paddingVertical: 4, paddingHorizontal: 0, fontSize: amountFontSize, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] }} />
         </View>
@@ -112,14 +113,14 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
         </Pressable>
       </View>
     </View>
-    {errors.amount ? <ThemedText accessibilityRole="alert">{errors.amount}</ThemedText> : null}
+
     <ThemedText type="smallBold">Notes (optional)</ThemedText>
     <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note..." placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
     <TransactionDateTime date={date} time={time} disabled={disabled}
       onDateChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: undefined })); }}
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />
-    {errors.date ? <ThemedText accessibilityRole="alert">{errors.date}</ThemedText> : null}
-    {errors.time ? <ThemedText accessibilityRole="alert">{errors.time}</ThemedText> : null}
+
+
     {type !== 'TRANSFER' ? <>
       <ThemedText type="smallBold">Account</ThemedText>
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
@@ -131,7 +132,6 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
     {!accounts.some((account) => !account.archived) && <ThemedText accessibilityRole="alert">Add or unarchive an account in Settings to record transactions.</ThemedText>}
 </> : null}
-    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     </ScrollView>
     <View style={{ gap: 6, paddingTop: 8, borderTopWidth: 1, borderColor: theme.border }}>
         <Pressable accessibilityRole="button" accessibilityLabel={original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'} accessibilityState={{ disabled }} disabled={disabled} onPress={submit}>

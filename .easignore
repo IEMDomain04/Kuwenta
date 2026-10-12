@@ -1,0 +1,68 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+example
+
+# generated native folders
+/ios
+/android
+
+# Build upload only: local tooling and test sources are not runtime dependencies.
+/tests/
+/scripts/
+/.agents/
+/.codex/
+/AGENTS.md
+/README.md
+
+# Unused starter artwork and the original design export stay on this computer.
+/assets/kuwenta-app-icon.png
+/assets/expo.icon/
+/assets/images/icon.png
+/assets/images/logo-glow.png
+/assets/images/tutorial-web.png
+/assets/images/expo-logo.png
+/assets/images/expo-badge.png
+/assets/images/expo-badge-white.png
+/assets/images/react-logo.png
+/assets/images/react-logo@2x.png
+/assets/images/react-logo@3x.png
+/assets/images/android-icon-background.png
+/assets/images/android-icon-foreground.png
+/assets/images/android-icon-monochrome.png
+/assets/images/favicon.png

@@ -16,6 +16,7 @@ export default function AccountsScreen() {
   const { accounts, transactions, busy } = useFinance();
   const theme = useTheme();
   const { height } = useWindowDimensions();
+  const [dragging, setDragging] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   let accountInsight = '';
   let negativeAccounts: string[] = [];
@@ -32,7 +33,7 @@ export default function AccountsScreen() {
       : '';
   }
   catch (cause) { error = cause instanceof Error ? cause.message : 'Could not calculate balances.'; }
-  return <FinanceScreen title="Accounts" headerAccessory={<Pressable accessibilityRole="button" accessibilityLabel="Add account" disabled={busy} onPress={() => router.push('/account')} style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', gap: 4, alignItems: 'center', backgroundColor: theme.backgroundSelected, opacity: pressed || busy ? 0.5 : 1 })}>
+  return <FinanceScreen title="Accounts" scrollEnabled={!dragging} headerAccessory={<Pressable accessibilityRole="button" accessibilityLabel="Add account" disabled={busy} onPress={() => router.push('/account')} style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', gap: 4, alignItems: 'center', backgroundColor: theme.backgroundSelected, opacity: pressed || busy ? 0.5 : 1 })}>
         <Ionicons name="add" size={16} color={theme.accent} /><ThemedText type="smallBold" themeColor="accent">Add account</ThemedText>
       </Pressable>} floatingAction={<AddTransactionButton disabled={busy} />}>
     <LinearGradient colors={[theme.backgroundSelected, theme.background]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 12, borderRadius: 22, gap: 8 }}>
@@ -70,6 +71,6 @@ export default function AccountsScreen() {
         </SafeAreaView>
       </View>
     </Modal>
-    <AccountsOverview showAdd={false} />
+    <AccountsOverview showAdd={false} onDraggingChange={setDragging} />
   </FinanceScreen>;
 }

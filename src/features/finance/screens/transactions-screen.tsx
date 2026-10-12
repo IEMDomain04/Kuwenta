@@ -13,10 +13,10 @@ import { useFinance } from '../provider';
 import type { Transaction } from '../types';
 
 export default function TransactionsScreen() {
-  const { accounts, transactions, month, refresh, busy, removeTransaction } = useFinance();
+  const { accounts, transactions, month, refresh, busy, removeTransaction, showNotice } = useFinance();
   const theme = useTheme();
   const params = useLocalSearchParams<{ accountId?: string }>();
-  const [error, setError] = useState('');
+  function setError(message: string) { if (message) showNotice(message, true); }
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER'>('ALL');
   const [accountFilter, setAccountFilter] = useState<string | null>(typeof params.accountId === 'string' ? params.accountId : null);
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function TransactionsScreen() {
       <Ionicons name="refresh-outline" size={16} color={theme.textSecondary} />
       <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>{busy ? 'Refreshing...' : 'Pull down to refresh'}</ThemedText>
     </View>
-    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
+
     {accountFilter !== null && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
       <ThemedText type="small" style={{ flex: 1 }}>Account: {accounts.find((account) => account.id === accountFilter)?.name ?? 'Unavailable account'}</ThemedText>
       <ActionButton compact label="Reset account" onPress={() => setAccountFilter(null)} />

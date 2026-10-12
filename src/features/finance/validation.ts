@@ -2,7 +2,8 @@ import { isUtcTimestamp, isValidDate, isValidTime } from './dates';
 import { CATEGORIES, type Account, type Transaction, type TransactionDraft, type SavingsGoal } from './types';
 
 export function validateAccount(account: Account): void {
-  if (!account.id?.trim() || !account.name?.trim()) throw new Error('Account ID and name are required.');
+  if (!account.name?.trim()) throw new Error('Enter an account name.');
+  if (!account.id?.trim()) throw new Error('Could not identify this account. Try again.');
   if (account.currency !== 'PHP') throw new Error('Only PHP accounts are supported.');
   if (!Number.isSafeInteger(account.openingBalance)) throw new Error('Opening balance must be safe integer centavos.');
   if (!['spending', 'savings'].includes(account.purpose)) throw new Error('Invalid account purpose.');

@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { SelectionSheet } from '../components/selection-sheet';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
@@ -23,9 +23,10 @@ export default function BudgetsScreen() {
   const report = budgetReport(budgets, transactions, month);
   const [editor, setEditor] = useState<{ category: string; amount: string; creating: boolean } | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [error, setError] = useState('');
+  function setError(message: string) { if (message) finance.showNotice(message, true); }
   const [rejected, setRejected] = useState(false);
   const [working, setWorking] = useState(false);
+  const amountInput = useRef<TextInput>(null);
   const pending = useRef(false);
   const locked = busy || working;
   useEffect(() => { const listener = BackHandler.addEventListener('hardwareBackPress', () => pending.current || locked); return () => listener.remove(); }, [locked]);
@@ -58,7 +59,7 @@ export default function BudgetsScreen() {
       budget = { month, category: editor.category, limitAmount: parseMoney(editor.amount.replace(/,/g, '')) };
       validateBudget(budget);
       budgetReport([...budgets.filter((row) => row.month !== month || row.category !== budget.category), budget], transactions, month);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid budget.'); return; }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid budget.'); amountInput.current?.focus(); return; }
     const creating = editor.creating;
     if (creating) { pending.current = true; void perform(() => finance.saveBudget(budget, true)); }
     else confirm('Save budget changes?', budget.category + ' for ' + readableReportingMonth(month) + ': ' + formatMoney(budget.limitAmount) + '. Transactions remain unchanged.', () => finance.saveBudget(budget, false));
@@ -93,14 +94,14 @@ export default function BudgetsScreen() {
           {editor.creating ? <Ionicons name="chevron-down" size={16} color={theme.textSecondary} /> : null}
         </Pressable>
         <ThemedText type="small">Monthly limit (PHP)</ThemedText>
-        <MoneyField accessibilityLabel="Monthly budget limit in pesos" autoFocus value={editor.amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary}
+        <MoneyField ref={amountInput} accessibilityLabel="Monthly budget limit in pesos" autoFocus value={editor.amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary}
           onValueChange={(amount) => { setEditor({ ...editor, amount }); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }}
           style={{ color: theme.text, fontSize: 22, padding: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }} />
         <ActionButton primary label={working ? 'Saving...' : 'Save'} disabled={locked || rejected} onPress={save} />
         <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setEditor(null); setError(''); } }} />
       </View>}
       <SelectionSheet visible={categoryOpen && Boolean(editor)} title="Budget category" options={unused.map((category) => ({ value: category, label: category }))} selected={editor?.category} disabled={locked} onClose={() => setCategoryOpen(false)} onSelect={(category) => setEditor((current) => current ? { ...current, category } : null)} />
-      {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
+
       {!editor ? <>
       <ThemedText type="smallBold">Expenses without budgets</ThemedText>
       {report.unbudgeted.length ? report.unbudgeted.map((row) => <ThemedText key={row.category} type="small">{row.category}: {formatMoney(row.amount)}</ThemedText>) : <ThemedText type="small">No expenses outside budgeted categories this month.</ThemedText>}

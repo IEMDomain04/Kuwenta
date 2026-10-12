@@ -14,7 +14,7 @@ import { ActionButton, IconButton } from './ui';
 import { MoneyField } from './money-field';
 
 export function AccountManager({ accountId, onClose, initialPurpose = 'spending', initialCorrectOpening = false }: { accountId?: string; onClose?: () => void; initialPurpose?: Account['purpose']; initialCorrectOpening?: boolean } = {}) {
-  const { accounts, transactions, month, busy, saveAccount, newSubmissionId } = useFinance();
+  const { accounts, transactions, month, busy, saveAccount, newSubmissionId, showNotice } = useFinance();
   const theme = useTheme();
   const { height } = useWindowDimensions();
   const [purposeOpen, setPurposeOpen] = useState(false);
@@ -25,7 +25,9 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
   const [opening, setOpening] = useState(initial ? formatEditableMoney(moneyInput(initial.openingBalance), true)! : onClose ? '0' : '');
   const [correctOpening, setCorrectOpening] = useState(initialCorrectOpening);
   const [rejected, setRejected] = useState(false);
-  const [error, setError] = useState('');
+  const nameInput = useRef<TextInput>(null);
+  const amountInput = useRef<TextInput>(null);
+  function setError(message: string) { if (message) showNotice(message, true); }
   const [working, setWorking] = useState(false);
   const pending = useRef(false);
   const newId = useRef<string | undefined>(undefined);
@@ -49,17 +51,18 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       const id = creating ? (newId.current ??= await newSubmissionId()) : account.id;
       await saveAccount({ ...account, id }, creating);
       setEditor(null); newId.current = undefined; setError(''); onClose?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the account.'); }
+    } catch { /* The provider already shows the save error. */ }
     finally { pending.current = false; setWorking(false); }
   }
   function review() {
     if (!editor || locked || pending.current || rejected) return;
+    if (!editor.name.trim()) { setError('Enter an account name.'); nameInput.current?.focus(); return; }
     let draft: Account;
     try {
       draft = { ...editor, id: editor.id || 'new-account', name: editor.name.trim(), includedInAvailable: editor.purpose === 'spending', openingBalance: editor.id && !correctOpening ? editor.openingBalance : parseMoney(opening.replace(/,/g, ''), { allowZero: true, allowNegative: true }) };
       validateAccount(draft);
       calculateAccountSummary(draft, transactions, month);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid account.'); return; }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid account.'); amountInput.current?.focus(); return; }
     Keyboard.dismiss(); pending.current = true;
     if (!editor.id) { void commit(draft, true); return; }
     Alert.alert('Save account changes?', draft.name + (correctOpening ? '\nCorrect original opening balance: ' + formatMoney(editor.openingBalance) + ' to ' + formatMoney(draft.openingBalance) + '\nThis changes the historical starting balance and current balance, without counting as income.' : '\nAccount settings will be updated. The balance stays unchanged.'), [
@@ -103,7 +106,7 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       </View> : null}
       {savedAccount && <ThemedText type="smallBold">Current balance: {formatMoney(calculateAccountSummary(savedAccount, transactions, month).balance)}</ThemedText>}
       <ThemedText type="small">Account name</ThemedText>
-      <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savings..." placeholderTextColor={theme.textSecondary} style={inputStyle} />
+      <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savings..." placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="small">Purpose</ThemedText>
       <Pressable accessibilityRole="button" accessibilityLabel="Select account purpose" accessibilityState={{ disabled: locked, expanded: purposeOpen }} disabled={locked} onPress={() => { Keyboard.dismiss(); setPurposeOpen(true); }} style={{ minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={18} color={theme.accent} />
@@ -113,14 +116,13 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       {(!editor.id || correctOpening) ? <ThemedText type="small">{editor.id ? 'Correct original opening balance' : 'Starting balance'}</ThemedText> : null}
       {editor.id && correctOpening ? <ThemedText type="small" themeColor="textSecondary">This changes your historical starting balance. To correct today's balance, use Adjust balance instead.</ThemedText> : null}
       {(!editor.id || correctOpening) && <>
-      <MoneyField signed accessibilityLabel="Account opening balance in pesos" value={opening} onValueChange={(value) => { setOpening(value); setRejected(false); setError(''); }}
+      <MoneyField ref={amountInput} signed accessibilityLabel="Account opening balance in pesos" value={opening} onValueChange={(value) => { setOpening(value); setRejected(false); setError(''); }}
         onRejected={() => { setRejected(true); setError('Use digits, up to two decimal places, and an optional minus sign.'); }} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="small" themeColor="textSecondary">A starting balance adjustment, separate from income.</ThemedText>
       </>}
       <ActionButton primary label={working ? 'Saving...' : editor.id ? 'Save changes' : 'Save account'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setEditor(null); setError(''); newId.current = undefined; onClose?.(); } }} />
     </View> : !onClose ? <ActionButton label="Add account" primary disabled={locked} onPress={() => edit()} /> : null}
-    {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
     {(onClose ? editor ? [] : accounts.filter((account) => account.id === accountId) : accounts).map((account) => {
       const summary = calculateAccountSummary(account, transactions, month);
       const count = transactions.filter((row) => (row.accountId === account.id || row.destinationAccountId === account.id)).length;

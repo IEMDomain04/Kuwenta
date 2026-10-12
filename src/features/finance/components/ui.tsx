@@ -13,12 +13,12 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '../money';
 import type { Transaction } from '../types';
 
-export function FinanceScreen({ title, children, scroll = true, tabScreen = true, headerAccessory, headerLeading, floatingAction, centeredTitle = false }: { title: string; children: ReactNode; scroll?: boolean; tabScreen?: boolean; headerAccessory?: ReactNode; headerLeading?: ReactNode; floatingAction?: ReactNode; centeredTitle?: boolean }) {
+export function FinanceScreen({ title, children, scroll = true, scrollEnabled = true, tabScreen = true, headerAccessory, headerLeading, floatingAction, centeredTitle = false }: { title: string; children: ReactNode; scroll?: boolean; scrollEnabled?: boolean; tabScreen?: boolean; headerAccessory?: ReactNode; headerLeading?: ReactNode; floatingAction?: ReactNode; centeredTitle?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const content = <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, ...(centeredTitle ? { justifyContent: 'center' } : {}) }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>{headerLeading ?? (!tabScreen ? <BackButton /> : null)}<ThemedText type="subtitle" style={!tabScreen || centeredTitle ? { fontSize: 20, lineHeight: 28, flexShrink: 1 } : undefined} accessibilityRole="header">{title}</ThemedText></View>{headerAccessory}</View>{children}</>;
   return <SafeAreaView edges={tabScreen ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']} style={[styles.safe, { backgroundColor: theme.background }]}>
-    {scroll ? <ScrollView style={{ flex: 1 }} bounces={false} overScrollMode="never" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, !!floatingAction && { paddingBottom: 90 }, !tabScreen && { paddingBottom: 32 }]}>{content}</ScrollView>
+    {scroll ? <ScrollView scrollEnabled={scrollEnabled} style={{ flex: 1 }} bounces={false} overScrollMode="never" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, !!floatingAction && { paddingBottom: 90 }, !tabScreen && { paddingBottom: 32 }]}>{content}</ScrollView>
       : <ThemedView style={[styles.content, styles.fill, !tabScreen && { paddingBottom: 16 }]}>{content}</ThemedView>}
     {floatingAction && <View style={{ position: 'absolute', right: Math.max(insets.right, 16), bottom: tabScreen ? 16 : Math.max(insets.bottom, 16) }}>{floatingAction}</View>}
   </SafeAreaView>;

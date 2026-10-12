@@ -1,6 +1,6 @@
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, View } from 'react-native';
+import { Alert, BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
@@ -24,9 +24,10 @@ export default function AccountScreen() {
   const [mode, setMode] = useState<'details' | 'edit' | 'adjust'>('details');
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [amount, setAmount] = useState('');
-  const [error, setError] = useState('');
+  function setError(message: string) { if (message) finance.showNotice(message, true); }
   const [rejected, setRejected] = useState(false);
   const [working, setWorking] = useState(false);
+  const amountInput = useRef<TextInput>(null);
   const pending = useRef(false);
   const submission = useRef<string | undefined>(undefined);
   const locked = finance.busy || working;
@@ -82,7 +83,7 @@ export default function AccountScreen() {
       target = parseMoney(amount.replace(/,/g, ''), { allowZero: true, allowNegative: true });
       const delta = BigInt(target) - BigInt(balance);
       if (delta > BigInt(Number.MAX_SAFE_INTEGER) || delta < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Adjustment exceeds the supported range.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid balance.'); return; }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid balance.'); amountInput.current?.focus(); return; }
     if (target === balance) { setMode('details'); return; }
     pending.current = true;
     Alert.alert('Adjust current balance?', account.name + '\n' + formatMoney(balance) + ' to ' + formatMoney(target) + '\nAdjustment: ' + formatMoney(target - balance) + '\nThis records a correction separate from income and expenses. The opening balance stays unchanged.', [
@@ -110,7 +111,7 @@ export default function AccountScreen() {
           </View>
           {mode === 'adjust' ? <>
             <ThemedText type="smallBold">Actual balance now</ThemedText>
-            <MoneyField signed accessibilityLabel="Actual account balance in pesos" value={amount} editable={!locked}
+            <MoneyField ref={amountInput} signed accessibilityLabel="Actual account balance in pesos" value={amount} editable={!locked}
               onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }}
               onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }}
               style={{ color: theme.text, fontSize: 24, borderWidth: 1, borderColor: theme.border, padding: 14, borderRadius: 12 }} />
@@ -163,7 +164,7 @@ export default function AccountScreen() {
             </Modal>
 
           </>}
-          {error ? <ThemedText accessibilityRole="alert" style={{ color: theme.error, backgroundColor: theme.errorSurface }}>{error}</ThemedText> : null}
+
         </>}
     </FinanceScreen>
   </KeyboardAvoidingView>;

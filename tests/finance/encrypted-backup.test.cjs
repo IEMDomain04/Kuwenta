@@ -14,6 +14,7 @@ let writingFails = false;
 let encryptionFails = false;
 let cryptoCalls = 0;
 let importedKey;
+let nativeBackupCrypto = null;
 let picked = null;
 let exportedEnvelope;
 let decryptedBytes;
@@ -64,6 +65,7 @@ class File {
   delete() { this.exists = false; this.deleted = true; }
 }
 Module._load = function(name, ...args) {
+  if (name === 'expo') return { requireOptionalNativeModule: name => { assert.equal(name, 'KuwentaBackupCrypto'); return nativeBackupCrypto; } };
   if (name === 'expo-crypto') return expoCrypto;
   if (name === 'expo-file-system') return { File, FileMode: { ReadOnly: 'r' }, Paths: { cache: 'cache' } };
   if (name === 'expo-sharing') return {
@@ -128,9 +130,10 @@ test('separate exports use fresh salt and ciphertext', async () => {
 });
 
 test('password and payload validation happen before encryption', async () => {
-  for (const value of ['', 'short', ' '.repeat(12), 'a'.repeat(129)]) {
+  for (const value of ['', 'short', 'a'.repeat(7), ' '.repeat(12), 'a'.repeat(129)]) {
     assert.throws(() => validateBackupPassword(value));
   }
+  validateBackupPassword('a'.repeat(8));
   validateBackupPassword('a'.repeat(12));
   validateBackupPassword('a'.repeat(128));
   const before = cryptoCalls;
@@ -303,4 +306,76 @@ test('encrypted backups preserve goals and historical transfer purposes', async 
   assert.deepEqual(restored.budgets, budgets);
   assert.equal(restored.transactions[0].sourcePurpose, 'spending');
   assert.equal(restored.transactions[0].destinationPurpose, 'savings');
+});
+
+test('eight-character export passwords round-trip through the existing encrypted format', async () => {
+  const encrypted = await encryptBackup(json, '1234abcd');
+  assert.deepEqual(await decryptBackup(encrypted, '1234abcd'), parseBackup(json));
+});
+
+test('export reports each preparation stage before sharing', async () => {
+  const stages = [];
+  await shareEncryptedBackup(json, password, stage => stages.push(stage));
+  assert.deepEqual(stages, ['Checking file sharing...', 'Protecting your backup...', 'Writing backup file...', 'Choose where to save your backup.']);
+});
+
+test('cancelling preparation prevents file creation and later sharing', async () => {
+  const controller = new AbortController();
+  const before = files.length;
+  await assert.rejects(() => shareEncryptedBackup(json, password, stage => {
+    if (stage === 'Protecting your backup...') controller.abort(new Error('Backup cancelled.'));
+  }, controller.signal), /Backup cancelled/);
+  assert.equal(files.length, before);
+});
+
+test('cancellation during encryption wipes the key and never creates a file', async () => {
+  const controller = new AbortController();
+  const before = files.length;
+  const encrypt = expoCrypto.aesEncryptAsync;
+  expoCrypto.aesEncryptAsync = async (...args) => {
+    const result = await encrypt(...args);
+    controller.abort(new Error('Backup cancelled.'));
+    return result;
+  };
+  try {
+    await assert.rejects(() => shareEncryptedBackup(json, password, undefined, controller.signal), /Backup cancelled/);
+    assert.equal(files.length, before);
+    assert.ok(importedKey.every(byte => byte === 0));
+  } finally { expoCrypto.aesEncryptAsync = encrypt; }
+});
+
+test('cancellation also works with the React Native AbortController polyfill', async () => {
+  const { AbortController: NativeAbortController } = require('abort-controller/dist/abort-controller');
+  const controller = new NativeAbortController();
+  controller.abort();
+  const before = files.length;
+  await assert.rejects(() => shareEncryptedBackup(json, password, undefined, controller.signal), /Backup cancelled/);
+  assert.equal(files.length, before);
+});
+
+test('native derivation exports and imports the unchanged format, including Unicode passwords', async () => {
+  let calls = 0;
+  nativeBackupCrypto = { deriveKey: async (value, salt, iterations) => {
+    calls++;
+    assert.equal(iterations, 600000);
+    return crypto.pbkdf2Sync(Buffer.from(value, 'utf8'), Buffer.from(salt, 'hex'), iterations, 32, 'sha256').toString('hex');
+  } };
+  try {
+    const encrypted = await encryptBackup(json, password);
+    assert.equal(decrypt(JSON.parse(encrypted), password), json);
+    assert.deepEqual(await decryptBackup(encrypted, password), parseBackup(json));
+    assert.deepEqual(await decryptBackup(JSON.stringify(exportedEnvelope), password), parseBackup(json));
+    assert.equal(calls, 3);
+  } finally { nativeBackupCrypto = null; }
+});
+
+test('native errors and malformed keys fail before creating a backup file', async () => {
+  const before = files.length;
+  nativeBackupCrypto = { deriveKey: async () => { throw new Error('Native key derivation failed'); } };
+  try {
+    await assert.rejects(() => shareEncryptedBackup(json, password), /Native key derivation failed/);
+    nativeBackupCrypto = { deriveKey: async () => '00' };
+    await assert.rejects(() => shareEncryptedBackup(json, password), /Could not protect the backup/);
+    assert.equal(files.length, before);
+  } finally { nativeBackupCrypto = null; }
 });

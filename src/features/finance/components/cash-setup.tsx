@@ -23,6 +23,9 @@ const mascots = [
 export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (cents: number, name: string, accountName: string) => Promise<void> }) {
   const theme = useTheme();
   const [step, setStep] = useState(0);
+  const nameInput = useRef<TextInput>(null);
+  const accountInput = useRef<TextInput>(null);
+  const amountInput = useRef<TextInput>(null);
   const [name, setName] = useState('');
   const [skipIntro, setSkipIntro] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -54,7 +57,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   function next() {
     if (locked || pending.current) return;
     try {
-      if (step === 1 && !name.trim()) throw new Error('Please enter your name.');
+      if (step === 1 && !name.trim()) throw new Error('Enter your name.');
       if (step === 1 && (name.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(name))) throw new Error('Use a name up to 50 characters.');
       if (step === 4) {
         if (!accountName.trim() || accountName.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(accountName)) throw new Error('Enter an account name up to 50 characters.');
@@ -62,11 +65,11 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         setCents(parseMoney(amount.replace(/,/g, '') || '0', { allowZero: true }));
       }
       Keyboard.dismiss(); setError(''); setStep(step === 1 && skipIntro ? 4 : step + 1);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check your details.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check your details.'); if (step === 1) nameInput.current?.focus(); else if (!accountName.trim()) accountInput.current?.focus(); else amountInput.current?.focus(); }
   }
   async function finish() {
     if (locked || pending.current) return;
-    if (!name.trim()) { setError('Please enter your name.'); setStep(1); return; }
+    if (!name.trim()) { setError('Enter your name.'); setStep(1); return; }
     pending.current = true; setSaving(true); setError('');
     try { await onComplete(cents, name.trim(), accountName.trim()); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not finish setup. Your details are kept.'); }
@@ -75,6 +78,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   const inputStyle = { color: theme.text, backgroundColor: theme.backgroundElement, padding: 14, borderWidth: 1, borderColor: theme.border, borderRadius: 16, fontSize: 12 };
   return <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {error ? <ThemedText accessibilityRole="alert" type="small" style={{ color: theme.error, backgroundColor: theme.errorSurface, padding: 12, borderRadius: 12 }}>{error}</ThemedText> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingTop: 8 }}>
         <View accessibilityRole="progressbar" accessibilityLabel="Onboarding progress" accessibilityValue={{ min: 1, max: titles.length, now: step + 1, text: 'Step ' + (step + 1) + ' of ' + titles.length }} style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
           {titles.map((title, index) => <View key={title} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: index <= step ? theme.accent : theme.border }} />)}
@@ -90,7 +94,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         </> : null}
         {step === 1 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Choose the name you want to see in your Home greeting.</ThemedText>
-          <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={inputStyle} />
+          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={inputStyle} />
         </> : null}
         {step === 2 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Use the + button to record money activity.</ThemedText>
@@ -110,9 +114,9 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         {step === 4 ? <>
           <ThemedText type="smallBold">Currency: Philippine Peso (PHP)</ThemedText>
           <ThemedText type="smallBold">First account name</ThemedText>
-          <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="First account name" value={accountName} maxLength={50} editable={!locked} onChangeText={(value) => { setAccountName(value); setError(''); }} placeholder="Cash" placeholderTextColor={theme.textSecondary} autoCapitalize="words" style={inputStyle} />
+          <TextInput ref={accountInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="First account name" value={accountName} maxLength={50} editable={!locked} onChangeText={(value) => { setAccountName(value); setError(''); }} placeholder="Cash" placeholderTextColor={theme.textSecondary} autoCapitalize="words" style={inputStyle} />
           <ThemedText type="smallBold">Starting balance</ThemedText>
-          <MoneyField accessibilityLabel="Starting balance in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={{ ...inputStyle, fontSize: 22 }}
+          <MoneyField ref={amountInput} accessibilityLabel="Starting balance in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={{ ...inputStyle, fontSize: 22 }}
             onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} />
           <ThemedText type="small" themeColor="textSecondary">Your current money, not income. Leave blank to start with zero.</ThemedText>
         </> : null}
@@ -123,7 +127,6 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
           <ThemedText type="small" style={{ textAlign: 'center' }}>{name.trim() ? 'Welcome, ' + name.trim() + '!' : 'Welcome!'} {accountName.trim()} starts with {formatMoney(cents)}.</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Your records stay on this device. Export a backup from Settings to keep a safe copy.</ThemedText>
         </> : null}
-        {error ? <ThemedText accessibilityRole="alert" type="small" style={{ color: theme.error, backgroundColor: theme.errorSurface, padding: 12, borderRadius: 12 }}>{error}</ThemedText> : null}
       </ScrollView>
       <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 12, width: '100%', maxWidth: 520, alignSelf: 'center' }}>
         {step > 0 ? <View style={{ flex: 1 }}><ActionButton label="Back" disabled={locked} onPress={back} /></View> : null}

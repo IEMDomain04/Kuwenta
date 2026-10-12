@@ -29,3 +29,7 @@ test('stored records validate IDs, timestamps and unsupported fields', () => {
     assert.throws(() => validateManualRecord(record(changes)));
   }
 });
+
+test('blank account names produce a field notice without exposing account IDs', () => {
+  assert.throws(() => validateAccount({ ...cash, name: '  ' }), { message: 'Enter an account name.' });
+});
