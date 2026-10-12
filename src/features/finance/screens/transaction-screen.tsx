@@ -1,10 +1,9 @@
 import { QuickEntry } from '../components/quick-entry';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
-import { formatTransactionDateTime } from '../dates';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { TransactionForm } from '../components/transaction-form';
@@ -12,7 +11,6 @@ import { FinanceScreen, ActionButton } from '../components/ui';
 import { useFinance } from '../provider';
 import { validateDraft } from '../validation';
 import { calculateFinanceSummary } from '../calculations';
-import { formatMoney } from '../money';
 import type { TransactionDraft, ManualTransactionType } from '../types';
 
 export default function TransactionScreen({ transferOnly = false, transferChoices }: { transferOnly?: boolean; transferChoices?: ReactNode } = {}) {
@@ -63,16 +61,7 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
       calculateFinanceSummary(finance.accounts, [...finance.transactions.filter((row) => row.id !== id), candidate], draft.transactionDate.slice(0, 7));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid input.'); return; }
     Keyboard.dismiss(); pending.current = true;
-    if (!original) { void save(draft); return; }
-    const accountLabel = (row: TransactionDraft | typeof original) => {
-      const source = finance.accounts.find((account) => account.id === row.accountId)?.name ?? '';
-      return row.type === 'TRANSFER' ? source + ' to ' + (finance.accounts.find((account) => account.id === row.destinationAccountId)?.name ?? '') : source;
-    };
-    const accountChange = accountLabel(original) + ' -> ' + accountLabel(draft) + '\n';
-    Alert.alert('Save transaction changes?', accountChange + `${original.category} ${formatMoney(original.amount)} to ${draft.category} ${formatMoney(draft.amount)}\n${draft.type} | ${formatTransactionDateTime(draft.transactionDate, draft.transactionTime)}\n${draft.notes ?? ''}`, [
-      { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
-      { text: 'Confirm', onPress: () => { void save(draft); } },
-    ], { cancelable: false });
+    void save(draft);
   }
   if (original?.type === "ADJUSTMENT") return <FinanceScreen title="Balance adjustment" tabScreen={false}><ThemedText>Balance corrections are managed from the account.</ThemedText><ActionButton label="View account" onPress={() => router.replace({ pathname: "/account", params: { id: original.accountId } })} /><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   if (id && !original) return <FinanceScreen title="Transaction unavailable" tabScreen={false}><ThemedText>This transaction no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;

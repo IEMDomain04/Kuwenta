@@ -1,3 +1,4 @@
+import { FieldError } from './field-error';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFinance } from '../provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +19,7 @@ import { TransactionDateTime } from './transaction-date-time';
 import { ActionButton } from './ui';
 
 type Props = { transferOnly?: boolean; initialDraft?: TransactionDraft; original?: Transaction; initialAccountId?: string; initialDestinationAccountId?: string; initialType?: ManualTransactionType; disabled: boolean; onSubmit: (draft: TransactionDraft) => void; onCancel: () => void; onTypeChange: (type: ManualTransactionType) => void };
-type Field = 'amount' | 'date' | 'time';
+type Field = 'amount' | 'date' | 'time' | 'account' | 'destination';
 export function TransactionForm({ transferOnly = false, initialDraft, original, initialAccountId, initialDestinationAccountId, initialType = 'EXPENSE', disabled, onSubmit, onCancel, onTypeChange }: Props) {
   const theme = useTheme();
   const dark = useColorScheme() === 'dark';
@@ -50,7 +51,9 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
   }
   const inputStyle = { color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 12 };
   function submit() {
-    const issues = { ...errors };
+    const issues: Partial<Record<Field, string>> = errors.amount ? { amount: errors.amount } : {};
+    if (!selectedAccount || selectedAccount.archived) issues.account = 'Choose an active account.';
+    if (type === 'TRANSFER' && (!accounts.some(row => row.id === destinationAccountId && !row.archived) || destinationAccountId === accountId)) issues.destination = 'Choose a different active destination account.';
     let cents = 0;
     try { cents = parseMoney(amount.replace(/,/g, '')); } catch (cause) { issues.amount = cause instanceof Error ? cause.message : 'Invalid amount.'; }
     if (!isValidDate(date)) issues.date = 'Enter a real date as YYYY-MM-DD (1900-9999).';
@@ -72,18 +75,20 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     {type === 'TRANSFER' ? <>
       <ThemedText type="smallBold">{type === "TRANSFER" ? "From account" : "Account"}</ThemedText>
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
-      onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
+      onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: errors.account ? theme.error : theme.border, borderRadius: 12 }}>
       <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
       <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} | PHP{selectedAccount?.archived ? ' | Archived' : ''}</ThemedText>
       <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
     </Pressable>
+    <FieldError message={errors.account} />
     {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
     {!accounts.some((account) => !account.archived) && <ThemedText accessibilityRole="alert">Add or unarchive an account in Settings to record transactions.</ThemedText>}
     {type === 'TRANSFER' && <>
       <ThemedText type="smallBold">To account</ThemedText>
-      <Pressable accessibilityRole="button" accessibilityLabel="Choose destination account" disabled={disabled} onPress={() => { Keyboard.dismiss(); setChoosingDestination(true); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Choose destination account" disabled={disabled} onPress={() => { Keyboard.dismiss(); setChoosingDestination(true); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: errors.destination ? theme.error : theme.border, borderRadius: 12 }}>
         <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} /><ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{accounts.find((account) => account.id === destinationAccountId)?.name ?? 'Choose destination account'}</ThemedText><Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
       </Pressable>
+      <FieldError message={errors.destination} />
       {transferPreview && <View style={{ gap: 6, backgroundColor: theme.background, borderRadius: 12, padding: 12 }}>
         <ThemedText type="smallBold">Balances after saving</ThemedText>
         <ThemedText type="small">{selectedAccount?.name}: {formatMoney(transferPreview.sourceBalance)}</ThemedText>
@@ -94,7 +99,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
       {accounts.filter((account) => !account.archived).length < 2 && <ThemedText accessibilityRole="alert">Add or unarchive another account to make a transfer.</ThemedText>}
     </>}
 </> : null}
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, backgroundColor: type === 'INCOME' ? theme.incomeSurface : theme.expenseSurface, padding: 12, minHeight: 108 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: errors.amount ? 1 : 0, borderColor: theme.error, backgroundColor: type === 'INCOME' ? theme.incomeSurface : theme.expenseSurface, padding: 12, minHeight: 108 }}>
       <Pressable accessibilityRole="button" accessibilityLabel={'Category: ' + category + '. Change category.'} accessibilityState={{ disabled }} disabled={disabled || type === 'TRANSFER'}
         onPress={() => { Keyboard.dismiss(); setCategoryOpen(true); }} style={({ pressed }) => ({ width: 56, height: 56, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: categoryVisual(category, type === 'INCOME', dark).color + '20', opacity: pressed || disabled ? 0.5 : 1 })}>
         <Ionicons name={categoryVisual(category, type === 'INCOME', dark).icon} size={32} color={categoryVisual(category, type === 'INCOME', dark).color} />
@@ -114,9 +119,10 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
       </View>
     </View>
 
+    <FieldError message={errors.amount} />
     <ThemedText type="smallBold">Notes (optional)</ThemedText>
     <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" ref={notesRef} accessibilityLabel="Transaction notes" value={notes} onChangeText={setNotes} editable={!disabled} multiline placeholder="Add a note..." placeholderTextColor={theme.textSecondary} style={[inputStyle, { minHeight: 64, textAlignVertical: 'top' }]} />
-    <TransactionDateTime date={date} time={time} disabled={disabled}
+    <TransactionDateTime dateError={errors.date} timeError={errors.time} date={date} time={time} disabled={disabled}
       onDateChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: undefined })); }}
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />
 
@@ -124,19 +130,20 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
     {type !== 'TRANSFER' ? <>
       <ThemedText type="smallBold">Account</ThemedText>
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose account, ' + (selectedAccount?.name ?? 'No active account')} accessibilityState={{ disabled }} disabled={disabled}
-      onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
+      onPress={() => { Keyboard.dismiss(); setChoosingDestination(false); setAccountOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, minHeight: 48, borderWidth: 1, borderColor: errors.account ? theme.error : theme.border, borderRadius: 12 }}>
       <Ionicons name="wallet-outline" size={20} color={theme.textSecondary} />
       <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{selectedAccount?.name ?? 'Choose an account'} | PHP{selectedAccount?.archived ? ' | Archived' : ''}</ThemedText>
       <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
     </Pressable>
+    <FieldError message={errors.account} />
     {selectedAccount?.archived && <ThemedText accessibilityRole="alert">Unarchive this account in Settings before editing its transactions.</ThemedText>}
     {!accounts.some((account) => !account.archived) && <ThemedText accessibilityRole="alert">Add or unarchive an account in Settings to record transactions.</ThemedText>}
 </> : null}
     </ScrollView>
     <View style={{ gap: 6, paddingTop: 8, borderTopWidth: 1, borderColor: theme.border }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'} accessibilityState={{ disabled }} disabled={disabled} onPress={submit}>
+        <Pressable accessibilityRole="button" accessibilityLabel={original ? 'Save changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'} accessibilityState={{ disabled }} disabled={disabled} onPress={submit}>
       <View style={{ backgroundColor: disabled ? theme.disabledBackground : theme.accentPressed, padding: 16, minHeight: 50, borderRadius: 14, alignItems: 'center', opacity: disabled ? 0.5 : 1 }}>
-        <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : theme.onAccent }}>{disabled ? 'Please wait...' : original ? 'Review changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'}</ThemedText>
+        <ThemedText type="smallBold" style={{ color: disabled ? theme.disabledText : theme.onAccent }}>{disabled ? 'Please wait...' : original ? 'Save changes' : type === 'TRANSFER' ? 'Save transfer' : 'Save'}</ThemedText>
       </View>
     </Pressable>
     <ActionButton compact label="Cancel" disabled={disabled} onPress={onCancel} />
@@ -152,7 +159,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
             </View>
             <ScrollView style={{ maxHeight: height * 0.55 }}>
               {accounts.filter((account) => !account.archived && (!choosingDestination || account.id !== accountId)).map((account) => <Pressable key={account.id} accessibilityRole="button" accessibilityLabel={account.name} accessibilityState={{ selected: account.id === (choosingDestination ? destinationAccountId : accountId), disabled }} disabled={disabled}
-                onPress={() => { if (choosingDestination) setDestinationAccountId(account.id); else setAccountId(account.id); if (!choosingDestination && destinationAccountId === account.id) setDestinationAccountId(''); setAccountOpen(false); }} style={{ minHeight: 52, padding: 12, marginBottom: 8, borderRadius: 12, backgroundColor: account.id === (choosingDestination ? destinationAccountId : accountId) ? theme.backgroundSelected : theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                onPress={() => { setErrors(current => ({ ...current, account: undefined, destination: undefined })); if (choosingDestination) setDestinationAccountId(account.id); else setAccountId(account.id); if (!choosingDestination && destinationAccountId === account.id) setDestinationAccountId(''); setAccountOpen(false); }} style={{ minHeight: 52, padding: 12, marginBottom: 8, borderRadius: 12, backgroundColor: account.id === (choosingDestination ? destinationAccountId : accountId) ? theme.backgroundSelected : theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="wallet-outline" size={22} color={theme.accent} />
                 <View style={{ flex: 1, minWidth: 0 }}><ThemedText numberOfLines={1} ellipsizeMode="tail">{account.name}</ThemedText><ThemedText type="small" themeColor="textSecondary">{formatMoney(calculateAccountSummary(account, transactions, "1900-01").balance)}</ThemedText></View>
                 {account.id === (choosingDestination ? destinationAccountId : accountId) && <Ionicons name="checkmark-circle" size={20} color={theme.accent} />}

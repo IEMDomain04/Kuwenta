@@ -1,8 +1,9 @@
+import { useConfirmation } from '../components/confirmation';
 import { NotificationSettingsPanel } from '../components/notification-settings';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useAppearance } from '@/hooks/appearance-provider';
 import { useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { FinanceScreen, ActionButton } from '../components/ui';
@@ -13,6 +14,7 @@ import { useFinance } from '../provider';
 export default function SettingsScreen() {
   const { busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup } = useFinance();
   const theme = useTheme();
+  const confirmation = useConfirmation();
   const { mode, setMode } = useAppearance();
   function setAppearanceError(message: string) { if (message) showNotice(message, true); }
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -38,13 +40,13 @@ export default function SettingsScreen() {
   function confirmReset() {
     if (pending.current || busy) return;
     pending.current = true;
-    Alert.alert('Reset all Kuwenta data?', 'Permanently remove all accounts, opening balances, transactions, transfers, adjustments, savings goals, budgets, and saved account preferences on this device. A fresh Cash account will start at zero. This cannot be undone. Export a backup first if you want to keep your records. Exported backup files are not deleted.', [
+    confirmation.alert('Reset all Kuwenta data?', 'Permanently remove all accounts, opening balances, transactions, transfers, adjustments, savings goals, budgets, and saved account preferences on this device. A fresh Cash account will start at zero. This cannot be undone. Export a backup first if you want to keep your records. Exported backup files are not deleted.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Reset all data', style: 'destructive', onPress: () => {
         setResetting(true); setError('');
         void resetData().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not reset data.')).finally(() => { pending.current = false; setResetting(false); });
       } },
-    ], { cancelable: false });
+    ], { icon: 'warning-outline', rows: [{ label: 'Removed', value: 'All records on this device' }, { label: 'Kept', value: 'Exported backup files' }] });
   }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><FinanceScreen title="Settings">
     <View style={section}>
@@ -75,7 +77,7 @@ export default function SettingsScreen() {
         <View accessibilityViewIsModal style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 20, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' }}>
           <ThemedText type="smallBold" accessibilityRole="header">Your name</ThemedText>
           {nameError ? <ThemedText type="small" accessibilityRole="alert" themeColor="error">{nameError}</ThemedText> : null}
-          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
+          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: nameError ? theme.error : theme.border, borderRadius: 12, padding: 14 }} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}><ActionButton label="Cancel" disabled={savingName || busy} onPress={() => setNameOpen(false)} /></View>
             <View style={{ flex: 1 }}><ActionButton primary label={savingName ? 'Saving...' : 'Save'} disabled={savingName || busy} onPress={() => { void saveName(); }} /></View>

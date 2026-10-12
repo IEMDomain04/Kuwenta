@@ -1,10 +1,11 @@
+import { FieldError } from '../components/field-error';
+import { type ConfirmationOptions, useConfirmation } from '../components/confirmation';
 import { ThemedText } from "@/components/themed-text";
 import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   BackHandler,
   Keyboard,
   KeyboardAvoidingView,
@@ -36,6 +37,8 @@ export default function BudgetsScreen() {
   const params = useLocalSearchParams<{ add?: string; category?: string }>();
   const finance = useFinance();
   const theme = useTheme();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const confirmation = useConfirmation();
   const { month, budgets, transactions, busy } = finance;
   const report = budgetReport(budgets, transactions, month);
   const totalRemaining = report.rows.reduce((sum, item) => sum + Math.max(0, item.remaining), 0);
@@ -84,6 +87,7 @@ export default function BudgetsScreen() {
           : null,
     );
     setCategoryOpen(false);
+    setFieldErrors({});
     setError("");
     setRejected(false);
     // Route intent initializes the editor; saving does not reopen it.
@@ -109,11 +113,12 @@ export default function BudgetsScreen() {
     message: string,
     operation: () => Promise<void>,
     destructive = false,
+    summary: ConfirmationOptions = {},
   ) {
     if (locked || pending.current) return;
     pending.current = true;
     Keyboard.dismiss();
-    Alert.alert(
+    confirmation.alert(
       title,
       message,
       [
@@ -132,7 +137,7 @@ export default function BudgetsScreen() {
           },
         },
       ],
-      { cancelable: false },
+      { ...summary, icon: destructive ? "trash-outline" : "pie-chart-outline" },
     );
   }
   function save() {
@@ -156,24 +161,22 @@ export default function BudgetsScreen() {
         month,
       );
     } catch (cause) {
+      setFieldErrors({ amount: cause instanceof Error ? cause.message : "Invalid budget." });
       setError(cause instanceof Error ? cause.message : "Invalid budget.");
       amountInput.current?.focus();
       return;
     }
     const creating = editor.creating;
-    if (creating) {
+    if (creating || report.rows.find(row => row.category === budget.category)?.limitAmount === budget.limitAmount) {
       pending.current = true;
-      void perform(() => finance.saveBudget(budget, true));
+      void perform(() => finance.saveBudget(budget, creating));
     } else
       confirm(
         "Save budget changes?",
-        budget.category +
-          " for " +
-          readableReportingMonth(month) +
-          ": " +
-          formatMoney(budget.limitAmount) +
-          ". Transactions remain unchanged.",
+        "Updates this category limit. Recorded expenses stay unchanged.",
         () => finance.saveBudget(budget, false),
+        false,
+        { rows: [{ label: 'Category', value: budget.category }, { label: 'Month', value: readableReportingMonth(month) }], change: { label: 'Budget limit', before: formatMoney(report.rows.find(row => row.category === budget.category)!.limitAmount), after: formatMoney(budget.limitAmount) } },
       );
   }
   const unused = CATEGORIES.EXPENSE.filter(
@@ -205,7 +208,8 @@ export default function BudgetsScreen() {
                     creating: true,
                   });
                   setRejected(false);
-                  setError("");
+                  setFieldErrors({});
+                setError("");
                 }}
               />
             ) : null}
@@ -278,6 +282,7 @@ export default function BudgetsScreen() {
                             )!,
                             creating: false,
                           });
+                          setFieldErrors({});
                           setError("");
                           setRejected(false);
                         }}
@@ -297,6 +302,7 @@ export default function BudgetsScreen() {
                               "? Your expenses are kept.",
                             () => finance.removeBudget(month, row.category),
                             true,
+                            { rows: [{ label: 'Category', value: row.category }, { label: 'Month', value: readableReportingMonth(month) }, { label: 'Limit', value: formatMoney(row.limitAmount) }] },
                           )
                         }
                       />
@@ -358,6 +364,7 @@ export default function BudgetsScreen() {
               ) : null}
             </Pressable>
             <ThemedText type="small">Monthly limit (PHP)</ThemedText>
+            <FieldError message={fieldErrors.amount} />
             <MoneyField
               ref={amountInput}
               accessibilityLabel="Monthly budget limit in pesos"
@@ -369,9 +376,11 @@ export default function BudgetsScreen() {
               onValueChange={(amount) => {
                 setEditor({ ...editor, amount });
                 setRejected(false);
+                setFieldErrors({});
                 setError("");
               }}
               onRejected={() => {
+                setFieldErrors({ amount: "Use digits and up to two decimal places." });
                 setRejected(true);
                 setError("Use digits and up to two decimal places.");
               }}
@@ -380,7 +389,7 @@ export default function BudgetsScreen() {
                 fontSize: 22,
                 padding: 12,
                 borderWidth: 1,
-                borderColor: theme.border,
+                borderColor: fieldErrors.amount ? theme.error : theme.border,
                 borderRadius: 12,
               }}
             />
@@ -396,7 +405,8 @@ export default function BudgetsScreen() {
               onPress={() => {
                 if (!pending.current) {
                   setEditor(null);
-                  setError("");
+                  setFieldErrors({});
+                setError("");
                 }
               }}
             />

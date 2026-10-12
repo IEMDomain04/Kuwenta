@@ -1,6 +1,8 @@
+import { FieldError } from '../components/field-error';
+import { useConfirmation } from '../components/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, TextInput, View } from 'react-native';
+import { BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
@@ -18,6 +20,8 @@ export default function AccountScreen() {
   const accountId = typeof id === 'string' ? id : undefined;
   const finance = useFinance();
   const theme = useTheme();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const confirmation = useConfirmation();
   const account = finance.accounts.find((row) => row.id === accountId);
   const history = finance.transactions.filter((row) => row.accountId === accountId || row.destinationAccountId === accountId).sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt));
   const balance = account ? calculateAccountSummary(account, finance.transactions, finance.month).balance : 0;
@@ -62,24 +66,24 @@ export default function AccountScreen() {
       (linkedGoal ? '\nThe linked goal "' + linkedGoal.name + '" will also be deleted.' : '') +
       (transferAccounts.length ? '\nRelated transfers will be deleted too. Balances may change in: ' + transferAccounts.map(id => finance.accounts.find(row => row.id === id)?.name ?? id).join(', ') + '.' : '') +
       '\nThis cannot be undone. Archive instead to keep your records.';
-    Alert.alert('Delete account?', message, [
+    confirmation.alert('Delete account?', message, [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
-      { text: 'Delete account', style: 'destructive', onPress: () => {
+      { text: 'Delete', style: 'destructive', onPress: () => {
         setWorking(true); setError('');
         void finance.removeAccount(account.id).then(leave).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not delete the account.')).finally(() => { pending.current = false; setWorking(false); });
       } },
-    ], { cancelable: false });
+    ], { rows: [{ label: 'Account', value: account.name }, { label: 'Balance removed', value: formatMoney(balance) }] });
   }
   function archive() {
     if (!account || locked || pending.current) return;
     pending.current = true;
-    Alert.alert(account.archived ? 'Unarchive account?' : 'Archive account?', account.archived ? 'Make this account available for transactions again.' : 'The balance, transactions and linked goal are kept. New transactions and edits are blocked until unarchived.', [
+    confirmation.alert(account.archived ? 'Unarchive account?' : 'Archive account?', account.archived ? 'Make this account available for transactions again.' : 'The balance, transactions and linked goal are kept. New transactions and edits are blocked until unarchived.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: account.archived ? 'Unarchive' : 'Archive', onPress: () => {
         setWorking(true);
         void finance.saveAccount({ ...account, archived: !account.archived }, false).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not update the account.')).finally(() => { pending.current = false; setWorking(false); setOptionsOpen(false); });
       } },
-    ], { cancelable: false });
+    ], { icon: 'archive-outline', rows: [{ label: 'Account', value: account.name }] });
   }
   function review() {
     if (!account || locked || pending.current || rejected) return;
@@ -88,13 +92,13 @@ export default function AccountScreen() {
       target = parseMoney(amount.replace(/,/g, ''), { allowZero: true, allowNegative: true });
       const delta = BigInt(target) - BigInt(balance);
       if (delta > BigInt(Number.MAX_SAFE_INTEGER) || delta < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Adjustment exceeds the supported range.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid balance.'); amountInput.current?.focus(); return; }
+    } catch (cause) { setFieldErrors({ amount: cause instanceof Error ? cause.message : 'Invalid balance.' }); setError(cause instanceof Error ? cause.message : 'Invalid balance.'); amountInput.current?.focus(); return; }
     if (target === balance) { setMode('details'); return; }
     pending.current = true;
-    Alert.alert('Adjust current balance?', account.name + '\n' + formatMoney(balance) + ' to ' + formatMoney(target) + '\nAdjustment: ' + formatMoney(target - balance) + '\nThis records a correction separate from income and expenses. The opening balance stays unchanged.', [
+    confirmation.alert('Adjust balance?', 'Records a balance correction, separate from income and expenses. The opening balance stays unchanged.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Confirm', onPress: () => { void commit(target, balance); } },
-    ], { cancelable: false });
+    ], { icon: 'wallet-outline', rows: [{ label: 'Account', value: account.name }], change: { label: 'Balance', before: formatMoney(balance), after: formatMoney(target) } });
   }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <FinanceScreen title={!accountId ? 'Add account' : mode === 'adjust' ? 'Adjust balance' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (pending.current) return; if (mode !== 'details') setMode('details'); else leave(); }} />}>
@@ -117,14 +121,15 @@ export default function AccountScreen() {
           {mode === 'adjust' ? <>
             <ThemedText type="smallBold">Actual balance now</ThemedText>
             <MoneyField ref={amountInput} signed accessibilityLabel="Actual account balance in pesos" value={amount} editable={!locked}
-              onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }}
-              onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }}
-              style={{ color: theme.text, fontSize: 24, borderWidth: 1, borderColor: theme.border, padding: 14, borderRadius: 12 }} />
+              onValueChange={(value) => { setAmount(value); setFieldErrors({}); setRejected(false); setError(''); }}
+              onRejected={() => { setRejected(true); setFieldErrors({ amount: 'Use digits and up to two decimal places.' }); setError('Use digits and up to two decimal places.'); }}
+              style={{ color: theme.text, fontSize: 24, borderWidth: 1, borderColor: fieldErrors.amount ? theme.error : theme.border, padding: 14, borderRadius: 12 }} />
+            <FieldError message={fieldErrors.amount} />
             <ActionButton primary label={working ? 'Saving...' : 'Review adjustment'} disabled={locked || rejected} onPress={review} />
             <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setMode('details'); setError(''); } }} />
           </> : <>
             {!account.archived && <>
-              <ActionButton compact soft bordered label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setMode('adjust'); }} />
+              <ActionButton compact soft bordered label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setFieldErrors({}); setMode('adjust'); }} />
               <ActionButton primary label="Transfer money" disabled={locked || finance.accounts.filter((row) => !row.archived).length < 2}
                 onPress={() => router.push({ pathname: '/transfer', params: { type: 'TRANSFER', accountId: account.id } })} />
               {finance.accounts.filter((row) => !row.archived).length < 2 && <ThemedText type="small">Add another active account to transfer money.</ThemedText>}

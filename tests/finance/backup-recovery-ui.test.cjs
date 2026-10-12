@@ -19,7 +19,9 @@ function harness({ legacy = false, recovery = true, failRestore = false } = {}) 
   const sandbox = { Error, exports: {}, require(name) {
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect() {} };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
-    if (name === 'react-native') return { TextInput: 'Input', Keyboard: { dismiss() {} }, Alert: { alert: (title, message, buttons) => { confirmation = { title, message, buttons }; } } };
+    if (name === './confirmation') return { useConfirmation: () => ({ alert: (title, message, buttons, options) => { confirmation = { title, message, buttons, options }; } }) };
+    if (name.endsWith('/field-error')) return { FieldError: 'FieldError' };
+    if (name === 'react-native') return { TextInput: 'Input', Keyboard: { dismiss() {} } };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: '#06633E' }) };
     if (name === './ui') return { ActionButton: 'Button' };
@@ -67,7 +69,7 @@ for (const legacy of [false, true]) test((legacy ? 'legacy protected' : 'passwor
   app.confirmation().buttons.find(button => button.text === 'Cancel').onPress();
   assert.equal(app.restored(), 0);
   app.render().button('Restore this backup').props.onPress();
-  app.confirmation().buttons.find(button => button.text === 'Restore backup').onPress();
+  app.confirmation().buttons.find(button => button.text === 'Restore').onPress();
   await settle(); assert.equal(app.restored(), 1);
 });
 test('normal import previews immediately and cancellation does not replace records', async () => {
@@ -86,7 +88,7 @@ test('failed restore preserves the preview and allows retry without reporting su
   const app = harness({ recovery: false, failRestore: true });
   app.render().button('Choose backup file').props.onPress(); await settle();
   app.render().button('Replace current records').props.onPress();
-  app.confirmation().buttons.find(button => button.text === 'Replace current records').onPress();
+  app.confirmation().buttons.find(button => button.text === 'Replace').onPress();
   await settle();
   assert.equal(app.restored(), 0);
   assert.deepEqual(app.notices, ['Restore failed; current records preserved.']);

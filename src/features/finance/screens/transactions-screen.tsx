@@ -1,8 +1,9 @@
+import { useConfirmation } from '../components/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTransactionDateTime, readableReportingMonth, transactionDayHeading } from '../dates';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, SectionList, View } from 'react-native';
+import { Pressable, ScrollView, SectionList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { FinanceScreen, TransactionRow, ActionButton, AddTransactionButton } from '../components/ui';
@@ -15,6 +16,7 @@ import type { Transaction } from '../types';
 export default function TransactionsScreen() {
   const { accounts, transactions, month, refresh, busy, removeTransaction, showNotice } = useFinance();
   const theme = useTheme();
+  const confirmation = useConfirmation();
   const params = useLocalSearchParams<{ accountId?: string }>();
   function setError(message: string) { if (message) showNotice(message, true); }
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER'>('ALL');
@@ -36,13 +38,13 @@ export default function TransactionsScreen() {
     deleting.current = true; setError('');
     const accountName = accounts.find((account) => account.id === transaction.accountId)?.name ?? '';
     const accountLabel = transaction.type === 'TRANSFER' ? accountName + ' to ' + (accounts.find((account) => account.id === transaction.destinationAccountId)?.name ?? '') : accountName;
-    Alert.alert('Delete transaction?', accountLabel + '\n' + `${transaction.category} | ${formatMoney(transaction.amount)}\n${formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime)}`, [
+    confirmation.alert('Delete transaction?', 'This removes the record and recalculates account balances and reports. This cannot be undone.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { deleting.current = false; } },
       { text: 'Delete', style: 'destructive', onPress: () => {
         void removeTransaction(transaction.id).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not delete.'))
           .finally(() => { deleting.current = false; });
       } },
-    ], { cancelable: false });
+    ], { rows: [{ label: 'Category', value: transaction.category }, { label: 'Amount', value: formatMoney(transaction.amount) }, { label: 'Account', value: accountLabel }, { label: 'Date', value: formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime) }] });
   }
   return <FinanceScreen title="Transaction history" centeredTitle scroll={false} floatingAction={<AddTransactionButton disabled={busy} />}>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>

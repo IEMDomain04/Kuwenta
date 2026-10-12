@@ -1,5 +1,7 @@
+import { FieldError } from './field-error';
+import { useConfirmation } from './confirmation';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, TextInput } from 'react-native';
+import { Keyboard, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { pickBackupFile } from '../backup-files';
@@ -15,6 +17,8 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
   onNotice: (message: string, error?: boolean) => void;
 }) {
   const theme = useTheme();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const confirmation = useConfirmation();
   const confirming = useRef(false);
   const passwordInput = useRef<TextInput>(null);
   const [restoring, setRestoring] = useState(false);
@@ -34,7 +38,7 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
   }, []);
   function clear() {
     generation.current++;
-    setSelected(null); setPassword(''); setPreview(null); setMessage('');
+    setSelected(null); setPassword(''); setFieldErrors({}); setPreview(null); setMessage('');
   }
   function showPreview(backup: FinanceBackup, name: string) {
     const time = philippineDateTime(new Date(backup.exportedAt));
@@ -76,7 +80,7 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
       if (mounted.current && token === generation.current) showPreview(backup, selected.name);
     } catch (error) {
       if (mounted.current && token === generation.current) {
-        setMessage(''); showNotice(error instanceof Error ? error.message : 'Could not preview backup.', true);
+        setMessage(''); setFieldErrors({ password: error instanceof Error ? error.message : 'Could not unlock backup.' }); showNotice(error instanceof Error ? error.message : 'Could not preview backup.', true);
         passwordInput.current?.focus();
       }
     } finally {
@@ -89,12 +93,12 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
     const backup = preview.backup;
     confirming.current = true;
     Keyboard.dismiss();
-    Alert.alert(recovery ? 'Recover records from this backup?' : 'Replace current records?',
+    confirmation.alert(recovery ? 'Recover records from this backup?' : 'Replace current records?',
       recovery ? 'Kuwenta will use the records in this backup. Changes made after its export will not be recovered. The inaccessible database will be kept on this device. Continue?'
         : 'This replaces your accounts, transactions, budgets, and goals with this backup. Changes made after its export will be lost. Export your current records first if you want to keep them.',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; } },
-        { text: recovery ? 'Restore backup' : 'Replace current records', style: 'destructive', onPress: () => {
+        { text: recovery ? 'Restore' : 'Replace', style: 'destructive', onPress: () => {
           if (!mounted.current) { confirming.current = false; return; }
           pending.current = true; setRestoring(true); setMessage('Restoring backup...');
           void restoreBackup(backup).then(() => {
@@ -106,7 +110,7 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
             if (mounted.current) setRestoring(false);
           });
         } },
-      ], { cancelable: false });
+      ], { icon: 'cloud-download-outline', rows: [{ label: 'Backup', value: preview.name }, { label: 'Exported', value: preview.exported }, { label: 'Accounts / records', value: preview.summary.accountCount + ' / ' + preview.summary.transactionCount }, { label: 'Budgets / goals', value: preview.summary.budgetCount + ' / ' + preview.summary.goalCount }] });
   }
   const locked = disabled || busy || working || restoring;
   return <>
@@ -116,9 +120,10 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
     {selected ? <>
       <ThemedText type="small">This older backup is protected. Enter its original password.</ThemedText>
       <TextInput ref={passwordInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Password for older backup" placeholder="Original backup password"
-        placeholderTextColor={theme.textSecondary} value={password} onChangeText={setPassword}
+        placeholderTextColor={theme.textSecondary} value={password} onChangeText={value => { setPassword(value); setFieldErrors({}); }}
         secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={128} editable={!locked}
-        style={{ color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 }} />
+        style={{ color: theme.text, borderColor: fieldErrors.password ? theme.error : theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 }} />
+      <FieldError message={fieldErrors.password} />
       <ActionButton label="Unlock and preview" disabled={locked} onPress={() => { void unlock(); }} />
     </> : null}
     {preview ? <>
