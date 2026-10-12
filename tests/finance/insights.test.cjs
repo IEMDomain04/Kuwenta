@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { moneyInsights, accountInsights } = require('../../.expo/finance-tests/insights.js');
+const { moneyInsights, accountInsights, moneyInsightReaction } = require('../../.expo/finance-tests/insights.js');
 const { cash, record } = require('./fixtures.cjs');
 const now = new Date('2026-10-11T02:00:00Z');
 const budget = limitAmount => [{ month: '2026-10', category: 'Food', limitAmount }];
@@ -15,11 +15,12 @@ test('empty activity avoids spending feedback and shows a concise available-mone
   assert.match(result.insights[0], /available for spending/);
 });
 test('budget warnings precede observations and use the current month only', () => {
-  const rows = [record(), record({ id: 'older', amount: 900000, transactionDate: '2026-09-09' })];
+  const rows = [record(), record({ id: 'older', amount: 9000, transactionDate: '2026-09-09' })];
   const result = moneyInsights([cash], rows, budget(15000), [], now);
   assert.match(result[0], /80%.*30 remaining/);
   assert.ok(result.some(text => /120 recorded/.test(text) && text.includes('October 2026')));
-  assert.match(result[1], /expenses exceed income/);
+  assert.ok(result.every(text => !/expenses exceed income/.test(text)));
+  assert.equal(moneyInsightReaction(result[0]), 'thinking');
 });
 test('limit reached and overspending take priority over successful income', () => {
   const rows = [record({ amount: 15000 }), record({ id: 'income', type: 'INCOME', category: 'Freelance', amount: 200000 })];
@@ -136,4 +137,60 @@ test('account spending summary excludes transfers, corrections, external funds a
   assert.match(result.insights[0], /spent.*100.50 in October 2026.*899.50 available/);
   const empty = accountInsights([{ ...cash, openingBalance: 0 }], [], [], now);
   assert.deepEqual(empty.insights, ['Add your starting balances to see your money overview.']);
+});
+
+
+test('ordinary student spending with no income gets factual, friendly feedback', () => {
+ const rows = Object.freeze([
+  Object.freeze(record({ category: 'Meals', amount: 12000 })),
+  Object.freeze(record({ id: 'fare', category: 'Transport', amount: 3000 })),
+ ]);
+ const before = JSON.stringify(rows);
+ const messages = moneyInsights([cash], rows, [], [], now);
+ assert.ok(messages.some(text => /Meals.*120 recorded/.test(text)));
+ assert.ok(messages.every(text => !/exceed income|need.*job|over budget|negative recorded balance/.test(text)));
+ assert.equal(moneyInsightReaction(messages[0]), 'friendly');
+ assert.equal(JSON.stringify(rows), before);
+ const smallIncome = record({ id: 'allowance', type: 'INCOME', category: 'Allowance', amount: 1000 });
+ assert.ok(moneyInsights([cash], [...rows, smallIncome], [], [], now).every(text => !/exceed income/.test(text)));
+ assert.equal(moneyInsightReaction('Your money story starts here.'), 'friendly');
+});
+
+test('clear funding problems remain concerned while budget reminders stay calm', () => {
+ const first = (accounts, rows, budgets) => moneyInsights(accounts, rows, budgets, [], now)[0];
+ assert.equal(moneyInsightReaction(first([cash], [record()], budget(10000))), 'concerned');
+ assert.equal(moneyInsightReaction(first([cash], [record()], budget(12000))), 'thinking');
+ assert.equal(moneyInsightReaction(first([cash], [record()], budget(15000))), 'thinking');
+ const negative = first([{ ...cash, openingBalance: 1000 }], [record()], []);
+ assert.match(negative, /Cash has a negative recorded balance/);
+ assert.equal(moneyInsightReaction(negative), 'concerned');
+ const gap = first([{ ...cash, openingBalance: 15000 }], [record()], budget(20000));
+ assert.match(gap, /available, below/);
+ assert.equal(moneyInsightReaction(gap), 'concerned');
+ const future = moneyInsights([{ ...cash, openingBalance: 0 }], [record({ transactionDate: '2026-10-12' })], [], [], now);
+ assert.deepEqual(future, []);
+});
+
+test('within-budget spending, saving and goals produce supportive expressions', () => {
+ const within = moneyInsights([cash], [record()], budget(30000), [], now)[0];
+ assert.match(within, /budgeted categories are within their limits/);
+ assert.equal(moneyInsightReaction(within), 'encouraging');
+ const into = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'save', amount: 10000, sourcePurpose: 'spending', destinationPurpose: 'savings' });
+ const goal = { id: 'goal', name: 'Laptop', accountId: 'save', targetAmount: 10000, createdAt: into.createdAt, updatedAt: into.updatedAt };
+ const messages = moneyInsights([cash, saving], [into], [], [goal], now);
+ assert.equal(moneyInsightReaction(messages[0]), 'celebrating');
+ assert.equal(moneyInsightReaction(messages.find(text => /transferred into savings/.test(text))), 'encouraging');
+ const funded = moneyInsights([cash, saving], [into], [], [{ ...goal, targetAmount: 20000 }], now);
+ assert.equal(moneyInsightReaction(funded.find(text => /50% funded/.test(text))), 'encouraging');
+});
+
+test('higher spending and savings withdrawals are observations, not sad reactions', () => {
+ const rows = [record(), record({ id: 'prior', amount: 10000, transactionDate: '2026-09-09' })];
+ const higher = moneyInsights([cash], rows, [], [], now).find(text => /higher compared with/.test(text));
+ assert.ok(higher);
+ assert.equal(moneyInsightReaction(higher), 'thinking');
+ const out = record({ type: 'TRANSFER', category: 'Transfer', accountId: 'save', destinationAccountId: 'cash', amount: 10000, sourcePurpose: 'savings', destinationPurpose: 'spending' });
+ const withdrawal = moneyInsights([cash, { ...saving, openingBalance: 20000 }], [out], [], [], now)[0];
+ assert.match(withdrawal, /transferred out of savings/);
+ assert.equal(moneyInsightReaction(withdrawal), 'thinking');
 });

@@ -15,19 +15,19 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
   // Validate the complete snapshot, then exclude future entries from period feedback.
   calculateFinanceSummary(accounts, transactions, month);
   const recorded = transactions.filter(row => row.transactionDate <= date);
-  const summary = calculateFinanceSummary(accounts, recorded, month);
   const warnings: string[] = [];
   const progress: string[] = [];
   const observations: string[] = [];
   const report = budgetReport(budgets, recorded, month);
+  for (const account of accounts) {
+    const balance = calculateAccountSummary(account, recorded, month).balance;
+    if (balance < 0) warnings.push(account.name + ' has a negative recorded balance of ' + money(balance) + '. Review its activity.');
+  }
   for (const row of report.rows.filter(row => row.progress >= 0.8).sort((a, b) => b.progress - a.progress || a.category.localeCompare(b.category))) {
     warnings.push(row.remaining < 0
       ? row.category + ' is ' + money(-row.remaining) + ' over budget for ' + period + '.'
       : row.remaining === 0 ? row.category + ' budget limit reached for ' + period + '.'
       : row.category + ': ' + Math.round(row.progress * 100) + '% of the ' + period + ' budget used; ' + money(row.remaining) + ' remaining.');
-  }
-  if (summary.monthlyExpenses > summary.monthlyIncome) {
-    warnings.push('Recorded expenses exceed income by ' + money(summary.monthlyExpenses - summary.monthlyIncome) + ' for ' + period + '. Starting balances may cover the difference.');
   }
   const remaining = report.rows.reduce((total, row) => total + Math.max(0, row.remaining), 0);
   if (recorded.some(row => row.transactionDate.slice(0, 7) === month)) {
@@ -39,12 +39,15 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
     }
   }
   const savings = calculateSavings(accounts, recorded, month);
-  if (savings.savedThisMonth < 0) warnings.push(period + ': ' + money(-savings.savedThisMonth) + ' transferred out of savings, net.');
+  if (savings.savedThisMonth < 0) observations.push(period + ': ' + money(-savings.savedThisMonth) + ' transferred out of savings, net.');
   if (savings.savedThisMonth > 0) progress.push(period + ': ' + money(savings.savedThisMonth) + ' transferred into savings, net.');
   for (const goal of goals) {
     const result = calculateGoalProgress(goal, accounts, transactions);
     if (result.achieved) progress.unshift(goal.name + ': target reached.');
     else if (result.progress > 0) progress.push(goal.name + ': ' + Math.round(result.progress * 100) + '% funded; ' + money(result.remaining) + ' remaining at the current balance.');
+  }
+  if (report.budgetedSpent > 0 && report.rows.every(row => row.remaining > 0)) {
+    progress.push('Your budgeted categories are within their limits for ' + period + '.');
   }
   const previous = month === '1900-01' ? null : adjacentMonth(month, -1);
   const day = Number(date.slice(8));
@@ -58,7 +61,7 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
       const difference = calculateFinanceSummary(accounts, current, month).monthlyExpenses - calculateFinanceSummary(accounts, prior, previous).monthlyExpenses;
       if (difference !== 0) {
         const message = 'Recorded spending for days 1-' + elapsed + ' of ' + period + ' is ' + money(Math.abs(difference)) + (difference > 0 ? ' higher' : ' lower') + ' compared with the same days of ' + readableReportingMonth(previous) + '.';
-        (difference > 0 ? warnings : progress).push(message);
+        (difference > 0 ? observations : progress).push(message);
       }
     }
   }
@@ -78,6 +81,15 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
     observations.push(top.category + (tied ? ' is tied for your largest expense category' : ' is your largest expense category') + ' for ' + period + ': ' + money(top.amount) + ' recorded.');
   }
   return [...new Set([...warnings, ...progress, ...observations])];
+}
+
+/** Match the displayed feedback: spending alone is not a sign of financial trouble. */
+export function moneyInsightReaction(message: string): 'friendly' | 'thinking' | 'celebrating' | 'encouraging' | 'concerned' {
+  if (/has a negative recorded balance of|is .* over budget for|is available, below/i.test(message)) return 'concerned';
+  if (/: target reached\.$/i.test(message)) return 'celebrating';
+  if (/transferred into savings, net|% funded;|budgeted categories are within their limits|lower compared with/i.test(message)) return 'encouraging';
+  if (/budget used;|budget limit reached for|transferred out of savings, net|higher compared with|insights are unavailable/i.test(message)) return 'thinking';
+  return 'friendly';
 }
 
 /** Prioritize noteworthy account activity, with a short summary when there are no warnings. */

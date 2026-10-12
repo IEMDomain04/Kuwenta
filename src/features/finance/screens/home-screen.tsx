@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { moneyInsights } from '../insights';
+import { moneyInsights, moneyInsightReaction } from '../insights';
 import { router } from 'expo-router';
 import { CategoryIcon } from '../components/category-visual';
 import { philippineDateTime, formatTransactionDateTime } from '../dates';
@@ -54,10 +54,7 @@ export default function HomeScreen() {
   }, [accounts, transactions, budgets, goals, insightDate]);
   const insightMessage = insights[0] ?? message;
   // Expressions describe the displayed insight; they never change financial records.
-  const reaction = /over budget|budget used|limit reached|exceed income|below|transferred out|higher compared/i.test(insightMessage) ? 'concerned'
-    : /target reached/i.test(insightMessage) ? 'celebrating'
-    : /transferred into savings|funded|lower compared/i.test(insightMessage) ? 'encouraging'
-    : insights.length ? 'thinking' : 'friendly';
+  const reaction = moneyInsightReaction(insightMessage);
   return <FinanceScreen title="Kuwenta" floatingAction={<AddTransactionButton disabled={busy} />}>
     <View style={styles.greeting}>
       <ThemedText type="small" themeColor="textSecondary">{dateLabel}</ThemedText>
