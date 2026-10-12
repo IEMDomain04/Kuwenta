@@ -31,15 +31,15 @@ export default function AccountsScreen() {
       </Pressable>} floatingAction={<AddTransactionButton disabled={busy} />}>
     <LinearGradient colors={[theme.backgroundSelected, theme.background]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 12, borderRadius: 22, gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Image source={money?.hasNegativeAccount ? require('../../../../assets/images/mascot/concerned.png') : require('../../../../assets/images/mascot/friendly.png')} contentFit="contain" accessible={false} style={{ width: 80, height: 94 }} />
+        <View style={{ width: 80, alignSelf: 'stretch', justifyContent: 'center', paddingTop: 28 }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Explain Total and Available Money" onPress={() => setDetails('money')} style={({ pressed }) => ({ position: 'absolute', top: -8, left: -8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+            <Ionicons name="help-circle-outline" size={16} color={theme.accent} />
+          </Pressable>
+          <Image source={money?.hasNegativeAccount ? require('../../../../assets/images/mascot/concerned.png') : require('../../../../assets/images/mascot/friendly.png')} contentFit="contain" accessible={false} style={{ width: 80, height: 94 }} />
+        </View>
         <View style={{ flex: 1, minWidth: 0, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: theme.accent, backgroundColor: theme.backgroundElement, gap: 4 }}>
-          <View style={{ position: 'absolute', left: -5, top: 24, width: 10, height: 10, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: theme.accent, backgroundColor: theme.backgroundElement, transform: [{ rotate: '45deg' }] }} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Explain Total and Available Money" onPress={() => setDetails('money')} hitSlop={4} style={({ pressed }) => ({ width: 44, height: 44, marginLeft: -8, marginVertical: -8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-              <Ionicons name="help-circle-outline" size={16} color={theme.accent} />
-            </Pressable>
-            <ThemedText type="smallBold" themeColor="accent" style={{ flex: 1 }}>Kuwenta</ThemedText>
-          </View>
+          <View style={{ position: 'absolute', left: -5, top: '50%', marginTop: 9, width: 10, height: 10, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: theme.accent, backgroundColor: theme.backgroundElement, transform: [{ rotate: '45deg' }] }} />
+          <ThemedText type="smallBold" themeColor="accent">Kuwenta</ThemedText>
           {money ? <>
             <ThemedText type="small">You have <ThemedText type="smallBold">{formatMoney(money.totalMoney)}</ThemedText> recorded in total.</ThemedText>
             <ThemedText type="small"><ThemedText type="smallBold">{formatMoney(money.availableMoney)}</ThemedText> is available for spending.</ThemedText>

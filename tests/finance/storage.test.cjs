@@ -896,49 +896,81 @@ test('legacy users skip setup, reset reopens it, and backup restore completes it
 });
 
 
-test('delete only empty unused non-Cash accounts, including archived accounts', async (t) => {
+test('active and archived accounts can be deleted with their opening balances and linked goals', async t => {
   const db = await setup(t);
   const { deleteAccount, saveAccount } = require('../../.expo/finance-tests/storage/accounts.js');
-  const account = { id: 'unused', name: 'Unused', currency: 'PHP', openingBalance: 0, purpose: 'spending', includedInAvailable: true, archived: true };
-  await saveAccount(db, account, true);
-  await db.runAsync("INSERT INTO preferences(key, value) VALUES ('lastEntryAccount', 'unused')");
+  const account = { id: 'mistake', name: 'Mistake', currency: 'PHP', openingBalance: 50000, purpose: 'savings', includedInAvailable: false, archived: false };
+  for (const archived of [false, true]) {
+    await saveAccount(db, { ...account, archived }, true);
+    await db.runAsync("INSERT INTO goals VALUES ('linked-goal', 'Goal', 'mistake', 100000, NULL, '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')");
+    await db.runAsync("INSERT OR REPLACE INTO preferences(key, value) VALUES ('lastEntryAccount', 'mistake')");
+    await db.runAsync("INSERT OR REPLACE INTO preferences(key, value) VALUES ('accountOrder', '[\"mistake\",\"cash\"]')");
+    await deleteAccount(db, account.id);
+    await deleteAccount(db, account.id);
+    assert.equal(await db.getFirstAsync('SELECT id FROM accounts WHERE id = ?', account.id), null);
+    assert.equal(await db.getFirstAsync("SELECT id FROM goals WHERE accountId = 'mistake'"), null);
+    assert.equal(await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'lastEntryAccount'"), null);
+    assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'accountOrder'")).value, '["cash"]');
+  }
+  await saveAccount(db, { ...account, openingBalance: -50000 }, true);
   await deleteAccount(db, account.id);
-  await deleteAccount(db, account.id);
-  assert.equal(await db.getFirstAsync('SELECT id FROM accounts WHERE id = ?', account.id), null);
-  assert.equal(await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'lastEntryAccount'"), null);
   await assert.rejects(deleteAccount(db, 'cash'), /Cash account cannot/);
-  await saveAccount(db, { ...account, id: 'funded', openingBalance: 100 }, true);
-  await assert.rejects(deleteAccount(db, 'funded'), /balance/);
-  await saveAccount(db, { ...account, id: 'negative', openingBalance: -100 }, true);
-  await assert.rejects(deleteAccount(db, 'negative'), /balance/);
-  await saveAccount(db, { ...account, id: 'linked', purpose: 'savings' }, true);
-  await db.runAsync("INSERT INTO goals VALUES ('linked-goal', 'Goal', 'linked', 10000, NULL, '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')");
-  await assert.rejects(deleteAccount(db, 'linked'), /goal/);
-  assert.equal((await db.getFirstAsync('SELECT count(*) AS n FROM accounts')).n, 4);
+  assert.equal((await db.getFirstAsync('SELECT count(*) AS n FROM accounts')).n, 1);
 });
 
-test('account deletion preserves zero-net history and both transfer endpoints; failed deletion rolls back preferences', async (t) => {
+test('account deletion removes related activity and transfers, recalculates other balances, and keeps unrelated records', async t => {
+  const db = await setup(t);
+  const { deleteAccount, saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { calculateCurrentMoney } = require('../../.expo/finance-tests/calculations.js');
+  const { readBackupJson } = require('../../.expo/finance-tests/storage/backup.js');
+  await updateOpeningBalance(db, 100000);
+  const bank = { id: 'bank', name: 'Bank', currency: 'PHP', openingBalance: 50000, purpose: 'spending', includedInAvailable: true, archived: false };
+  await saveAccount(db, bank, true);
+  await createTransaction(db, 'bank-in', { ...income(), accountId: 'bank', amount: 12000 });
+  await createTransaction(db, 'bank-out', { ...expense(), accountId: 'bank' });
+  await createTransaction(db, 'to-bank', { ...expense(), type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 10000 });
+  await createTransaction(db, 'from-bank', { ...expense(), accountId: 'bank', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'cash', amount: 3000 });
+  await createTransaction(db, 'unrelated', { ...income(), amount: 1000 });
+  await db.runAsync("INSERT INTO transactions (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, adjustmentDirection, externalName) VALUES ('external', 'bank', 'EXTERNAL', 1000, 'External transfer', '2026-10-09', '00:00:00', NULL, '2026-10-09T00:00:00.000Z', '2026-10-09T00:00:00.000Z', 'increase', 'Friend')");
+  await deleteAccount(db, 'bank');
+  assert.deepEqual((await listTransactions(db)).map(row => row.id), ['unrelated']);
+  const summary = calculateCurrentMoney(await listAccounts(db), await listTransactions(db));
+  assert.equal(summary.totalMoney, 101000);
+  assert.equal(summary.availableMoney, 101000);
+  assert.equal(JSON.parse(await readBackupJson(db)).accounts.length, 1);
+  assert.equal((await db.getAllAsync('PRAGMA foreign_key_check')).length, 0);
+});
+
+test('failed account deletion rolls back financial records, goals and preferences together', async t => {
   const db = await setup(t);
   const { deleteAccount, saveAccount } = require('../../.expo/finance-tests/storage/accounts.js');
-  const account = { id: 'history', name: 'History', currency: 'PHP', openingBalance: 0, purpose: 'spending', includedInAvailable: true, archived: false };
-  await saveAccount(db, account, true);
-  await createTransaction(db, 'in', { ...income(), accountId: 'history', amount: 12000 });
-  await createTransaction(db, 'out', { ...expense(), accountId: 'history' });
-  await assert.rejects(deleteAccount(db, 'history'), /history/);
-  await saveAccount(db, { ...account, id: 'destination' }, true);
-  await createTransaction(db, 'transfer', { ...expense(), type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'destination' });
-  await assert.rejects(deleteAccount(db, 'destination'), /history/);
-  await saveAccount(db, { ...account, id: 'empty' }, true);
-  await db.runAsync("UPDATE preferences SET value = 'empty' WHERE key = 'lastEntryAccount'");
+  await saveAccount(db, { id: 'bank', name: 'Bank', currency: 'PHP', openingBalance: 50000, purpose: 'savings', includedInAvailable: false, archived: false }, true);
+  await createTransaction(db, 'bank-out', { ...expense(), accountId: 'bank' });
+  await db.runAsync("INSERT INTO goals VALUES ('goal', 'Goal', 'bank', 100000, NULL, '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')");
+  await db.runAsync("INSERT OR REPLACE INTO preferences VALUES ('lastEntryAccount', 'bank'), ('accountOrder', '[\"bank\",\"cash\"]')");
   const run = db.runAsync;
   db.runAsync = async (sql, ...params) => { if (sql.startsWith('DELETE FROM accounts')) throw new Error('delete failure'); return run(sql, ...params); };
-  await assert.rejects(deleteAccount(db, 'empty'), /delete failure/);
+  await assert.rejects(deleteAccount(db, 'bank'), /delete failure/);
   db.runAsync = run;
-  assert.ok(await db.getFirstAsync("SELECT id FROM accounts WHERE id = 'empty'"));
-  assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'lastEntryAccount'")).value, 'empty');
-  assert.equal((await listTransactions(db)).length, 3);
+  assert.ok(await db.getFirstAsync("SELECT id FROM accounts WHERE id = 'bank'"));
+  assert.ok(await db.getFirstAsync("SELECT id FROM goals WHERE id = 'goal'"));
+  assert.equal((await listTransactions(db)).length, 1);
+  assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'lastEntryAccount'")).value, 'bank');
+  assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'accountOrder'")).value, '["bank","cash"]');
 });
 
+test('deleting a transfer account rolls back if it would overflow the remaining account balance', async t => {
+  const db = await setup(t);
+  const { deleteAccount, saveAccount } = require('../../.expo/finance-tests/storage/accounts.js');
+  const account = { id: 'bank', name: 'Bank', currency: 'PHP', openingBalance: Number.MAX_SAFE_INTEGER, purpose: 'spending', includedInAvailable: true, archived: false };
+  await saveAccount(db, account, true);
+  await saveAccount(db, { ...account, id: 'offset', openingBalance: -Number.MAX_SAFE_INTEGER }, true);
+  await createTransaction(db, 'transfer', { ...expense(), accountId: 'bank', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'offset', amount: 1000 });
+  await createTransaction(db, 'income', { ...income(), accountId: 'bank', amount: 1 });
+  await assert.rejects(deleteAccount(db, 'offset'), /supported|safe|range/);
+  assert.ok(await db.getFirstAsync("SELECT id FROM accounts WHERE id = 'offset'"));
+  assert.equal((await listTransactions(db)).length, 2);
+});
 
 test('budgets persist, copy only missing categories, recalculate expenses, and preserve transactions on deletion', async (t) => {
   const db = await setup(t);

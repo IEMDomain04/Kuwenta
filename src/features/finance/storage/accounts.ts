@@ -1,6 +1,6 @@
 import type { Account, Transaction } from '../types';
 import { validateAccount } from '../validation';
-import { calculateAccountSummary } from '../calculations';
+import { calculateAccountSummary, calculateCurrentMoney, calculateFinanceSummary, calculateSavings } from '../calculations';
 import type { FinanceDatabase } from './database';
 
 type AccountRow = Omit<Account, 'includedInAvailable' | 'archived' | 'color'> & { includedInAvailable: number; archived: number; color?: Account['color'] | null };
@@ -68,17 +68,39 @@ export async function completeCashSetup(db: FinanceDatabase, cents: number, disp
   });
 }
 
-/** Delete only an unused, empty account; never remove financial history. */
+/** Permanent deletion after UI confirmation; archive remains the option that keeps records. */
 export async function deleteAccount(db: FinanceDatabase, id: string): Promise<void> {
   if (id === 'cash') throw new Error('The default Cash account cannot be deleted. Use Reset all data to start over.');
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const account = await transaction.getFirstAsync<AccountRow>('SELECT * FROM accounts WHERE id = ?', id);
-    if (!account) return; // A repeated deletion cannot affect another account.
-    if (await transaction.getFirstAsync('SELECT id FROM transactions WHERE accountId = ? OR destinationAccountId = ? LIMIT 1', id, id)) throw new Error('This account has transaction history. Archive it instead to preserve your records.');
-    if (await transaction.getFirstAsync('SELECT id FROM goals WHERE accountId = ? LIMIT 1', id)) throw new Error('Delete or relink the savings goal before deleting this account.');
-    if (account.openingBalance !== 0) throw new Error('This account still has a balance. Resolve it before deleting the account.');
+    if (!account) return; // Repeated deletion cannot affect another account.
+    const removed = await transaction.getAllAsync<{ transactionDate: string }>('SELECT transactionDate FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
+    await transaction.runAsync('DELETE FROM goals WHERE accountId = ?', id);
+    await transaction.runAsync('DELETE FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
     await transaction.runAsync("DELETE FROM preferences WHERE key = 'lastEntryAccount' AND value = ?", id);
+    const order = await transaction.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'accountOrder'");
+    if (order) {
+      let ids: unknown;
+      try { ids = JSON.parse(order.value); } catch { /* Discard malformed display preferences. */ }
+      if (Array.isArray(ids) && ids.every(value => typeof value === 'string')) {
+        await transaction.runAsync("UPDATE preferences SET value = ? WHERE key = 'accountOrder'", JSON.stringify(ids.filter(value => value !== id)));
+      } else {
+        await transaction.runAsync("DELETE FROM preferences WHERE key = 'accountOrder'");
+      }
+    }
     await transaction.runAsync('DELETE FROM accounts WHERE id = ?', id);
+    const remainingAccounts = await listAccounts(transaction);
+    const remainingRows = (await transaction.getAllAsync<Transaction>('SELECT * FROM transactions')).map(row => ({
+      ...row, notes: row.notes ?? undefined, externalName: row.externalName ?? undefined,
+      sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined,
+      destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined,
+    }));
+    // Removing transfers or offsetting balances must not leave unsupported totals.
+    calculateCurrentMoney(remainingAccounts, remainingRows);
+    calculateSavings(remainingAccounts, remainingRows, '1900-01');
+    for (const month of new Set(removed.map(row => row.transactionDate.slice(0, 7)))) {
+      calculateFinanceSummary(remainingAccounts, remainingRows, month);
+    }
   });
 }
 
