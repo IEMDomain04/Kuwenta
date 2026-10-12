@@ -64,11 +64,15 @@ export function syncNotifications(budgets: readonly Budget[], transactions: read
     const plan = allowed && settings.daily ? reminderPlan(new Date(), transactions) : [];
     const wanted = new Set(plan.map(item => 'kuwenta-reminder-' + item.key));
     for (const item of scheduled) if (item.identifier.startsWith('kuwenta-reminder-') && !wanted.has(item.identifier)) await Notifications.cancelScheduledNotificationAsync(item.identifier);
-    const existing = new Set(scheduled.map(item => item.identifier));
+    const existing = new Map(scheduled.map(item => [item.identifier, item]));
     for (const item of plan) {
       const identifier = 'kuwenta-reminder-' + item.key;
-      if (!existing.has(identifier)) await Notifications.scheduleNotificationAsync({ identifier,
-        content: { title: 'Tracking reminder', body: "Record today's spending in Kuwenta.", sound: false, data: { screen: 'home' } },
+      const previous = existing.get(identifier);
+      if (previous?.content.title === item.title && previous.content.body === item.body) continue;
+      // Refresh old wording after an app update, without rescheduling unchanged reminders.
+      if (previous) await Notifications.cancelScheduledNotificationAsync(identifier);
+      await Notifications.scheduleNotificationAsync({ identifier,
+        content: { title: item.title, body: item.body, sound: false, data: { screen: 'home' } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: 'kuwenta' },
       });
     }

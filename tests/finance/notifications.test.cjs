@@ -55,6 +55,7 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
   const fs = require('node:fs');
   const scheduled = new Map();
   const delivered = [];
+  const scheduledCalls = [];
   let allowed = true;
   let requests = 0;
   const native = {
@@ -65,6 +66,7 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
     getAllScheduledNotificationsAsync: async () => [...scheduled.values()],
     cancelScheduledNotificationAsync: async id => { scheduled.delete(id); },
     scheduleNotificationAsync: async item => {
+      scheduledCalls.push(item);
       const request = { ...item, identifier: item.identifier || String(delivered.length + scheduled.size), content: item.content };
       if (item.trigger?.type === 'date') scheduled.set(request.identifier, request);
       else delivered.push(request);
@@ -88,7 +90,7 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
     throw new Error('Unexpected dependency: ' + name);
   } };
   vm.runInNewContext(source, sandbox);
-  return { api: sandbox.exports, store: existingStore, scheduled, delivered, deny: () => { allowed = false; }, requestCount: () => requests };
+  return { api: sandbox.exports, store: existingStore, scheduled, delivered, scheduledCalls, deny: () => { allowed = false; }, requestCount: () => requests };
 }
 test('notification bridge cancels logged-day reminders, avoids duplicates, and respects disabling', async () => {
   const h = notificationHarness();
@@ -157,4 +159,43 @@ test('old reminder windows migrate without losing opt-in or retaining duplicate 
   await h.api.saveNotificationSettings({ enabled: true, daily: false, budgets: true });
   assert.equal(h.scheduled.size, 0);
   assert.equal(JSON.parse(store.get('kuwenta.notifications')).start, undefined);
+});
+
+
+test('phone reminders refresh old wording without changing their slots, duplicating reminders or touching other apps', async () => {
+  const h = notificationHarness();
+  await h.api.saveNotificationSettings({ enabled: true, daily: true, budgets: true });
+  const identifier = 'kuwenta-reminder-2026-10-12-14';
+  h.scheduled.set(identifier, { identifier, content: { title: 'Tracking reminder', body: "Record today's spending in Kuwenta." } });
+  h.scheduled.set('other-reminder', { identifier: 'other-reminder', content: { title: 'Other', body: 'Keep this' } });
+  await h.api.syncNotifications([], []);
+  const afternoon = h.scheduled.get(identifier);
+  assert.equal(afternoon.content.title, 'A little catch-up');
+  assert.equal(afternoon.content.body, 'Any money activity to add to your records?');
+  assert.equal(afternoon.trigger.date.toISOString(), '2026-10-12T06:00:00.000Z');
+  assert.equal(h.scheduled.size, 42);
+  assert.equal(h.scheduled.get('other-reminder').content.body, 'Keep this');
+  const copy = new Set([...h.scheduled.values()].filter(item => item.identifier.startsWith('kuwenta-reminder-')).map(item => item.content.title));
+  assert.deepEqual(copy, new Set(['Quick check-in', 'A little catch-up', 'Before you forget']));
+  for (const item of h.scheduled.values()) {
+    if (!item.identifier.startsWith('kuwenta-reminder-')) continue;
+    assert.equal(item.content.sound, false);
+    assert.equal(item.content.data.screen, 'home');
+    assert.doesNotMatch(item.content.body, /Kuwenta|Plans|spend/i);
+  }
+  const callCount = h.scheduledCalls.length;
+  await h.api.syncNotifications([], []);
+  assert.equal(h.scheduledCalls.length, callCount);
+  assert.equal(h.scheduled.size, 42);
+});
+
+test('phone budget messages stay neutral and private at both thresholds', () => {
+  const budgets = [{ month: '2026-10', category: 'Food', limitAmount: 1000 }];
+  const near = budgetAlertPlan(budgets, [expense(800)], '2026-10')[0];
+  const over = budgetAlertPlan(budgets, [expense(1001)], '2026-10')[0];
+  assert.equal(near.title, 'Budget update');
+  assert.equal(near.body, 'Your recorded spending is close to a budget limit.');
+  assert.equal(over.title, 'Budget update');
+  assert.equal(over.body, 'Your recorded spending is over a budget limit.');
+  for (const item of [near, over]) assert.doesNotMatch(item.body, /Kuwenta|Plans|Food|1000|1001/);
 });
