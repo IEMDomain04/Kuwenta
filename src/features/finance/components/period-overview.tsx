@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
-import { BarChart } from 'react-native-gifted-charts';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,26 +14,34 @@ export function PeriodOverview({ now }: { now: Date }) {
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
   const [period, setPeriod] = useState<DashboardPeriod>('day');
-  const [chartWidth, setChartWidth] = useState(0);
   const [selectedDate, setSelectedDate] = useState('');
   const report = dashboardReport(transactions, period, month, now);
   const days = dashboardSpending(transactions, 'week', month, now);
   const selected = days.find((day) => day.date === selectedDate);
   const hasExpenses = days.some((day) => day.expenses > 0);
-  const slot = chartWidth / days.length;
-  const barWidth = slot * 0.55;
-  // Only chart geometry uses pesos; stored amounts and displayed totals remain exact centavos.
-  const data = days.map((day) => ({ value: day.expenses / 100, frontColor: day.isToday ? theme.accent : theme.expense, onPress: () => setSelectedDate(day.date) }));
-  const maximum = Math.max(1, ...days.map((day) => day.expenses / 100));
+  const spendingColors = [theme.background, '#14532D', '#15803D', '#22C55E', '#86EFAC'];
   function choosePeriod(value: DashboardPeriod) { setPeriod(value); }
   return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
     <View style={{ flexGrow: 1, flexBasis: fontScale > 1.3 ? '100%' : 130, minWidth: 120, padding: 10, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 6 }}>
       <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14 }} themeColor="textSecondary">THIS WEEK</ThemedText>
-      <View onLayout={(event) => setChartWidth(event.nativeEvent.layout.width)} style={{ minHeight: 100 }}>
-        {chartWidth > 0 ? <View accessible={false} style={{ overflow: 'hidden' }}><BarChart key={days[0].date + chartWidth} data={data} width={chartWidth} height={80} maxValue={maximum} barWidth={barWidth} spacing={slot - barWidth} initialSpacing={(slot - barWidth) / 2} endSpacing={0} barBorderRadius={3} minHeight={2} hideRules hideYAxisText yAxisThickness={0} xAxisThickness={0} yAxisLabelWidth={0} disableScroll xAxisLabelsHeight={0} /></View> : null}
-        <View style={{ flexDirection: 'row', height: 16 }}>{days.map((day) => <ThemedText key={day.date} type="small" style={{ flex: 1, textAlign: 'center', fontSize: 10, lineHeight: 14, color: day.isToday ? theme.accent : theme.textSecondary, fontWeight: day.isToday ? '700' : '400' }}>{day.label}</ThemedText>)}</View>
+      <View style={{ flex: 1, justifyContent: 'center', gap: 8, minHeight: 100 }}>
+        <View style={{ flexDirection: 'row', gap: 3 }}>
+          {days.map((day) => {
+            // Daily totals are stored in centavos; levels stay fixed across weeks.
+            const level = day.expenses === 0 ? 0 : day.expenses < 15_000 ? 1 : day.expenses < 30_000 ? 2 : day.expenses < 50_000 ? 3 : 4;
+            return <Pressable key={day.date} accessibilityRole="button" accessibilityLabel={readableTransactionDate(day.date) + ', ' + formatMoney(day.expenses) + ' spent'} accessibilityState={{ selected: selectedDate === day.date }} onPress={() => setSelectedDate(day.date)} style={{ flex: 1, minHeight: 44, justifyContent: 'center', gap: 5 }}>
+              <View style={{ width: '100%', aspectRatio: 1, borderRadius: 4, backgroundColor: spendingColors[level], borderWidth: 1, borderColor: selectedDate === day.date ? theme.text : theme.border }} />
+              <ThemedText type="small" numberOfLines={1} adjustsFontSizeToFit style={{ textAlign: 'center', fontSize: 9, lineHeight: 13, color: day.isToday ? theme.accent : theme.textSecondary, fontWeight: day.isToday ? '700' : '400' }}>{day.label}</ThemedText>
+            </Pressable>;
+          })}
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 3 }}>
+          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 8, lineHeight: 12 }}>Less</ThemedText>
+          {spendingColors.map((color, index) => <View key={index} style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color, borderWidth: index === 0 ? 1 : 0, borderColor: theme.border }} />)}
+          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 8, lineHeight: 12 }}>More</ThemedText>
+        </View>
       </View>
-      <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14 }} themeColor="textSecondary">{hasExpenses ? 'Expenses / tap a bar' : 'No expenses recorded'}</ThemedText>
+      <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14 }} themeColor="textSecondary">{hasExpenses ? 'Spending / tap a tile' : 'No expenses recorded'}</ThemedText>
       {selected ? <ThemedText accessibilityLiveRegion="polite" type="small" style={{ fontSize: 11, lineHeight: 16 }}>{new Intl.DateTimeFormat('en', { weekday: 'long', timeZone: 'UTC' }).format(new Date(selected.date + 'T12:00:00Z'))}, {readableTransactionDate(selected.date)}: {formatMoney(selected.expenses)}</ThemedText> : null}
     </View>
     <View style={{ flexGrow: 1, flexBasis: 130, minWidth: 120, padding: 10, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 7 }}>

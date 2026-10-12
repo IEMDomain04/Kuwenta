@@ -38,6 +38,7 @@ export default function BudgetsScreen() {
   const theme = useTheme();
   const { month, budgets, transactions, busy } = finance;
   const report = budgetReport(budgets, transactions, month);
+  const totalRemaining = report.rows.reduce((sum, item) => sum + Math.max(0, item.remaining), 0);
   const available = calculateCurrentMoney(
     finance.accounts,
     transactions,
@@ -261,10 +262,7 @@ export default function BudgetsScreen() {
                 <BudgetUsage
                   row={row}
                   available={available}
-                  totalRemaining={report.rows.reduce(
-                    (sum, item) => sum + Math.max(0, item.remaining),
-                    0,
-                  )}
+                  totalRemaining={totalRemaining}
                   currentMonth={month === finance.currentMonth}
                   actions={
                     <View style={{ flexDirection: "row", gap: 4 }}>

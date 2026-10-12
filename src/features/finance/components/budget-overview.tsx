@@ -18,6 +18,7 @@ export function BudgetOverview({ compact = false, reportingMonth }: { compact?: 
   const theme = useTheme();
   const month = reportingMonth ?? philippineDateTime().transactionDate.slice(0, 7);
   const report = budgetReport(finance.budgets, finance.transactions, month);
+  const totalRemaining = report.rows.reduce((sum, item) => sum + Math.max(0, item.remaining), 0);
   const available = calculateCurrentMoney(finance.accounts, finance.transactions).availableMoney;
   if (compact && !report.rows.length) return null;
   function openBudget(category?: string, add = false) {
@@ -36,7 +37,7 @@ export function BudgetOverview({ compact = false, reportingMonth }: { compact?: 
         <ActionButton compact label="Manage" disabled={finance.busy} onPress={() => openBudget()} />
       </View>
       {(compact ? report.rows.slice(0, 3) : report.rows).map((row, index) => <View key={row.category} style={{ paddingTop: index === 0 ? 4 : 12, paddingBottom: 4, ...(index > 0 ? { borderTopWidth: 1, borderColor: theme.border } : {}) }}>
-        <BudgetUsage row={row} available={available} totalRemaining={report.rows.reduce((sum, item) => sum + Math.max(0, item.remaining), 0)} currentMonth={month === finance.currentMonth} />
+        <BudgetUsage row={row} available={available} totalRemaining={totalRemaining} currentMonth={month === finance.currentMonth} />
       </View>)}
       {compact && report.rows.length > 3 ? <ThemedText type="small" themeColor="textSecondary">{report.rows.length - 3} more categories in Manage.</ThemedText> : null}
       {!compact ? <ActionButton compact primary label="Add budget" disabled={finance.busy || report.rows.length >= CATEGORIES.EXPENSE.length} onPress={() => openBudget(undefined, true)} /> : null}
