@@ -1,11 +1,11 @@
 import { formatMoney } from './money';
-import { CATEGORIES, type Budget, type Transaction } from './types';
+import { CATEGORIES, LEGACY_EXPENSE_CATEGORIES, type Budget, type Transaction } from './types';
 import { isValidMonth } from './dates';
 import { spendingByCategory } from './reporting';
 
 export function validateBudget(budget: Budget): void {
   if (!isValidMonth(budget.month)) throw new Error('Choose a valid budget month.');
-  if (!(CATEGORIES.EXPENSE as readonly string[]).includes(budget.category)) throw new Error('Choose an expense category.');
+  if (!(CATEGORIES.EXPENSE as readonly string[]).includes(budget.category) && !LEGACY_EXPENSE_CATEGORIES.includes(budget.category)) throw new Error('Choose an expense category.');
   if (!Number.isSafeInteger(budget.limitAmount) || budget.limitAmount <= 0) throw new Error('Budget limit must be positive integer centavos.');
 }
 export function budgetReport(budgets: readonly Budget[], transactions: readonly Transaction[], month: string) {

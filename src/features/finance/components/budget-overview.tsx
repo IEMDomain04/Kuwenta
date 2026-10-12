@@ -40,7 +40,7 @@ export function BudgetOverview({ compact = false, reportingMonth }: { compact?: 
         <BudgetUsage row={row} available={available} totalRemaining={totalRemaining} currentMonth={month === finance.currentMonth} />
       </View>)}
       {compact && report.rows.length > 3 ? <ThemedText type="small" themeColor="textSecondary">{report.rows.length - 3} more categories in Manage.</ThemedText> : null}
-      {!compact ? <ActionButton compact primary label="Add budget" disabled={finance.busy || report.rows.length >= CATEGORIES.EXPENSE.length} onPress={() => openBudget(undefined, true)} /> : null}
+      {!compact ? <ActionButton compact primary label="Add budget" disabled={finance.busy || CATEGORIES.EXPENSE.every(category => report.rows.some(row => row.category === category))} onPress={() => openBudget(undefined, true)} /> : null}
     </View>
   );
 }

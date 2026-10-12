@@ -174,7 +174,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
             </View>
             <ScrollView style={{ maxHeight: height * 0.55 }} keyboardShouldPersistTaps="handled">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {(type === 'TRANSFER' ? [] : CATEGORIES[type]).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: value === category, disabled }} disabled={disabled}
+                {(type === 'TRANSFER' ? [] : [...CATEGORIES[type], ...(original?.type === type && !(CATEGORIES[type] as readonly string[]).includes(original.category) ? [original.category] : [])]).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: value === category, disabled }} disabled={disabled}
                   onPress={() => { setCategory(value); setCategoryOpen(false); }} style={({ pressed }) => ({ width: '31%', minHeight: 80, padding: 8, borderRadius: 12, borderWidth: 1.5, borderColor: value === category ? theme.accent : theme.border, backgroundColor: value === category ? theme.backgroundSelected : theme.backgroundElement, alignItems: 'center', justifyContent: 'center', gap: 5, opacity: pressed || disabled ? 0.5 : 1 })}>
                   <CategoryIcon category={value} income={type === 'INCOME'} />
                   <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ width: '100%', fontSize: 12, lineHeight: 17, textAlign: 'center' }}>{value}</ThemedText>

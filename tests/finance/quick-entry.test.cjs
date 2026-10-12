@@ -52,11 +52,11 @@ test('parsing is pure and never changes account records', () => {
 });
 
 
-test('load phrases create Mobile Load & Data expenses in the specified active account', () => {
- for (const phrase of ['Mobile load 100 from Cash', 'Bought load 100 using Bank 2', 'Prepaid airtime 100', 'Data promo 100', 'Nagpaload 100']) {
+test('load phrases create Mobile Load expenses in the specified active account', () => {
+ for (const phrase of ['Mobile load 100 from Cash', 'Bought load 100 using Bank 2', 'Prepaid airtime 100', 'Nagpaload 100']) {
   const result = parse(phrase).draft;
   assert.equal(result.type, 'EXPENSE'); assert.equal(result.amount, 10000);
-  assert.equal(result.category, 'Mobile Load & Data');
+  assert.equal(result.category, 'Mobile Load');
  }
  assert.equal(parse('Bought load 50 using Bank 2').draft.accountId, 'bank');
 });
@@ -82,12 +82,59 @@ test('incomplete, invalid or external transfers require clarification instead of
 test('student expenses and income map to categories and remain valid review drafts', () => {
  const { validateDraft } = require('../../.expo/finance-tests/validation.js');
  for (const [phrase, category] of [
-  ['Chips 30','Snacks & Drinks'], ['Coffee 80','Café'], ['Keyboard 1000','Tech & Accessories'],
-  ['Bag 500','School & Personal Items'], ['Games 100','Games & Entertainment'], ['Cash-out fee 15','Fees'],
+  ['Chips 30','Snacks'], ['Coffee 80','Café'], ['Keyboard 1000','Tech'],
+  ['Bag 500','Personal Items'], ['Games 100','Games'], ['Cash-out fee 15','Fees'],
   ['Part-time 500','Part-time Work'], ['Freelance 2000','Freelance'], ['Gift 500','Gifts'], ['Received 100','Other Income']
  ]) {
   const {draft} = parse(phrase);
   assert.equal(draft.category, category, phrase);
   validateDraft(draft, cash);
  }
+});
+
+
+test('separate everyday expense categories produce valid review drafts', () => {
+ const { validateDraft } = require('../../.expo/finance-tests/validation.js');
+ for (const [phrase, category] of [
+  ['Groceries 1500', 'Groceries'], ['Toothbrush 40', 'Personal Care'], ['Toothpaste 70', 'Personal Care'],
+  ['Shampoo 90', 'Personal Care'], ['Detergent 80', 'Cleaning Supplies'], ['Dish soap 50', 'Cleaning Supplies'],
+  ['Caf\u00e9 80', 'Caf\u00e9'], ['Juice 30', 'Drinks'], ['Data promo 100', 'Mobile Data'], ['Movie 200', 'Entertainment'],
+  ['Charger 300', 'Accessories'], ['Notebook 50', 'School Supplies'], ['Tuition 1000', 'Education']
+ ]) {
+  const { draft, warnings } = parse(phrase);
+  assert.equal(draft.category, category, phrase);
+  assert.deepEqual(warnings, []);
+  validateDraft(draft, cash);
+ }
+ assert.throws(() => parse('Toothpaste and detergent 150'), /More than one category/);
+});
+
+test('retired categories stay valid for saved records and budgets', () => {
+ const { CATEGORIES, LEGACY_EXPENSE_CATEGORIES } = require('../../.expo/finance-tests/types.js');
+ const { validateManualRecord } = require('../../.expo/finance-tests/validation.js');
+ const { validateBudget, budgetReport } = require('../../.expo/finance-tests/budgets.js');
+ const { record } = require('./fixtures.cjs');
+ const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+ assert.equal(new Set(CATEGORIES.EXPENSE).size, CATEGORIES.EXPENSE.length);
+ assert.equal(CATEGORIES.EXPENSE.some(category => category.includes('&')), false);
+ for (const category of LEGACY_EXPENSE_CATEGORIES) {
+  assert.equal(CATEGORIES.EXPENSE.includes(category), false);
+  const saved = record({ category });
+  const budget = { month: '2026-10', category, limitAmount: 20000 };
+  const restored = parseBackup(serializeBackup(cash, [saved], '2026-10-12T00:00:00.000Z'));
+  assert.equal(restored.transactions[0].category, category);
+  validateManualRecord(saved);
+  validateBudget(budget);
+  assert.equal(budgetReport([budget], [saved], '2026-10').rows[0].spent, saved.amount);
+ }
+});
+
+
+test('updated categories survive backup round trips without changing amounts', () => {
+ const { CATEGORIES } = require('../../.expo/finance-tests/types.js');
+ const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+ const { record } = require('./fixtures.cjs');
+ const records = CATEGORIES.EXPENSE.map((category, index) => record({ id: 'category-' + index, category, amount: 100 }));
+ const restored = parseBackup(serializeBackup(cash, records, '2026-10-12T00:00:00.000Z'));
+ assert.deepEqual(restored.transactions, records);
 });
