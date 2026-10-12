@@ -7,11 +7,13 @@ import { previewBackup, type FinanceBackup } from '../backup';
 import { formatMoney } from '../money';
 import { philippineDateTime } from '../dates';
 import { ActionButton } from './ui';
-import { useFinance } from '../provider';
 
-export function BackupImportPreview({ disabled = false }: { disabled?: boolean }) {
+export function BackupImportPreview({ disabled = false, busy = false, onRestore: restoreBackup, onNotice: showNotice, recovery = false }: {
+  disabled?: boolean; busy?: boolean; recovery?: boolean;
+  onRestore: (backup: FinanceBackup) => Promise<void>;
+  onNotice: (message: string, error?: boolean) => void;
+}) {
   const theme = useTheme();
-  const { busy, restoreBackup, showNotice } = useFinance();
   const confirming = useRef(false);
   const passwordInput = useRef<TextInput>(null);
   const [restoring, setRestoring] = useState(false);
@@ -77,8 +79,8 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
     const backup = preview.backup;
     confirming.current = true;
     Keyboard.dismiss();
-    Alert.alert('Replace your financial records?',
-      'This replaces ALL your current accounts, transactions, savings goals, and budgets with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
+    Alert.alert(recovery ? 'Recover records from this backup?' : 'Replace your financial records?',
+      recovery ? 'Kuwenta will use the records in this backup. Changes made after its export will not be recovered. The inaccessible database will be kept on this device. Continue?' : 'This replaces ALL your current accounts, transactions, savings goals, and budgets with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: 'Restore backup', style: 'destructive', onPress: () => {
@@ -97,7 +99,7 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
   }
   const locked = disabled || busy || working || restoring;
   return <>
-    <ThemedText type="smallBold">Preview a backup</ThemedText>
+    <ThemedText type="smallBold">{recovery ? 'Recover from backup' : 'Preview a backup'}</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Open an encrypted .kuwenta file to check its contents. This does not restore or change your current records.</ThemedText>
     <ActionButton label={working ? 'Checking backup...' : 'Choose backup file'} disabled={locked} onPress={() => { void chooseFile(); }} />
     {selected ? <>

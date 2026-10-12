@@ -11,7 +11,7 @@ import { BackupImportPreview } from '../components/backup-import-preview';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
-  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice } = useFinance();
+  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup } = useFinance();
   const theme = useTheme();
   const { mode, setMode } = useAppearance();
   function setAppearanceError(message: string) { if (message) showNotice(message, true); }
@@ -92,7 +92,7 @@ export default function SettingsScreen() {
     <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
     <BackupExport disabled={busy} />
-    <BackupImportPreview disabled={busy} />
+    <BackupImportPreview busy={busy} onRestore={restoreBackup} onNotice={showNotice} />
     <ThemedText type="small" themeColor="textSecondary">Restoring replaces current financial records. Export a backup first to keep them.</ThemedText>
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Reset App</ThemedText>

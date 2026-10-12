@@ -8,14 +8,15 @@ import { CashSetup } from './components/cash-setup';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, ActivityIndicator, AppState, Platform, Pressable, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, AppState, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { calculateFinanceSummary, calculateCurrentMoney } from './calculations';
 import { isValidMonth, philippineDateTime } from './dates';
-import { openFinanceDatabase } from './storage/database';
+import { BackupImportPreview } from './components/backup-import-preview';
+import { openFinanceDatabase, recoverFinanceDatabase, DatabaseRecoveryError } from './storage/database';
 import { listGoals, saveGoal as saveGoalRecord, deleteGoal } from './storage/goals';
 import { saveAccountOrder as saveAccountOrderRecord, deleteAccount, saveDisplayName as saveDisplayNameRecord, completeCashSetup, listAccounts, saveAccount as saveAccountRecords, updateOpeningBalance } from './storage/accounts';
 import { resetFinancialData, restoreBackup as restoreBackupRecords } from './storage/backup';
@@ -26,6 +27,7 @@ import { FinanceScreen, ActionButton } from './components/ui';
 
 type Snapshot = { displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
+  recoverBackup: (backup: FinanceBackup) => Promise<void>;
   saveAccountOrder: (ids: readonly string[]) => Promise<void>;
   saveDisplayName: (name: string) => Promise<void>;
   saveExternal: (record: Transaction) => Promise<void>;
@@ -74,6 +76,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     catch (cause) { return { summary: null, error: cause instanceof Error ? cause.message : 'Could not calculate this month.' }; }
   }, [snapshot, selectedMonth]);
   const [error, setError] = useState('');
+  const [canRecover, setCanRecover] = useState(false);
   const [notice, setNotice] = useState<{ message: string; detail?: string; expiresAt?: number; tone?: 'success' | 'info' | 'income' | 'expense' | 'error' } | null>(null);
   const actions = useRef<Actions | null>(null);
   useEffect(() => {
@@ -86,6 +89,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     let connection: SQLiteDatabase | undefined;
     let locked = false;
     let running: Promise<unknown> = Promise.resolve();
+    let recoveryAllowed = false;
     let loadedMonth = '';
     async function load(baseline = false) {
       connection ??= await openFinanceDatabase();
@@ -106,14 +110,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       loadedMonth = month;
       if (active) {
         const next = { displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
-        loadedSnapshot.current = next; setSnapshot(next); setError('');
+        loadedSnapshot.current = next; setSnapshot(next); setError(''); setCanRecover(false); recoveryAllowed = false;
       }
     }
     async function refresh() {
       if (locked || !active) return;
       locked = true; setBusy(true);
       running = load().catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Could not load records.');
+        recoveryAllowed = cause instanceof DatabaseRecoveryError;
+        if (active) { setError(cause instanceof Error ? cause.message : 'Could not load records.'); setCanRecover(recoveryAllowed); }
       }).finally(() => { locked = false; if (active) setBusy(false); });
       await running;
     }
@@ -133,6 +138,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       finally { locked = false; if (active) setBusy(false); }
     }
     actions.current = {
+      recoverBackup: async backup => {
+        if (locked || !active || connection || !recoveryAllowed) throw new Error('Recovery is not available. Tap Retry first.');
+        locked = true; setBusy(true);
+        const operation = (async () => { await recoverFinanceDatabase(backup); await load(true); })();
+        running = operation.catch(() => {});
+        try { await operation; }
+        catch (cause) {
+          recoveryAllowed = !connection;
+          if (active) { setError(cause instanceof Error ? cause.message : 'Could not recover records.'); setCanRecover(recoveryAllowed); }
+          throw cause;
+        }
+        finally { locked = false; if (active) setBusy(false); }
+      },
       saveAccountOrder: (ids) => write(db => saveAccountOrderRecord(db, ids), undefined),
       saveDisplayName: (name) => write((db) => saveDisplayNameRecord(db, name), 'Name updated.'),
       saveExternal: (record) => write((db) => createExternalTransfer(db, record.id, record), 'External transfer saved', formatMoney(record.amount, true), false, 'info'),
@@ -180,17 +198,21 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       void running.finally(async () => { await connection?.closeAsync(); }).catch(() => {});
     };
   }, []);
-  if (!snapshot) return <FinanceScreen title="Kuwenta">
-    {busy ? <><ActivityIndicator /><ThemedText>Loading your money...</ThemedText></>
-      : <><ThemedText accessibilityRole="alert">{error || 'Preparing records...'}</ThemedText>
-        <ActionButton label="Retry" onPress={() => { void actions.current?.refresh(); }} /></>}
-  </FinanceScreen>;
+  if (!snapshot) return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><FinanceScreen title="Kuwenta">
+    <View style={{ gap: 8 }}>
+      {busy ? <ActivityIndicator /> : null}
+      <ThemedText accessibilityRole={busy ? undefined : 'alert'}>{busy ? (canRecover ? 'Recovering your records...' : 'Loading your money...') : error || 'Preparing records...'}</ThemedText>
+    </View>
+    <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} />
+    {canRecover ? <BackupImportPreview recovery busy={busy} onRestore={backup => actions.current?.recoverBackup(backup) ?? Promise.reject(new Error('App is closing.'))} onNotice={message => setError(message)} /> : null}
+  </FinanceScreen></KeyboardAvoidingView>;
   if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? Promise.reject(new Error('App is closing.'))} />;
   if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
   const noticeColor = notice?.tone === 'expense' || notice?.tone === 'error' ? theme.error : notice?.tone === 'info' ? theme.secondary : theme.income;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     showNotice: (message, error = false) => setNotice({ message, tone: error ? 'error' : 'success', expiresAt: Date.now() + (error ? 7000 : 4000) }),
+    recoverBackup: backup => actions.current?.recoverBackup(backup) ?? unavailable(),
     saveAccountOrder: (ids) => actions.current?.saveAccountOrder(ids) ?? unavailable(),
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
     saveDisplayName: (name) => actions.current?.saveDisplayName(name) ?? unavailable(),
