@@ -3,32 +3,38 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 
-function setup({ existing = false, legacy = false, key = 'a'.repeat(64), cipher = true, mismatch = false, integrity = 'ok', failStore = false, moveDelay = 0, failMove = false, sidecarsOnly = false, failDeleteOnce = false, encryptedJournalOnly = false } = {}) {
+function setup({ existing = false, legacy = false, key = 'a'.repeat(64), cipher = true, mismatch = false, integrity = 'ok', failStore = false, moveDelay = 0, failMove = false, sidecarsOnly = false, failDeleteOnce = false, encryptedJournalOnly = false, directory = '/private', expoGo = false } = {}) {
   const events = [];
+  const fileUris = []; let keyReads = 0;
   const files = new Set([...(existing ? ['kuwenta-encrypted.db'] : []), ...(legacy ? ['kuwenta.db', 'kuwenta.db-wal', 'kuwenta.db-shm'] : []), ...(sidecarsOnly ? ['kuwenta.db-wal', 'kuwenta.db-shm'] : []), ...(encryptedJournalOnly ? ['kuwenta-encrypted.db-wal'] : [])]);
   let deleteFailed = false;
   class File {
-    constructor(directory, name) { this.name = name; this.uri = 'file:///private/' + name; }
+    constructor(directory, name) {
+      assert.match(directory, /^file:\/\/\//, 'native File needs an absolute file URI');
+      this.name = name; this.uri = directory.replace(/\/$/, '') + '/' + name;
+      fileUris.push(this.uri);
+    }
     get exists() { return files.has(this.name); }
     delete() { if (failDeleteOnce && !deleteFailed) { deleteFailed = true; throw new Error('busy journal'); } events.push('delete:' + this.name); files.delete(this.name); }
     async move(destination) { events.push('move-start'); await new Promise(resolve => setTimeout(resolve, moveDelay)); if (failMove) throw new Error('move failed'); if (files.has(destination.name)) throw new Error('destination exists'); events.push('publish'); files.delete(this.name); files.add(destination.name); }
   }
   const module = { exports: {} };
   const dependencies = {
-    'expo-file-system': { File, Directory: class { get exists() { return files.size > 0; } list() { return [...files].map(name => ({ name })); } } },
-    'expo-secure-store': { WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1, getItemAsync: async () => key, setItemAsync: async (_, value) => { if (failStore) throw new Error('locked'); key = value; events.push('store-key'); } },
+    'expo-constants': { __esModule: true, default: { executionEnvironment: expoGo ? 'storeClient' : 'standalone' }, ExecutionEnvironment: { StoreClient: 'storeClient' } },
+    'expo-file-system': { File, Directory: class { constructor(uri) { assert.match(uri, /^file:\/\/\//); } get exists() { return files.size > 0; } list() { return [...files].map(name => ({ name })); } } },
+    'expo-secure-store': { WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1, getItemAsync: async () => { keyReads++; return key; }, setItemAsync: async (_, value) => { if (failStore) throw new Error('locked'); key = value; events.push('store-key'); } },
     'expo-crypto': { getRandomBytesAsync: async size => new Uint8Array(size).fill(1) },
     './database': { initializeDatabase: async () => events.push('initialize'), DatabaseRecoveryError: class extends Error {} },
     '../backup': { parseBackup: json => { const backup = JSON.parse(json); if (!backup.accounts) throw new Error('invalid backup'); return backup; } },
     './backup': { restoreBackup: async () => events.push('restore-backup') },
     'expo-sqlite': {
-      defaultDatabaseDirectory: '/private',
+      defaultDatabaseDirectory: directory,
       deleteDatabaseAsync: async name => { events.push('delete:' + name); files.delete(name); },
       openDatabaseAsync: async name => {
         events.push('open:' + name); files.add(name);
         return {
           execAsync: async sql => events.push(sql.startsWith('PRAGMA key') ? 'key' : sql),
-          runAsync: async (sql, path) => { assert.equal(path, '/private/kuwenta.db'); events.push('attach'); },
+          runAsync: async (sql, path) => { assert.equal(path, (directory.startsWith('file://') ? decodeURIComponent(directory.slice(7)) : directory).replace(/\/$/, '') + '/kuwenta.db'); events.push('attach'); },
           getFirstAsync: async sql => {
             if (sql === 'PRAGMA cipher_version') return cipher ? { cipher_version: '4' } : null;
             if (sql === 'PRAGMA legacy.user_version') return { user_version: 9 };
@@ -46,7 +52,7 @@ function setup({ existing = false, legacy = false, key = 'a'.repeat(64), cipher 
   vm.runInNewContext(readFileSync('.expo/finance-tests/storage/encrypted-database.js', 'utf8'), {
     setTimeout, exports: module.exports, module, require: name => { if (!dependencies[name]) throw new Error(name); return dependencies[name]; },
   });
-  return { open: module.exports.openEncryptedDatabase, recover: module.exports.recoverEncryptedDatabase, events, files, saved: () => key };
+  return { open: module.exports.openEncryptedDatabase, recover: module.exports.recoverEncryptedDatabase, events, files, fileUris, keyReads: () => keyReads, saved: () => key };
 }
 
 test('fresh install stores a random key before creating and publishing the verified database', async () => {
@@ -182,5 +188,27 @@ test('orphaned encrypted journals never cause a silent fresh database when the m
     await assert.rejects(state.open(), /security key|secured database/);
     assert.equal(state.events.length, 0);
     assert.ok(state.files.has('kuwenta-encrypted.db-wal'));
+  }
+});
+
+test('Expo Go stops before file inspection, key access, or migration, preserving all records', async () => {
+  const state = setup({ legacy: true, existing: true, key: null, expoGo: true });
+  await assert.rejects(state.open(), /Kuwenta APK or development build instead of Expo Go/);
+  await assert.rejects(state.recover({ accounts: [] }), /instead of Expo Go/);
+  assert.equal(state.keyReads(), 0);
+  assert.equal(state.fileUris.length, 0);
+  assert.equal(state.events.length, 0);
+  assert.equal(state.saved(), null);
+  assert.ok(state.files.has('kuwenta.db'));
+  assert.ok(state.files.has('kuwenta-encrypted.db'));
+});
+test('raw Android paths and existing iOS file URIs point to the same database location', async () => {
+  for (const directory of ['/private', 'file:///private', '/private/Kuwenta space % # \u20b1', 'file:///private/Kuwenta%20space%20%25%20%23%20%E2%82%B1/']) {
+    const state = setup({ directory, legacy: true });
+    await state.open();
+    const path = (directory.startsWith('file://') ? decodeURIComponent(directory.slice(7)) : directory).replace(/\/$/, '');
+    assert.ok(state.fileUris.every(uri => decodeURIComponent(uri.slice(7)).startsWith(path + '/')));
+    assert.ok(state.events.includes('attach'));
+    assert.ok(state.events.includes('publish'));
   }
 });

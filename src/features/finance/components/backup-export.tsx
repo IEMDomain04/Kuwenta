@@ -1,113 +1,45 @@
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { useTheme } from '@/hooks/use-theme';
-import { shareEncryptedBackup, validateBackupPassword } from '../encrypted-backup';
+import { shareBackup } from '../backup-files';
 import { useFinance } from '../provider';
 import { ActionButton } from './ui';
 
 export function BackupExport({ disabled = false }: { disabled?: boolean }) {
   const { busy, getBackupJson, showNotice } = useFinance();
-  const theme = useTheme();
-  const [open, setOpen] = useState(false);
-  const [password, setPassword] = useState('');
-  const [confirmation, setConfirmation] = useState('');
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState('');
   const pending = useRef(false);
-  const controller = useRef<AbortController | null>(null);
-  const passwordInput = useRef<TextInput>(null);
-  const confirmationInput = useRef<TextInput>(null);
-  const [sharing, setSharing] = useState(false);
   const mounted = useRef(true);
+  const cancellation = useRef<AbortController | null>(null);
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; controller.current?.abort(); };
+    return () => { mounted.current = false; cancellation.current?.abort(); };
   }, []);
 
   async function exportFile() {
     if (pending.current || busy || disabled) return;
-    try {
-      validateBackupPassword(password);
-      if (password !== confirmation) { confirmationInput.current?.focus(); throw new Error('The passwords must match.'); }
-    } catch (error) {
-      showNotice(error instanceof Error ? error.message : 'Check your password.', true);
-      if (password === confirmation || password.trim().length < 8 || password.length > 128) passwordInput.current?.focus();
-      return;
-    }
     pending.current = true;
+    const controller = new AbortController();
+    cancellation.current = controller;
     setExporting(true);
-    setMessage('Reading your records...');
-    setSharing(false);
-    const cancellation = new AbortController();
-    controller.current = cancellation;
-    // React Native's AbortController does not retain an abort reason.
-    let cancellationError = new Error('Backup cancelled.');
-    let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => {
-      cancellationError = new Error('Backup took too long. Please try again.');
-      cancellation.abort();
-    }, 120_000);
-    let rejectCancelled: () => void = () => {};
-    const cancelled = new Promise<never>((_resolve, reject) => {
-      rejectCancelled = () => reject(cancellationError);
-      cancellation.signal.addEventListener('abort', rejectCancelled, { once: true });
-    });
-    Keyboard.dismiss();
-    const enteredPassword = password;
-    setPassword('');
-    setConfirmation('');
+    setMessage('Preparing backup...');
     try {
-      const work = (async () => {
-        const json = await getBackupJson();
-        if (cancellation.signal.aborted) throw cancellationError;
-        await shareEncryptedBackup(json, enteredPassword, progress => {
-          if (!mounted.current || cancellation.signal.aborted) return;
-          setMessage(progress);
-          if (progress === 'Choose where to save your backup.') {
-            clearTimeout(timer); timer = undefined; setSharing(true);
-          }
-        }, cancellation.signal);
-      })();
-      await Promise.race([work, cancelled]);
-      if (mounted.current) {
-        setOpen(false);
-        setMessage('');
-        showNotice('Sharing closed. Check your saved file.');
-      }
+      const json = await getBackupJson();
+      if (!mounted.current) return;
+      await shareBackup(json, progress => { if (mounted.current) setMessage(progress); }, controller.signal);
+      if (mounted.current) showNotice('Sharing closed. Check your saved file.');
     } catch (error) {
-      if (mounted.current) {
-        setMessage('');
-        if (error instanceof Error && error.message === 'Backup cancelled.') setOpen(false);
-        else showNotice(error instanceof Error ? error.message : 'Could not export backup. Please try again.', true);
-      }
+      if (mounted.current) showNotice(error instanceof Error ? error.message : 'Could not export backup. Please try again.', true);
     } finally {
-      clearTimeout(timer);
-      cancellation.signal.removeEventListener('abort', rejectCancelled);
-      controller.current = null;
       pending.current = false;
-      if (mounted.current) { setExporting(false); setSharing(false); }
+      cancellation.current = null;
+      if (mounted.current) { setExporting(false); setMessage(''); }
     }
   }
-
-  const locked = busy || disabled || exporting;
-  const inputStyle = { color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 };
   return <>
     <ThemedText type="smallBold">Backup</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Save a password-protected copy of all your financial records. Keep the password safe: a forgotten password cannot be recovered.</ThemedText>
-    {open ? <>
-      <ThemedText type="small">Use a strong passphrase of 8 to 128 characters. The password is not saved.</ThemedText>
-      <TextInput ref={passwordInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Backup password" placeholder="Backup password" placeholderTextColor={theme.textSecondary}
-        value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false}
-        textContentType="newPassword" editable={!locked} maxLength={128} style={inputStyle} />
-      <TextInput ref={confirmationInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Confirm backup password" placeholder="Confirm password" placeholderTextColor={theme.textSecondary}
-        value={confirmation} onChangeText={setConfirmation} secureTextEntry autoCapitalize="none" autoCorrect={false}
-        textContentType="newPassword" editable={!locked} maxLength={128} style={inputStyle} />
-      <ActionButton label={exporting ? 'Preparing backup...' : 'Export backup'} disabled={locked} onPress={() => { void exportFile(); }} />
-      <ActionButton label="Cancel" disabled={sharing || (!exporting && locked)} onPress={() => {
-        if (exporting) { controller.current?.abort(); return; }
-        setPassword(''); setConfirmation(''); setMessage(''); setOpen(false);
-      }} />
-    </> : <ActionButton label="Export backup" disabled={locked} onPress={() => { setOpen(true); setMessage(''); }} />}
-    {message ? <ThemedText accessibilityLiveRegion="polite">{message}</ThemedText> : null}
+    <ThemedText type="small" themeColor="textSecondary">Save your accounts, transactions, budgets, and goals. The file has no password; keep it somewhere private.</ThemedText>
+    <ActionButton label={exporting ? 'Preparing backup...' : 'Export backup'} disabled={busy || disabled || exporting} onPress={() => { void exportFile(); }} />
+    {message ? <ThemedText type="small" accessibilityLiveRegion="polite">{message}</ThemedText> : null}
   </>;
 }

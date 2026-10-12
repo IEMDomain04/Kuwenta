@@ -56,7 +56,7 @@ test('initialization creates Cash exactly once and preserves records/opening bal
   await createTransaction(db, 'expense', expense());
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync('SELECT count(*) AS total FROM accounts')).total, 1);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
@@ -176,9 +176,9 @@ test('migration failure rolls back schema and version; newer schema is rejected'
   assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'accounts'"), null);
   fail = false;
   await initializeDatabase(db);
-  await db.execAsync('PRAGMA user_version = 10');
+  await db.execAsync('PRAGMA user_version = 11');
   await assert.rejects(initializeDatabase(db), /newer version/);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 11);
 });
 
 test('a failure after an edit write rolls back the original transaction', async (t) => {
@@ -278,7 +278,7 @@ test('invalid restore payloads fail before opening a write transaction and prese
     (v) => { v.transactions[0].amount = -1; },
     (v) => { v.transactions.push({ ...v.transactions[0] }); },
     (v) => { v.transactions[0].accountId = 'missing'; },
-    (v) => { v.version = 8; },
+    (v) => { v.version = 9; },
   ]) {
     const backup = backupFixture();
     mutate(backup);
@@ -344,7 +344,7 @@ test('confirmed restore replaces all accounts and history, including when restor
   const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
   const db = await setup(t);
   await createTransaction(db, 'old-record', expense());
-  await db.runAsync("INSERT INTO accounts VALUES ('other', 'Other', 'PHP', 0, 'spending', 1, 0)");
+  await db.runAsync("INSERT INTO accounts(id, name, currency, openingBalance, purpose, includedInAvailable, archived) VALUES ('other', 'Other', 'PHP', 0, 'spending', 1, 0)");
   await createTransaction(db, 'other-record', record({ accountId: 'other' }));
   const backup = backupFixture();
   backup.version = 1; delete backup.goals; delete backup.budgets;
@@ -382,7 +382,7 @@ test('version 1 migration preserves Cash amounts, IDs and timestamps and is repe
   await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.deepEqual(await listTransactions(db), before);
   assert.ok(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"));
@@ -521,7 +521,7 @@ test('version 3 table migration preserves records and rolls back failures', asyn
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
   db.execAsync = exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
 });
 
@@ -609,7 +609,7 @@ test('version 4 migration preserves existing adjustment and expense records', as
   await adjustAccountBalance(db, 'adjustment-kept', 'cash', 100, -12000);
   await db.execAsync('PRAGMA user_version = 3');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.equal((await getTransaction(db, 'adjustment-kept')).adjustmentDirection, 'increase');
   assert.equal((await getTransaction(db, 'expense-kept')).amount, 12000);
 });
@@ -806,7 +806,7 @@ test('preferences migration preserves financial records and is repeatable', asyn
   await db.execAsync('DROP TABLE preferences; PRAGMA user_version = 5');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.equal((await getTransaction(db, 'keep-six')).amount, 12000);
 });
 
@@ -816,7 +816,7 @@ test('full reset removes financial records and preferences, starts with zero Cas
   const { resetFinancialData } = require('../../.expo/finance-tests/storage/backup.js');
   await updateOpeningBalance(db, 100000);
   await createTransaction(db, 'old', expense());
-  await db.runAsync("INSERT INTO accounts VALUES ('saving', 'Savings', 'PHP', 50000, 'savings', 0, 1)");
+  await db.runAsync("INSERT INTO accounts(id, name, currency, openingBalance, purpose, includedInAvailable, archived) VALUES ('saving', 'Savings', 'PHP', 50000, 'savings', 0, 1)");
   await db.runAsync("INSERT INTO goals VALUES ('goal', 'Goal', 'saving', 100000, NULL, '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')");
   await resetFinancialData(db);
   await resetFinancialData(db);
@@ -1001,7 +1001,7 @@ test('budget schema migration preserves records and rolls back errors', async (t
   assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
   assert.equal((await listTransactions(db)).length, 1);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
 });
 
 
@@ -1131,4 +1131,57 @@ test('invalid account order is rejected and broken stored preferences do not hid
     await db.runAsync("UPDATE preferences SET value = ? WHERE key = 'accountOrder'", value);
     assert.deepEqual((await listAccounts(db)).map(account => account.id), ['cash', 'bank']);
   }
+});
+
+
+test('account colors persist through edits, restart, export and replacement restore without changing balances', async () => {
+  const { saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const directory = mkdtempSync(join(tmpdir(), 'kuwenta-colors-'));
+  const filename = join(directory, 'finance.db');
+  let db = connect(filename);
+  try {
+    await initializeDatabase(db);
+    const account = { ...(await getCashAccount(db)), id: 'bank', name: 'Bank', openingBalance: 450050, color: 'teal' };
+    await saveAccount(db, account, true);
+    await createTransaction(db, 'expense', { ...expense(), accountId: 'bank', amount: 5050 });
+    await saveAccount(db, { ...account, color: 'plum' }, false);
+    db.close(); db = connect(filename);
+    await initializeDatabase(db);
+    assert.equal((await listAccounts(db)).find(row => row.id === 'bank').color, 'plum');
+    const backup = parseBackup(await readBackupJson(db));
+    assert.equal(backup.version, 8);
+    await restoreBackup(db, backup);
+    const restored = (await listAccounts(db)).find(row => row.id === 'bank');
+    assert.equal(restored.color, 'plum');
+    assert.equal(calculateAccountSummary(restored, await listTransactions(db), '2026-10').balance, 445000);
+    await assert.rejects(saveAccount(db, { ...restored, color: '#FFFFFF' }, false), /valid account color/);
+    assert.equal((await listAccounts(db)).find(row => row.id === 'bank').color, 'plum');
+    await saveAccount(db, { ...restored, color: undefined }, false);
+    assert.equal((await listAccounts(db)).find(row => row.id === 'bank').color, undefined);
+  } finally {
+    db.close();
+    for (const name of readdirSync(directory)) unlinkSync(join(directory, name));
+    rmdirSync(directory);
+  }
+});
+
+test('version 9 account color migration preserves existing records and rolls back failed upgrades', async t => {
+  const db = await setup(t);
+  await updateOpeningBalance(db, 100000);
+  await createTransaction(db, 'expense', expense());
+  await db.execAsync('ALTER TABLE accounts DROP COLUMN color; PRAGMA user_version = 9;');
+  const exec = db.execAsync;
+  db.execAsync = async sql => { await exec(sql); if (sql.includes('ADD COLUMN color')) throw new Error('color migration failed'); };
+  await assert.rejects(initializeDatabase(db), /color migration failed/);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.ok(!(await db.getAllAsync('PRAGMA table_info(accounts)')).some(row => row.name === 'color'));
+  assert.equal((await getTransaction(db, 'expense')).amount, 12000);
+  db.execAsync = exec;
+  await initializeDatabase(db);
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
+  assert.equal((await getCashAccount(db)).openingBalance, 100000);
+  assert.equal((await getCashAccount(db)).color, undefined);
 });

@@ -26,7 +26,7 @@ export async function saveGoal(db: FinanceDatabase, goal: SavingsGoal, creating:
       validateAccount(newAccount);
       if (!creating || newAccount.id !== goal.accountId || newAccount.purpose !== 'savings' || newAccount.archived || newAccount.openingBalance !== 0 || newAccount.includedInAvailable) throw new Error('A new dedicated savings account must start at zero and be excluded from Available Money.');
       if (await transaction.getFirstAsync('SELECT id FROM accounts WHERE id = ?', newAccount.id)) throw new Error('Account submission ID is already in use.');
-      await transaction.runAsync('INSERT INTO accounts(id, name, currency, openingBalance, purpose, includedInAvailable, archived) VALUES (?, ?, ?, ?, ?, ?, ?)', newAccount.id, newAccount.name.trim(), 'PHP', 0, 'savings', 0, 0);
+      await transaction.runAsync('INSERT INTO accounts(id, name, currency, openingBalance, purpose, includedInAvailable, archived, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', newAccount.id, newAccount.name.trim(), 'PHP', 0, 'savings', 0, 0, newAccount.color ?? null);
     }
     const accounts = await listAccounts(transaction);
     validateGoal(goal, accounts);

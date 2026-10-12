@@ -1,9 +1,11 @@
+import { ACCOUNT_CARD_COLORS } from './account-colors';
 import { isUtcTimestamp, isValidDate, isValidTime } from './dates';
 import { CATEGORIES, type Account, type Transaction, type TransactionDraft, type SavingsGoal } from './types';
 
 export function validateAccount(account: Account): void {
   if (!account.name?.trim()) throw new Error('Enter an account name.');
   if (!account.id?.trim()) throw new Error('Could not identify this account. Try again.');
+  if (account.color !== undefined && (typeof account.color !== 'string' || !Object.hasOwn(ACCOUNT_CARD_COLORS, account.color))) throw new Error('Choose a valid account color.');
   if (account.currency !== 'PHP') throw new Error('Only PHP accounts are supported.');
   if (!Number.isSafeInteger(account.openingBalance)) throw new Error('Opening balance must be safe integer centavos.');
   if (!['spending', 'savings'].includes(account.purpose)) throw new Error('Invalid account purpose.');

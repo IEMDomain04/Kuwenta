@@ -17,6 +17,19 @@ let opening: Promise<unknown> = Promise.resolve();
 /** The caller owns this connection and must close it when finished. */
 export function openFinanceDatabase(): Promise<SQLiteDatabase> {
   const operation = opening.then(async () => {
+    const { default: Constants, ExecutionEnvironment } = await import('expo-constants');
+    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+      // Expo Go lacks SQLCipher. Keep test records separate from installed app data.
+      const { openDatabaseAsync } = await import('expo-sqlite');
+      const db = await openDatabaseAsync('kuwenta-expo-go-test.db');
+      try {
+        await initializeDatabase(db);
+        return db;
+      } catch (error) {
+        await db.closeAsync().catch(() => {});
+        throw error;
+      }
+    }
     const { openEncryptedDatabase } = await import('./encrypted-database');
     return openEncryptedDatabase();
   });

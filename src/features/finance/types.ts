@@ -1,4 +1,6 @@
-﻿/** All monetary fields are integer centavos. Only PHP is supported. */
+﻿import type { AccountCardColor } from './account-colors';
+
+/** All monetary fields are integer centavos. Only PHP is supported. */
 export type Account = {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export type Account = {
   purpose: 'spending' | 'savings';
   includedInAvailable: boolean;
   archived: boolean;
+  color?: AccountCardColor;
 };
 
 export const CATEGORIES = {

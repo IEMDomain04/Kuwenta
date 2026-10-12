@@ -1,6 +1,6 @@
 import type { FinanceDatabase } from './database';
 
-const VERSION = 9;
+const VERSION = 10;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -77,5 +77,11 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       await transaction.execAsync('INSERT INTO transactions_new SELECT * FROM transactions; DROP TABLE transactions; ALTER TABLE transactions_new RENAME TO transactions; ALTER TABLE transactions ADD COLUMN externalName TEXT; CREATE INDEX transactions_history ON transactions(accountId, transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_all_history ON transactions(transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_destination ON transactions(destinationAccountId); PRAGMA user_version = 9;');
     }
     if (version < 9) await transaction.execAsync('PRAGMA user_version = 9;');
+    if (version < 10) {
+      if (!(await transaction.getAllAsync<{ name: string }>('PRAGMA table_info(accounts)')).some(column => column.name === 'color')) {
+        await transaction.execAsync("ALTER TABLE accounts ADD COLUMN color TEXT CHECK(color IS NULL OR color IN ('green', 'blue', 'teal', 'plum', 'amber'));");
+      }
+      await transaction.execAsync('PRAGMA user_version = 10;');
+    }
   });
 }

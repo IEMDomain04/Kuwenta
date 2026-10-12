@@ -10,7 +10,7 @@ A local PHP money tracker built with Expo 57, React Native, Expo Router, and SQL
 - Account-to-account and external transfers; external movements remain separate from income/expense reports.
 - Monthly category budgets and savings goals in Plans.
 - Filtered transaction history and readable dates.
-- Onboarding, encrypted backup export/restore, and full reset in Settings.
+- Onboarding, password-free backup export/restore, and full reset in Settings.
 - Quick Entry recognizes supported transaction phrases and opens a draft for review before saving.
 
 ## Development
@@ -22,7 +22,7 @@ npx tsc --noEmit
 npm run test:finance
 ```
 
-Expo Go requires a compatible client for the installed SDK and native dependencies. Device validation is still required. `expo-dev-client` remains available for custom development builds.
+For ordinary UI and financial tracking tests, run `npx expo start --go` and scan with an SDK-compatible Expo Go client. Expo Go uses a separate, unencrypted `kuwenta-expo-go-test.db`; test records persist across reloads but do not automatically transfer to the installed app. Use sample data, or deliberately import a backup if needed. Notifications, launcher widgets, and database encryption still require an installed APK or development build. `expo-dev-client` remains available for custom development builds.
 
 ```sh
 npx expo run:android --device
@@ -43,7 +43,7 @@ Phone testing should include repeated saves, transfers, keyboard layouts, backup
 
 Android preview and production builds enable R8 code shrinking and unused-resource shrinking through `expo-build-properties`. Development builds include developer tools and are not representative of release size. Use the preview profile for a standalone APK; production generates an Android App Bundle for Play Store delivery.
 
-Startup uses the native green splash screen without the Expo overlay. Unused starter components and direct device, browser, gesture, Reanimated, and Worklets dependencies have been removed. Charts, SQLite, backup encryption, and mascot assets remain. Native dependencies required transitively by Expo Router may remain installed.
+Startup uses the native green splash screen without the Expo overlay. Unused starter components and direct device, browser, gesture, Reanimated, and Worklets dependencies have been removed. Charts, encrypted SQLite, legacy backup import, and mascot assets remain. Native dependencies required transitively by Expo Router may remain installed.
 
 Measure final size from a newly built release APK or Play-delivered app. JavaScript export measurements exclude native libraries and generated launcher resources. After changing native dependencies, regenerate local native projects using Expo prebuild before a local release build.
 
@@ -65,9 +65,9 @@ Accounts can be held and dragged to reorder within Spending or Savings in card o
 
 Account dragging previews neighboring positions and saves only on release, without a success toast. Cancelled moves restore the previous order. Field validation uses short top notices; account IDs stay internal. Transaction notices omit .00 for whole-peso amounts.
 
-Backup export accepts passwords of 8 to 128 characters and reports reading, encryption, file writing, and sharing separately. Preparation can be cancelled and times out after two minutes; late preparation cannot open the share sheet after cancellation. Encryption retains the existing AES-256-GCM / PBKDF2 settings, so older backups remain readable. The share sheet cannot confirm whether a destination saved the file.
+Backup export saves a portable, password-free JSON file through the phone's share/save options. Export serializes the fully loaded financial snapshot; it does not derive a password key or open another SQLite read transaction. Backups contain accounts, transactions, transfers, adjustments, budgets, and savings goals. Backups do not include the profile name, appearance, notification settings, or display-order preferences. The file is readable, so keep saved copies private. The share sheet cannot confirm whether a destination saved the file; temporary export files are removed when sharing closes.
 
-Android backup password derivation uses the small inline `KuwentaBackupCrypto` module and the platform PBKDF2-HMAC-SHA256 provider, off the JavaScript thread. The existing 600,000 iterations and encrypted format are unchanged. Export serializes the fully loaded financial snapshot rather than opening another SQLite transaction. Rebuild/install the APK (or development client) to enable native acceleration; Expo Go, iOS, and older builds use the compatible JavaScript fallback. No additional dependency is needed.
+Import validates the selected file before showing a compact preview of its date, accounts, records, budgets, goals, and balances. Explicit confirmation replaces all financial records in one transaction; failures roll back and preserve current records. Existing encrypted .kuwenta backups are detected automatically and still require their original password. Only this compatibility path retains AES-256-GCM, the existing 600,000 PBKDF2 iterations, and optional native key derivation.
 
 ## Android home-screen widget
 
@@ -89,6 +89,14 @@ Budget dashboard uses a single limit/spent/remaining summary, month selection an
 
 ### Encrypted local records
 
-Native builds use SQLCipher for the financial database and a random 256-bit key in Expo SecureStore. A new APK is required; Expo Go and old builds stop with an update message instead of falling back to plaintext. On first launch, existing records are exported to a staging database, compared, integrity checked, and reopened with the stored key before deleting the legacy database and its journal files. Failed copies preserve the original for retry. Subsequent opens reuse the encrypted file without running the copy or full integrity scan.
+Native builds use SQLCipher for the financial database and a random 256-bit key in Expo SecureStore. A new APK is required for encryption; old native builds stop with an update message instead of falling back to plaintext. Expo Go alone uses the separate unencrypted test database described above, without opening the encrypted database or accessing its key. On first launch, existing records are exported to a staging database, compared, integrity checked, and reopened with the stored key before deleting the legacy database and its journal files. Failed copies preserve the original for retry. Subsequent opens reuse the encrypted file without running the copy or full integrity scan.
 
-Export a password-protected backup before upgrading, and install the APK as an update without uninstalling. Android cloud backup and device transfer are excluded because the database key cannot be restored with the database. Missing or invalid keys never trigger a silent reset. The startup recovery form lets you unlock and preview an exported backup, then explicitly confirm replacement. Recovery writes and verifies a separate encrypted database before atomically saving its key and filename in SecureStore; the inaccessible original is retained. Failed moves preserve the plaintext original, and journal cleanup is retried independently of the main file. Widgets still expose their cached balances, and this does not add an app lock or protect a running app on a fully compromised phone. Native SQLCipher migration must be tested on an updated APK before release; JavaScript mocks do not validate the native encryption engine.
+Export a backup before upgrading, and install the APK as an update without uninstalling. Android cloud backup and device transfer are excluded because the database key cannot be restored with the database. Missing or invalid keys never trigger a silent reset. The startup recovery form lets you choose and preview an exported backup (older encrypted files require their original password), then explicitly confirm replacement. Recovery writes and verifies a separate encrypted database before atomically saving its key and filename in SecureStore; the inaccessible original is retained. Failed moves preserve the plaintext original, and journal cleanup is retried independently of the main file. Widgets still expose their cached balances, and this does not add an app lock or protect a running app on a fully compromised phone. Native SQLCipher migration must be tested on an updated APK before release; JavaScript mocks do not validate the native encryption engine.
+
+## Recorded-data insights
+
+Home prioritizes budget warnings, spending above recorded income, available money versus remaining positive budget allowances, and changes in spending over matched elapsed days. Savings funding, goal progress, and largest income/expense categories follow; tapping the mascot shows all relevant messages rather than only three. Future-dated entries are excluded from period feedback. These are recorded facts, not predictions or permission to spend.
+
+Accounts keeps balance definitions behind the question-mark help button, including every account's contribution and inclusion in Available Money. A separate insight card highlights negative balances, limited spending funds alongside savings, budget allowance gaps, and balance declines of at least 25% over the last 30 days. When none apply, it shows a short savings or current-month spending summary, or a starting-balance prompt for an empty account. The smaller help icon sits at the upper-left of the mascot bubble. Balance changes may include transfers and adjustments. Current totals preserve existing accounting rules, including archived accounts. Insight results are memoized until records or the Philippine calendar date change. No AI, polling, or new dependency is introduced.
+
+Account creation and editing offer Default, Green, Blue, Teal, Plum, and Amber card colors, with a live preview and light/dark variants. Existing accounts retain purpose-based default colors. Database schema 10 adds only an optional color column; version 8 backups preserve custom colors and still accept all older backup versions. Card colors do not affect balances or reports.

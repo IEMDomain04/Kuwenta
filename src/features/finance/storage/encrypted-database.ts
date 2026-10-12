@@ -1,3 +1,4 @@
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { openDatabaseAsync, defaultDatabaseDirectory, deleteDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import { File, Directory } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
@@ -12,7 +13,18 @@ const LEGACY = 'kuwenta.db';
 const KEY = 'kuwenta.database-key.v1';
 const OPTIONS = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 const RECOVERED_NAME = /^kuwenta-recovered-[a-f0-9]{32}\.db$/;
-const file = (name: string) => new File(defaultDatabaseDirectory, name);
+// Android SQLite exposes a filesystem path; File/Directory require a file URI.
+// Encode raw path segments once, while leaving existing iOS file URIs intact.
+const directoryUri = defaultDatabaseDirectory.startsWith('file://')
+  ? defaultDatabaseDirectory
+  : 'file://' + defaultDatabaseDirectory.split('/').map(encodeURIComponent).join('/');
+const file = (name: string) => new File(directoryUri, name);
+
+function requireEncryptedBuild() {
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    throw new Error('Encrypted records need the Kuwenta app. Open an installed Kuwenta APK or development build instead of Expo Go.');
+  }
+}
 function hasDatabaseFiles(name: string) {
   return ['', '-wal', '-shm', '-journal'].some(suffix => file(name + suffix).exists);
 }
@@ -68,6 +80,7 @@ async function openKeyed(name: string, key: string) {
 
 /** Native-only: web uses its existing unsupported-preview provider. */
 export async function openEncryptedDatabase(): Promise<SQLiteDatabase> {
+  requireEncryptedBuild();
   const saved = await SecureStore.getItemAsync(KEY, OPTIONS);
   let key = saved;
   let databaseName = DATABASE;
@@ -80,7 +93,7 @@ export async function openEncryptedDatabase(): Promise<SQLiteDatabase> {
     } catch { throw new DatabaseRecoveryError('The saved security key is invalid. Restore an exported backup to recover your records.'); }
   }
   const existing = file(databaseName).exists;
-  const directory = new Directory(defaultDatabaseDirectory);
+  const directory = new Directory(directoryUri);
   const recoveredExists = !saved && directory.exists && directory.list().some(entry => RECOVERED_NAME.test(entry.name));
   if (!key && (hasDatabaseFiles(databaseName) || recoveredExists)) {
     throw new DatabaseRecoveryError('The security key for these records is missing. Your database is preserved. Restore an exported backup to recover your records.');
@@ -138,6 +151,7 @@ export async function openEncryptedDatabase(): Promise<SQLiteDatabase> {
 
 /** Build recovery separately; changing the active key never touches the inaccessible original. */
 export async function recoverEncryptedDatabase(backup: FinanceBackup): Promise<void> {
+  requireEncryptedBuild();
   const validated = parseBackup(JSON.stringify(backup));
   const key = await randomKey();
   const suffix = Array.from(await getRandomBytesAsync(16), byte => byte.toString(16).padStart(2, '0')).join('');

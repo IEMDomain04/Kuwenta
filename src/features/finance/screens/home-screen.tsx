@@ -5,7 +5,7 @@ import { moneyInsights } from '../insights';
 import { router } from 'expo-router';
 import { CategoryIcon } from '../components/category-visual';
 import { philippineDateTime, formatTransactionDateTime } from '../dates';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppState, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { ThemedText } from '@/components/themed-text';
@@ -47,14 +47,14 @@ export default function HomeScreen() {
     : today.expenses ? 'You spent ' + formatMoney(today.expenses) + ' today. Tap to review your spending and budget details.'
     : today.income ? 'You recorded ' + formatMoney(today.income) + ' in income today. Keep recording your activity to build a clearer picture.'
     : 'No income or expenses recorded today. Your previous activity is ready to review below.';
-  let insights: string[] = [];
-  try { insights = moneyInsights(accounts, transactions, budgets, goals, now); }
-  catch { insights = ['Insights are unavailable. Review your records in Accounts and History.']; }
-  const budgetWarning = insights.find((text) => /over budget|budget used/.test(text));
-  const savingsProgress = insights.find((text) => /target reached|funded|transferred into savings/.test(text));
-  const insightMessage = budgetWarning ?? (today.expenses ? message : savingsProgress ?? insights[0] ?? message);
+  const insightDate = philippineDateTime(now).transactionDate;
+  const insights = useMemo(() => {
+    try { return moneyInsights(accounts, transactions, budgets, goals, new Date(insightDate + 'T00:00:00+08:00')); }
+    catch { return ['Insights are unavailable. Review your records in Accounts and History.']; }
+  }, [accounts, transactions, budgets, goals, insightDate]);
+  const insightMessage = insights[0] ?? message;
   // Expressions describe the displayed insight; they never change financial records.
-  const reaction = /over budget|budget used|transferred out/i.test(insightMessage) ? 'concerned'
+  const reaction = /over budget|budget used|limit reached|exceed income|below|transferred out|higher compared/i.test(insightMessage) ? 'concerned'
     : /target reached/i.test(insightMessage) ? 'celebrating'
     : /transferred into savings|funded|lower compared/i.test(insightMessage) ? 'encouraging'
     : insights.length ? 'thinking' : 'friendly';

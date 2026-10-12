@@ -90,10 +90,9 @@ export default function SettingsScreen() {
     <NotificationSettingsPanel onChanged={async () => { await refresh(); showNotice('Notifications updated.'); }} />
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Back up or replace your financial records.</ThemedText>
     <BackupExport disabled={busy} />
     <BackupImportPreview busy={busy} onRestore={restoreBackup} onNotice={showNotice} />
-    <ThemedText type="small" themeColor="textSecondary">Restoring replaces current financial records. Export a backup first to keep them.</ThemedText>
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Reset App</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Permanently clear Kuwenta records on this device and restart with Cash at zero. Export a backup above before resetting. There is no Undo.</ThemedText>

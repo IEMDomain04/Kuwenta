@@ -1,3 +1,5 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ACCOUNT_CARD_COLORS, accountCardColor, type AccountCardColor } from '../account-colors';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Keyboard, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
@@ -16,6 +18,7 @@ import { MoneyField } from './money-field';
 export function AccountManager({ accountId, onClose, initialPurpose = 'spending', initialCorrectOpening = false }: { accountId?: string; onClose?: () => void; initialPurpose?: Account['purpose']; initialCorrectOpening?: boolean } = {}) {
   const { accounts, transactions, month, busy, saveAccount, newSubmissionId, showNotice } = useFinance();
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
   const { height } = useWindowDimensions();
   const [purposeOpen, setPurposeOpen] = useState(false);
   const initial = accountId ? accounts.find((account) => account.id === accountId) : undefined;
@@ -84,13 +87,14 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     try { previewBalance = parseMoney(opening.replace(/,/g, '') || '0', { allowZero: true, allowNegative: true }); }
     catch { /* An incomplete or invalid draft has no displayable balance. */ }
   }
-  const previewColor = editor?.purpose === 'savings' ? theme.income : theme.secondary;
+  if (savedAccount) previewBalance = calculateAccountSummary(savedAccount, transactions, month).balance;
+  const previewColor = accountCardColor(editor ?? { purpose: initialPurpose }, dark);
   const inputStyle = { color: theme.text, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 12, fontSize: 12 };
   return <View style={{ gap: 12 }}>
     <ThemedText type="smallBold" accessibilityRole="header">Accounts | PHP</ThemedText>
     {editor ? <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
       <ThemedText type="smallBold">{editor.id ? 'Edit account' : 'Add account'}</ThemedText>
-      {!editor.id ? <View accessibilityLabel="New account preview" style={{ padding: 16, minHeight: 150, borderRadius: 20, backgroundColor: previewColor, gap: 12, boxShadow: '0 3px 8px rgba(20, 36, 67, 0.08)' }}>
+      <View accessibilityLabel="Account card preview" style={{ padding: 16, minHeight: 150, borderRadius: 20, backgroundColor: previewColor, gap: 12, boxShadow: '0 3px 8px rgba(20, 36, 67, 0.08)' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={20} color={theme.onAccent} />
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -99,12 +103,24 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
           </View>
         </View>
         <View style={{ marginTop: 'auto', gap: 3 }}>
-          <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: theme.onAccent }}>STARTING BALANCE</ThemedText>
+          <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: theme.onAccent }}>{editor.id ? 'CURRENT BALANCE' : 'STARTING BALANCE'}</ThemedText>
           <ThemedText style={{ fontSize: 18, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: theme.onAccent }}>{previewBalance === undefined ? '—' : formatMoney(previewBalance)}</ThemedText>
-          {previewBalance !== undefined && previewBalance < 0 ? <ThemedText type="small" style={{ fontSize: 10, color: theme.onAccent }}>Negative starting balance</ThemedText> : null}
+          {previewBalance !== undefined && previewBalance < 0 ? <ThemedText type="small" style={{ fontSize: 10, color: theme.onAccent }}>{editor.id ? 'Negative balance' : 'Negative starting balance'}</ThemedText> : null}
         </View>
-      </View> : null}
-      {savedAccount && <ThemedText type="smallBold">Current balance: {formatMoney(calculateAccountSummary(savedAccount, transactions, month).balance)}</ThemedText>}
+      </View>
+      <ThemedText type="small">Card color</ThemedText>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {([undefined, ...Object.keys(ACCOUNT_CARD_COLORS)] as (AccountCardColor | undefined)[]).map(color => {
+          const selected = editor.color === color;
+          const label = color ? ACCOUNT_CARD_COLORS[color].label : 'Default';
+          return <Pressable key={color ?? 'default'} accessibilityRole="button" accessibilityLabel={label + ' card color'} accessibilityState={{ selected, disabled: locked }} disabled={locked} onPress={() => setEditor({ ...editor, color })}
+            style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, borderWidth: selected ? 2 : 0, borderColor: theme.text, padding: 4, opacity: locked ? 0.5 : pressed ? 0.7 : 1 })}>
+            <View style={{ flex: 1, borderRadius: 18, backgroundColor: accountCardColor({ purpose: editor.purpose, color }, dark), alignItems: 'center', justifyContent: 'center' }}>
+              {selected ? <Ionicons name="checkmark" size={18} color={theme.onAccent} /> : color === undefined ? <Ionicons name="refresh-outline" size={16} color={theme.onAccent} /> : null}
+            </View>
+          </Pressable>;
+        })}
+      </View>
       <ThemedText type="small">Account name</ThemedText>
       <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savings..." placeholderTextColor={theme.textSecondary} style={inputStyle} />
       <ThemedText type="small">Purpose</ThemedText>

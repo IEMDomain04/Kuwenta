@@ -23,6 +23,7 @@ function harness() {
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-color-scheme') return { useColorScheme: () => 'light' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: '#06633E' }) };
+    if (name === '../account-colors') return require('../../.expo/finance-tests/account-colors.js');
     if (name === '../provider') return { useFinance: () => ({ accounts, transactions: [], busy: false, saveAccountOrder: async ids => { saved.push(Array.from(ids)); } }) };
     if (name === '../calculations') return { calculateAccountSummary: () => ({ balance: 100 }) };
     if (name === '../money') return { formatMoney: () => 'PHP 1.00' };
