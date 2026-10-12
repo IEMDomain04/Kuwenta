@@ -47,3 +47,11 @@ export function budgetFeedback(row: ReturnType<typeof budgetReport>['rows'][numb
   else if (row.progress >= 0.8) details.push('Check upcoming purchases before spending more in this category.');
   return { message, details };
 }
+
+/** Reorder previewed cards in their existing slots, preserving every hidden category. */
+export function mergeBudgetOrder(all: readonly string[], visible: readonly string[]): string[] {
+  if (new Set(all).size !== all.length || new Set(visible).size !== visible.length || visible.some(category => !all.includes(category))) throw new Error('Budgets changed. Try rearranging them again.');
+  const selected = new Set(visible);
+  let index = 0;
+  return all.map(category => selected.has(category) ? visible[index++] : category);
+}

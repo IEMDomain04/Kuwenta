@@ -8,7 +8,7 @@ import { pickBackupFile } from '../backup-files';
 import { previewBackup, type FinanceBackup } from '../backup';
 import { calculateCurrentMoney } from '../calculations';
 import { formatMoney } from '../money';
-import { philippineDateTime } from '../dates';
+import { formatTransactionDateTime, philippineDateTime } from '../dates';
 import { ActionButton } from './ui';
 
 export function BackupImportPreview({ disabled = false, busy = false, onRestore: restoreBackup, onNotice: showNotice, recovery = false }: {
@@ -45,7 +45,7 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
     setPreview({
       backup, name, summary: previewBackup(backup),
       total: calculateCurrentMoney(backup.accounts, backup.transactions).totalMoney,
-      exported: time.transactionDate + ' ' + time.transactionTime + ' PH',
+      exported: formatTransactionDateTime(time.transactionDate, time.transactionTime) + ' PH',
     });
     setSelected(null); setMessage('');
   }
@@ -112,6 +112,27 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
         } },
       ], { icon: 'cloud-download-outline', rows: [{ label: 'Backup', value: preview.name }, { label: 'Exported', value: preview.exported }, { label: 'Accounts / records', value: preview.summary.accountCount + ' / ' + preview.summary.transactionCount }, { label: 'Budgets / goals', value: preview.summary.budgetCount + ' / ' + preview.summary.goalCount }] });
   }
+  function openPreview() {
+    if (!preview || pending.current || confirming.current || disabled || busy) return;
+    confirming.current = true;
+    confirmation.alert('Backup preview', preview.summary.cashBalance < 0 ? 'Review these records before continuing. This backup has a negative Cash balance.' : 'Review these records before continuing. Your current data has not changed.', [
+      { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; clear(); } },
+      { text: 'Continue', onPress: () => { confirming.current = false; reviewRestore(); } },
+    ], { icon: 'document-text-outline', rows: [
+      { label: 'Total money', value: formatMoney(preview.total, true) },
+      { label: 'Backup file', value: preview.name },
+      { label: 'Exported', value: preview.exported },
+      { label: 'Accounts', value: String(preview.summary.accountCount) },
+      { label: 'Transactions', value: String(preview.summary.transactionCount) },
+      { label: 'Budgets', value: String(preview.summary.budgetCount) },
+      { label: 'Savings goals', value: String(preview.summary.goalCount) },
+    ] });
+  }
+  useEffect(() => {
+    if (preview && !working && !restoring) openPreview();
+    // Open once after file validation; canceled replacement remains available for review.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, working]);
   const locked = disabled || busy || working || restoring;
   return <>
     <ThemedText type="smallBold">{recovery ? 'Recover from backup' : 'Import backup'}</ThemedText>
@@ -126,17 +147,7 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
       <FieldError message={fieldErrors.password} />
       <ActionButton label="Unlock and preview" disabled={locked} onPress={() => { void unlock(); }} />
     </> : null}
-    {preview ? <>
-      <ThemedText type="smallBold">Backup contents</ThemedText>
-      <ThemedText type="small" numberOfLines={1}>{preview.name}</ThemedText>
-      <ThemedText type="small">Exported: {preview.exported}</ThemedText>
-      <ThemedText type="small">{preview.summary.accountCount} accounts ? {preview.summary.transactionCount} records</ThemedText>
-      <ThemedText type="small">{preview.summary.budgetCount} budgets ? {preview.summary.goalCount} savings goals</ThemedText>
-      <ThemedText type="small">Total money: {formatMoney(preview.total, true)}</ThemedText>
-      <ThemedText type="small">Cash balance: {formatMoney(preview.summary.cashBalance, true)}</ThemedText>
-      {preview.summary.cashBalance < 0 ? <ThemedText type="small" accessibilityRole="alert" themeColor="warning">This backup has a negative Cash balance.</ThemedText> : null}
-      <ActionButton label={restoring ? 'Restoring backup...' : recovery ? 'Restore this backup' : 'Replace current records'} disabled={locked} onPress={reviewRestore} />
-    </> : null}
+    {preview ? <ActionButton label="Review backup" disabled={locked} onPress={openPreview} /> : null}
     {selected || preview || working ? <ActionButton label={working ? 'Cancel preview' : 'Close preview'} disabled={restoring} onPress={clear} /> : null}
     {message ? <ThemedText type="small" accessibilityLiveRegion="polite">{message}</ThemedText> : null}
   </>;

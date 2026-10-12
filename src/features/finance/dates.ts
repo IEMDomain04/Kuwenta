@@ -57,8 +57,7 @@ export function formatTransactionDateTime(date: string, time: string): string {
   if (!isValidDate(date) || !isValidTime(time)) throw new Error('Invalid transaction date/time.');
   const [year, month, day] = date.split('-').map(Number);
   const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const hour = Number(time.slice(0, 2));
-  return names[month - 1] + ' ' + day + ', ' + year + ' · ' + (hour % 12 || 12) + ':' + time.slice(3, 5) + (hour < 12 ? ' AM' : ' PM');
+  return names[month - 1] + ' ' + day + ', ' + year + ' \u00b7 ' + formatTransactionTime(time);
 }
 export function readableReportingMonth(month: string): string {
   if (!isValidMonth(month)) throw new Error('Invalid reporting month.');
@@ -75,4 +74,10 @@ export function transactionDayHeading(date: string, now: Date = new Date()): str
   const day = new Intl.DateTimeFormat('en-PH', { weekday: 'short', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'));
   const label = date === today ? 'Today' : date === yesterday ? 'Yesterday' : day;
   return label + ' · ' + formatTransactionDateTime(date, '12:00:00').split(' · ')[0];
+}
+/** AM/PM display only; stored times remain HH:mm:ss. */
+export function formatTransactionTime(time: string): string {
+  if (!isValidTime(time)) throw new Error('Invalid transaction time.');
+  const hour = Number(time.slice(0, 2));
+  return (hour % 12 || 12) + ':' + time.slice(3, 5) + (hour < 12 ? ' AM' : ' PM');
 }

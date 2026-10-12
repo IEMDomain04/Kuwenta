@@ -79,3 +79,12 @@ test('recorded weekly balances include starting balances and dated records witho
   assert.equal(weeklyRecordedBalances([{...cash,openingBalance:-100}],[],new Date('2026-10-07T04:00:00Z'))[0].balance,-100);
   assert.throws(()=>weeklyRecordedBalances([cash],[record({accountId:'missing'})]));
 });
+
+
+test('category chart aggregates expenses only within the selected period', () => {
+  const { dashboardCategories } = require('../../.expo/finance-tests/dashboard.js');
+  const rows = [record({category:'Meals', amount:6000}), record({category:'Meals', amount:12000}), record({category:'Snacks', amount:3000}), record({type:'INCOME', amount:50000}), record({type:'TRANSFER', amount:10000}), record({type:'ADJUSTMENT', amount:1000}), record({transactionDate:'2026-10-11', amount:90000})];
+  assert.deepEqual(dashboardCategories(rows, '2026-10-09', '2026-10-09'), {total:21000,rows:[{category:'Meals',amount:18000},{category:'Snacks',amount:3000}]});
+  assert.deepEqual(dashboardCategories([], '2026-10-09', '2026-10-09'), {total:0, rows:[]});
+  assert.throws(() => dashboardCategories([record({amount:Number.MAX_SAFE_INTEGER}),record({amount:1})], '2026-10-09','2026-10-09'));
+});

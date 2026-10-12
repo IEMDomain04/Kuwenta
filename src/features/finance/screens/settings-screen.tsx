@@ -1,3 +1,4 @@
+import { HOME_VISUALIZATIONS, type HomeVisualization } from '../home-visualizations';
 import { useConfirmation } from '../components/confirmation';
 import { NotificationSettingsPanel } from '../components/notification-settings';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -12,11 +13,13 @@ import { BackupImportPreview } from '../components/backup-import-preview';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
-  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup } = useFinance();
+  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup, homeVisualizations, saveHomeVisualizations } = useFinance();
   const theme = useTheme();
   const confirmation = useConfirmation();
   const { mode, setMode } = useAppearance();
   function setAppearanceError(message: string) { if (message) showNotice(message, true); }
+  const [visualizationsOpen, setVisualizationsOpen] = useState(false);
+  const visualizationPending = useRef(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearanceOptions = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Use device setting']] as const;
   const [nameOpen, setNameOpen] = useState(false);
@@ -32,6 +35,13 @@ export default function SettingsScreen() {
     try { await saveDisplayName(name); setNameOpen(false); }
     catch (cause) { setNameError(cause instanceof Error ? cause.message : 'Could not save your name.'); }
     finally { namePending.current = false; setSavingName(false); }
+  }
+  async function saveVisualizations(selected: HomeVisualization[]) {
+    if (busy || visualizationPending.current) return;
+    visualizationPending.current = true;
+    try { await saveHomeVisualizations(selected); }
+    catch (cause) { showNotice(cause instanceof Error ? cause.message : 'Could not save Home visualizations.', true); }
+    finally { visualizationPending.current = false; }
   }
   const section = { padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 };
   const pending = useRef(false);
@@ -69,6 +79,25 @@ export default function SettingsScreen() {
         <ThemedText type="small" style={{ flex: 1 }}>{label}</ThemedText>
         {mode === value ? <Ionicons name="checkmark" size={16} color={theme.accent} /> : null}
       </Pressable>)}
+    </View> : null}
+
+    <ThemedText type="smallBold">Home visualizations</ThemedText>
+    <Pressable accessibilityRole="button" accessibilityLabel="Home visualizations" accessibilityState={{ expanded: visualizationsOpen }} onPress={() => setVisualizationsOpen(value => !value)}
+      style={{ minHeight: 48, paddingHorizontal: 12, borderRadius: 12, backgroundColor: theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <ThemedText type="small" style={{ flex: 1 }}>{homeVisualizations.length ? homeVisualizations.length + ' selected' : 'None selected'}</ThemedText>
+      <Ionicons name={visualizationsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textSecondary} />
+    </Pressable>
+    {visualizationsOpen ? <View style={{ borderRadius: 12, padding: 4, backgroundColor: theme.background }}>
+      {HOME_VISUALIZATIONS.map(option => {
+        const checked = homeVisualizations.includes(option.id);
+        return <Pressable key={option.id} accessibilityRole="checkbox" accessibilityLabel={option.label} accessibilityState={{ checked, disabled: busy }} disabled={busy}
+          onPress={() => { void saveVisualizations(checked ? homeVisualizations.filter(value => value !== option.id) : [...homeVisualizations, option.id]); }}
+          style={{ minHeight: 48, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10, opacity: busy ? 0.5 : 1 }}>
+          <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={20} color={checked ? theme.accent : theme.textSecondary} />
+          <ThemedText type="small" style={{ flex: 1 }}>{option.label}</ThemedText>
+        </Pressable>;
+      })}
+      <ActionButton compact label="Select none" disabled={busy || homeVisualizations.length === 0} onPress={() => { void saveVisualizations([]); }} />
     </View> : null}
 
     <Modal visible={nameOpen} transparent animationType="fade" onRequestClose={() => { if (!namePending.current) setNameOpen(false); }}>

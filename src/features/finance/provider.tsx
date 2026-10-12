@@ -1,14 +1,16 @@
+import { loadHomeVisualizations, saveHomeVisualizations as saveHomeVisualizationsRecord, type HomeVisualization } from './home-visualizations';
+import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { syncWidgets } from './widgets';
 import { syncNotifications, observeNotificationTaps } from './notifications';
 import { formatMoney } from './money';
 import { router, useRootNavigationState } from 'expo-router';
-import { listBudgets, saveBudget as saveBudgetRecord, deleteBudget, copyPreviousBudgets } from './storage/budgets';
+import { listBudgets, saveBudgetOrder as saveBudgetOrderRecord, saveBudget as saveBudgetRecord, deleteBudget, copyPreviousBudgets } from './storage/budgets';
 import { CashSetup } from './components/cash-setup';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, ActivityIndicator, AppState, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { AccessibilityInfo, AppState, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { ThemedText } from '@/components/themed-text';
@@ -25,8 +27,10 @@ import { createExternalTransfer, adjustAccountBalance, createTransactionId, crea
 import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
-type Snapshot = { displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
+type Snapshot = { homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
+  saveHomeVisualizations: (selected: HomeVisualization[]) => Promise<void>;
+  saveBudgetOrder: (month: string, categories: readonly string[]) => Promise<void>;
   recoverBackup: (backup: FinanceBackup) => Promise<void>;
   saveAccountOrder: (ids: readonly string[]) => Promise<void>;
   saveDisplayName: (name: string) => Promise<void>;
@@ -100,6 +104,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const lastEntryAccount = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'lastEntryAccount'"))?.value;
       const displayName = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'displayName'"))?.value;
       const needsCashSetup = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'cashSetupComplete'"))?.value === '0';
+      const homeVisualizations = await loadHomeVisualizations(connection);
       const goals = await listGoals(connection);
       const budgets = await listBudgets(connection);
       const month = philippineDateTime().transactionDate.slice(0, 7);
@@ -109,7 +114,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       catch (cause) { console.warn('Could not update Kuwenta widgets:', cause); }
       loadedMonth = month;
       if (active) {
-        const next = { displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
+        const next = { homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
         loadedSnapshot.current = next; setSnapshot(next); setError(''); setCanRecover(false); recoveryAllowed = false;
       }
     }
@@ -138,6 +143,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       finally { locked = false; if (active) setBusy(false); }
     }
     actions.current = {
+      saveHomeVisualizations: selected => write(db => saveHomeVisualizationsRecord(db, selected), undefined),
+      saveBudgetOrder: (month, categories) => write(db => saveBudgetOrderRecord(db, month, categories), undefined),
       recoverBackup: async backup => {
         if (locked || !active || connection || !recoveryAllowed) throw new Error('Recovery is not available. Tap Retry first.');
         locked = true; setBusy(true);
@@ -198,11 +205,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       void running.finally(async () => { await connection?.closeAsync(); }).catch(() => {});
     };
   }, []);
+  if (!snapshot && (!error || (busy && !canRecover))) return <ThemedView accessibilityLabel="Opening Kuwenta" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+    <Image source={require('../../../assets/images/kuwenta-app-icon.png')} contentFit="contain" accessible={false} style={{ width: 96, height: 96, borderRadius: 22 }} />
+  </ThemedView>;
   if (!snapshot) return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><FinanceScreen title="Kuwenta">
-    <View style={{ gap: 8 }}>
-      {busy ? <ActivityIndicator /> : null}
-      <ThemedText accessibilityRole={busy ? undefined : 'alert'}>{busy ? (canRecover ? 'Recovering your records...' : 'Loading your money...') : error || 'Preparing records...'}</ThemedText>
-    </View>
+    <ThemedText accessibilityRole="alert">{error}</ThemedText>
     <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} />
     {canRecover ? <BackupImportPreview recovery busy={busy} onRestore={backup => actions.current?.recoverBackup(backup) ?? Promise.reject(new Error('App is closing.'))} onNotice={message => setError(message)} /> : null}
   </FinanceScreen></KeyboardAvoidingView>;
@@ -212,6 +219,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     showNotice: (message, error = false) => setNotice({ message, tone: error ? 'error' : 'success', expiresAt: Date.now() + (error ? 7000 : 4000) }),
+    saveHomeVisualizations: selected => actions.current?.saveHomeVisualizations(selected) ?? unavailable(),
+    saveBudgetOrder: (month, categories) => actions.current?.saveBudgetOrder(month, categories) ?? unavailable(),
     recoverBackup: backup => actions.current?.recoverBackup(backup) ?? unavailable(),
     saveAccountOrder: (ids) => actions.current?.saveAccountOrder(ids) ?? unavailable(),
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },

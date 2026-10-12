@@ -1,6 +1,6 @@
 import type { FinanceDatabase } from './database';
 
-const VERSION = 10;
+const VERSION = 11;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -79,9 +79,16 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
     if (version < 9) await transaction.execAsync('PRAGMA user_version = 9;');
     if (version < 10) {
       if (!(await transaction.getAllAsync<{ name: string }>('PRAGMA table_info(accounts)')).some(column => column.name === 'color')) {
-        await transaction.execAsync("ALTER TABLE accounts ADD COLUMN color TEXT CHECK(color IS NULL OR color IN ('green', 'blue', 'teal', 'plum', 'amber'));");
+        await transaction.execAsync("ALTER TABLE accounts ADD COLUMN color TEXT CHECK(color IS NULL OR color IN ('green', 'blue', 'teal', 'plum', 'amber', 'cyan', 'indigo', 'rose', 'coral', 'brown', 'slate'));");
       }
       await transaction.execAsync('PRAGMA user_version = 10;');
+    }
+    if (version < 11) {
+      if (version === 10) {
+        // Replace only the color column constraint; account IDs and foreign keys stay intact.
+        await transaction.execAsync("ALTER TABLE accounts RENAME COLUMN color TO previousColor; ALTER TABLE accounts ADD COLUMN color TEXT CHECK(color IS NULL OR color IN ('green', 'blue', 'teal', 'plum', 'amber', 'cyan', 'indigo', 'rose', 'coral', 'brown', 'slate')); UPDATE accounts SET color = previousColor; ALTER TABLE accounts DROP COLUMN previousColor;");
+      }
+      await transaction.execAsync('PRAGMA user_version = 11;');
     }
   });
 }

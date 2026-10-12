@@ -26,9 +26,10 @@ const mascotImages = {
 };
 
 export default function HomeScreen() {
-  const { displayName, accounts, transactions, budgets, goals, month, busy } = useFinance();
+  const { displayName, accounts, transactions, budgets, goals, month, busy, homeVisualizations } = useFinance();
   const theme = useTheme();
   const { height, fontScale } = useWindowDimensions();
+  const [draggingBudget, setDraggingBudget] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function HomeScreen() {
     const subscription = AppState.addEventListener('change', state => { if (state === 'active') start(); else stop(); });
     return () => { stop(); subscription.remove(); };
   }, []);
-  const recent = transactions.filter((row) => row.type !== 'EXTERNAL').sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)).slice(0, 5);
+  const recent = useMemo(() => transactions.filter((row) => row.type !== 'EXTERNAL').sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)).slice(0, 5), [transactions]);
   const hasActivity = transactions.some((record) => record.type === 'INCOME' || record.type === 'EXPENSE');
   const today = dashboardReport(transactions, 'day', month, now);
   const dateLabel = new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', weekday: 'long', month: 'long', day: 'numeric' }).format(now);
@@ -55,7 +56,7 @@ export default function HomeScreen() {
   const insightMessage = insights[0] ?? message;
   // Expressions describe the displayed insight; they never change financial records.
   const reaction = moneyInsightReaction(insightMessage);
-  return <FinanceScreen title="Kuwenta" floatingAction={<AddTransactionButton disabled={busy} />}>
+  return <FinanceScreen title="Kuwenta" scrollEnabled={!draggingBudget} floatingAction={<AddTransactionButton disabled={busy} />}>
     <View style={styles.greeting}>
       <ThemedText type="small" themeColor="textSecondary">{dateLabel}</ThemedText>
       <ThemedText accessibilityRole="header" style={styles.heading}>{dashboardGreeting(displayName ?? '', now)}</ThemedText>
@@ -87,8 +88,8 @@ export default function HomeScreen() {
         </SafeAreaView>
       </View>
     </Modal>
-    {hasActivity ? <PeriodOverview now={now} /> : null}
-    <BudgetOverview compact reportingMonth={philippineDateTime(now).transactionDate.slice(0, 7)} />
+    {hasActivity && homeVisualizations.some(value => value !== 'budgets') ? <PeriodOverview now={now} visible={homeVisualizations} /> : null}
+    {homeVisualizations.includes('budgets') ? <BudgetOverview compact onDraggingChange={setDraggingBudget} reportingMonth={philippineDateTime(now).transactionDate.slice(0, 7)} /> : null}
     {recent.length > 0 ? <View style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 12, gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <ThemedText type="smallBold" style={{ fontSize: 13 }} accessibilityRole="header">Recent transactions</ThemedText>

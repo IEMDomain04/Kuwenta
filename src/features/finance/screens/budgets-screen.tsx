@@ -1,3 +1,4 @@
+import { BudgetList } from '../components/budget-list';
 import { FieldError } from '../components/field-error';
 import { type ConfirmationOptions, useConfirmation } from '../components/confirmation';
 import { ThemedText } from "@/components/themed-text";
@@ -52,6 +53,7 @@ export default function BudgetsScreen() {
     creating: boolean;
   } | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [unbudgetedOpen, setUnbudgetedOpen] = useState(false);
   function setError(message: string) {
     if (message) finance.showNotice(message, true);
@@ -189,6 +191,7 @@ export default function BudgetsScreen() {
     >
       <FinanceScreen
         title="Budgets"
+        scrollEnabled={!dragging}
         tabScreen={false}
         headerLeading={<BackButton disabled={locked} />}
         headerAccessory={
@@ -253,18 +256,16 @@ export default function BudgetsScreen() {
         ) : null}
         {!editor ? (
           <>
-            {report.rows.map((row) => (
+            <BudgetList key={month + JSON.stringify(report.rows.map(row => row.category))} rows={report.rows} disabled={locked} onDraggingChange={setDragging} onReorder={categories => finance.saveBudgetOrder(month, categories)} renderRow={(row, onHold) => (
               <View
                 key={row.category}
                 style={{
-                  padding: 14,
-                  borderRadius: 16,
-                  backgroundColor: theme.backgroundElement,
                   gap: 8,
                 }}
               >
                 <BudgetUsage
                   row={row}
+                  onHold={onHold}
                   available={available}
                   totalRemaining={totalRemaining}
                   currentMonth={month === finance.currentMonth}
@@ -310,7 +311,7 @@ export default function BudgetsScreen() {
                   }
                 />
               </View>
-            ))}
+            )} />
             {report.rows.length === 0 ? (
               <ThemedText type="small" themeColor="textSecondary">
                 No budgets yet. Tap Add to set a category limit.

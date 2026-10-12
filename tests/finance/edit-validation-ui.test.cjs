@@ -26,6 +26,7 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
     for (const [suffix, exported] of [['/field-error', 'FieldError'], ['/money-field', 'MoneyField'], ['/selection-sheet', 'SelectionSheet'], ['/quick-entry', 'QuickEntry'], ['/transaction-form', 'TransactionForm'], ['/transaction-date-time', 'TransactionDateTime']]) {
       if (name.endsWith(suffix)) return { [exported]: exported };
     }
+    if (name.endsWith('/budget-list')) return { BudgetList: 'BudgetList' };
     if (name.endsWith('/budget-usage')) return { BudgetUsage: 'BudgetUsage' };
     if (name.endsWith('/home-month-picker')) return { HomeMonthPicker: 'MonthPicker' };
     if (name.endsWith('/ui')) return { ActionButton: 'Button', IconButton: 'IconButton', FinanceScreen: 'Screen', BackButton: 'Back' };
@@ -36,7 +37,7 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
   const source = ts.transpileModule(fs.readFileSync('src/features/finance/' + file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   vm.runInNewContext(source, sandbox);
   function render() {
-    cursor = 0; const nodes = []; function walk(node) { if (Array.isArray(node)) return node.forEach(walk); if (!node?.props) return; nodes.push(node); walk(node.props.children); walk(node.props.actions); }
+    cursor = 0; const nodes = []; function walk(node) { if (Array.isArray(node)) return node.forEach(walk); if (!node?.props) return; nodes.push(node); walk(node.props.children); if (node.type === 'BudgetList') node.props.rows.forEach(row => walk(node.props.renderRow(row))); walk(node.props.actions); }
     const component = sandbox.exports.default ?? sandbox.exports.AccountManager ?? sandbox.exports.TransactionForm;
     const props = file.includes('account-manager') ? { accountId: params.id, onClose() {} } : file.includes('transaction-form') ? { disabled: false, onSubmit, onCancel() {}, onTypeChange() {}, initialType: params.type, initialAccountId: params.accountId } : {};
     walk(component(props));

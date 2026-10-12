@@ -95,3 +95,16 @@ export function weeklyRecordedBalances(accounts: readonly Account[], transaction
     balance: day.date > today ? null : calculateCurrentMoney(accounts, transactions.filter((record) => record.transactionDate <= day.date)).totalMoney,
   }));
 }
+
+/** Expense-only category totals for the same selected dashboard period. */
+export function dashboardCategories(transactions: readonly Transaction[], start: string, end: string) {
+  const amounts = new Map<string, number>();
+  let total = 0;
+  for (const record of transactions) {
+    if (record.type !== 'EXPENSE' || record.transactionDate < start || record.transactionDate > end) continue;
+    if (!Number.isSafeInteger(record.amount) || record.amount <= 0 || total > Number.MAX_SAFE_INTEGER - record.amount) throw new Error('Category spending exceeds the supported range.');
+    total += record.amount;
+    amounts.set(record.category, (amounts.get(record.category) ?? 0) + record.amount);
+  }
+  return { total, rows: [...amounts].map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category)) };
+}
