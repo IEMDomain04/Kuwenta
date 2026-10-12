@@ -966,7 +966,7 @@ test('deleting a transfer account rolls back if it would overflow the remaining 
   await saveAccount(db, account, true);
   await saveAccount(db, { ...account, id: 'offset', openingBalance: -Number.MAX_SAFE_INTEGER }, true);
   await createTransaction(db, 'transfer', { ...expense(), accountId: 'bank', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'offset', amount: 1000 });
-  await createTransaction(db, 'income', { ...income(), accountId: 'bank', amount: 1 });
+  await createTransaction(db, 'income', { ...income(), accountId: 'bank', amount: 1, transactionTime: '14:34:00' });
   await assert.rejects(deleteAccount(db, 'offset'), /supported|safe|range/);
   assert.ok(await db.getFirstAsync("SELECT id FROM accounts WHERE id = 'offset'"));
   assert.equal((await listTransactions(db)).length, 2);
@@ -1216,4 +1216,27 @@ test('version 9 account color migration preserves existing records and rolls bac
   assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.equal((await getCashAccount(db)).color, undefined);
+});
+
+
+test('JSON and Excel backups restore the same records into real SQLite', async t => {
+ const db = await setup(t);
+ const { cash } = require('./fixtures.cjs');
+ const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+ const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
+ const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+ const stamp = '2026-10-12T00:00:00.000Z';
+ const saving = { ...cash, id: 'save', name: 'Savings', purpose: 'savings', includedInAvailable: false, openingBalance: 0, color: 'green' };
+ const original = parseBackup(serializeBackup([cash, saving], [
+  record({ id: 'expense', category: 'Groceries', amount: 6025 }),
+  record({ id: 'transfer', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'save', amount: 20000, sourcePurpose: 'spending', destinationPurpose: 'savings' }),
+  record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Parent', adjustmentDirection: 'increase', amount: 10000 }),
+ ], stamp, [{ id: 'goal', name: 'Laptop', accountId: 'save', targetAmount: 100000, createdAt: stamp, updatedAt: stamp }], [{ month: '2026-10', category: 'Groceries', limitAmount: 20000 }]));
+ function normalize(backup) {
+  return { ...backup, exportedAt: stamp, accounts: [...backup.accounts].sort((a,b) => a.id.localeCompare(b.id)), transactions: [...backup.transactions].sort((a,b) => a.id.localeCompare(b.id)) };
+ }
+ for (const backup of [original, parseExcelBackup(createExcelBackup(original))]) {
+  await restoreBackup(db, backup);
+  assert.deepEqual(normalize(parseBackup(await readBackupJson(db))), normalize(original));
+ }
 });

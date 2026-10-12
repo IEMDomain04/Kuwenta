@@ -111,7 +111,7 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
   const locked = disabled || busy || working || restoring;
   return <>
     <ThemedText type="smallBold">{recovery ? 'Recover from backup' : 'Import backup'}</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Choose a backup, review it, then confirm replacement.</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Choose a Kuwenta JSON or Excel backup, review it, then confirm replacement.</ThemedText>
     <ActionButton label={working ? 'Checking backup...' : 'Choose backup file'} disabled={locked} onPress={() => { void chooseFile(); }} />
     {selected ? <>
       <ThemedText type="small">This older backup is protected. Enter its original password.</ThemedText>
