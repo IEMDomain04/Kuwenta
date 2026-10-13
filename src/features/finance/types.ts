@@ -1,4 +1,5 @@
-﻿import type { AccountCardColor } from './account-colors';
+import type { AccountIconName } from './account-icons';
+import type { AccountCardColor } from './account-colors';
 
 /** All monetary fields are integer centavos. Only PHP is supported. */
 export type Account = {
@@ -10,15 +11,16 @@ export type Account = {
   includedInAvailable: boolean;
   archived: boolean;
   color?: AccountCardColor;
+  icon?: AccountIconName;
 };
 
 export const CATEGORIES = {
-  INCOME: ['Allowance', 'Salary', 'Part-time Work', 'Freelance', 'Gifts', 'Other Income', 'Gift', 'Business', 'Other'],
-  EXPENSE: ['Meals', 'Snacks', 'Drinks', 'Transport', 'Café', 'Groceries', 'Personal Care', 'Cleaning Supplies', 'Mobile Load', 'Mobile Data', 'Games', 'Entertainment', 'Tech', 'Accessories', 'School Supplies', 'Personal Items', 'Shopping', 'Bills', 'Fees', 'Health', 'Education', 'Family', 'Subscriptions', 'Other'],
+  INCOME: ['Allowance', 'Service sale', 'Salary', 'Part-time Work', 'Freelance', 'Gifts', 'Other Income', 'Gift', 'Business', 'Other'],
+  EXPENSE: ['Meals', 'Snacks', 'Drinks', 'Transport', 'Café', 'Groceries', 'Personal Care', 'Cleaning Supplies', 'Mobile Load', 'Mobile Data', 'Games', 'Entertainment', 'Tech', 'Accessories', 'School Supplies', 'Personal Items', 'Shopping', 'Bills', 'Fees', 'Health', 'Education', 'Family', 'Subscriptions', 'Cash-in (E-bank)', 'Cash-out (E-bank)', 'Service sale', 'Other'],
 } as const;
 
 /** Accepted for existing records and backups, but hidden from new-entry pickers. */
-export const LEGACY_EXPENSE_CATEGORIES: readonly string[] = ['Food', 'Transportation', 'Snacks & Drinks', 'Mobile Load & Data', 'Games & Entertainment', 'Tech & Accessories', 'School & Personal Items'];
+export const LEGACY_EXPENSE_CATEGORIES: readonly string[] = ['E-bank Cash-in', 'E-bank Cash-out', 'Food', 'Transportation', 'Snacks & Drinks', 'Mobile Load & Data', 'Games & Entertainment', 'Tech & Accessories', 'School & Personal Items'];
 
 export type ManualTransactionType = keyof typeof CATEGORIES | 'TRANSFER';
 export type TransactionType = ManualTransactionType | 'TRANSFER' | 'ADJUSTMENT' | 'EXTERNAL';
@@ -33,7 +35,10 @@ export type TransactionDraft = {
   transactionDate: string; // YYYY-MM-DD, Philippine calendar date
   transactionTime: string; // HH:mm:ss, Philippine 24-hour time
   notes?: string;
+  exchange?: Exchange;
 };
+
+export type Exchange = { kind: 'E-bank Cash-in' | 'E-bank Cash-out' | 'Service sale'; paid: number; received: number; receivedAccountId: string; extraAccountId: string; earningsConfirmed: boolean };
 
 export type Transaction = Omit<TransactionDraft, 'type'> & {
   id: string;
@@ -44,6 +49,7 @@ export type Transaction = Omit<TransactionDraft, 'type'> & {
   sourcePurpose?: Account['purpose'];
   destinationPurpose?: Account['purpose'];
   externalName?: string;
+  exchangeParentId?: string;
   adjustmentDirection?: 'increase' | 'decrease';
 };
 
@@ -57,4 +63,5 @@ export type SavingsGoal = {
   updatedAt: string;
 };
 
+/** month is a stable period key: YYYY-MM, daily:YYYY-MM-DD, or weekly:Monday date. */
 export type Budget = { month: string; category: string; limitAmount: number };

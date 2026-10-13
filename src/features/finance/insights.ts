@@ -1,3 +1,4 @@
+import { budgetPeriodKey, budgetPeriodLabel } from './budget-periods';
 import type { Account, Budget, SavingsGoal, Transaction } from './types';
 import { calculateCurrentMoney, calculateAccountSummary, calculateFinanceSummary, calculateGoalProgress, calculateSavings } from './calculations';
 import { budgetReport } from './budgets';
@@ -19,6 +20,11 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
   const progress: string[] = [];
   const observations: string[] = [];
   const report = budgetReport(budgets, recorded, month);
+  for (const scope of [budgetPeriodKey('daily', date), budgetPeriodKey('weekly', date)]) {
+    for (const row of budgetReport(budgets, recorded, scope).rows.filter(row => row.progress >= 0.8)) {
+      warnings.push(row.remaining < 0 ? row.category + ' is ' + money(-row.remaining) + ' over budget for ' + budgetPeriodLabel(scope) + '.' : row.category + ': ' + money(Math.max(0, row.remaining)) + ' left for ' + budgetPeriodLabel(scope) + '.');
+    }
+  }
   for (const account of accounts) {
     const balance = calculateAccountSummary(account, recorded, month).balance;
     if (balance < 0) warnings.push(account.name + ' has a negative recorded balance of ' + money(balance) + '. Review its activity.');

@@ -35,7 +35,7 @@ type Actions = {
   saveAccountOrder: (ids: readonly string[]) => Promise<void>;
   saveDisplayName: (name: string) => Promise<void>;
   saveExternal: (record: Transaction) => Promise<void>;
-  saveBudget: (budget: Budget, creating: boolean) => Promise<void>;
+  saveBudget: (budget: Budget, creating: boolean, original?: Pick<Budget, 'month' | 'category'>) => Promise<void>;
   removeBudget: (month: string, category: string) => Promise<void>;
   copyBudgets: (month: string) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
@@ -162,7 +162,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       saveDisplayName: (name) => write((db) => saveDisplayNameRecord(db, name), 'Name updated.'),
       saveExternal: (record) => write((db) => createExternalTransfer(db, record.id, record), 'External transfer saved', formatMoney(record.amount, true), false, 'info'),
       refresh,
-      saveBudget: (budget, creating) => write((db) => saveBudgetRecord(db, budget, creating), 'Budget saved.'),
+      saveBudget: (budget, creating, original) => write((db) => saveBudgetRecord(db, budget, creating, original), 'Budget saved.'),
       removeBudget: (month, category) => write((db) => deleteBudget(db, month, category), 'Budget deleted.'),
       copyBudgets: (month) => write((db) => copyPreviousBudgets(db, month), 'Budgets copied.'),
       removeAccount: (id) => write((db) => deleteAccount(db, id), 'Account deleted.'),
@@ -226,7 +226,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
     saveDisplayName: (name) => actions.current?.saveDisplayName(name) ?? unavailable(),
     saveExternal: (record) => actions.current?.saveExternal(record) ?? unavailable(),
-    saveBudget: (budget, creating) => actions.current?.saveBudget(budget, creating) ?? unavailable(),
+    saveBudget: (budget, creating, original) => actions.current?.saveBudget(budget, creating, original) ?? unavailable(),
     removeBudget: (month, category) => actions.current?.removeBudget(month, category) ?? unavailable(),
     copyBudgets: (month) => actions.current?.copyBudgets(month) ?? unavailable(),
     saveGoal: (goal, creating, newAccount) => actions.current?.saveGoal(goal, creating, newAccount) ?? unavailable(),
@@ -272,7 +272,7 @@ function NotificationTapObserver() {
   const navigation = useRootNavigationState();
   useEffect(() => {
     if (!navigation?.key) return;
-    return observeNotificationTaps(screen => router.navigate(screen === 'budgets' ? '/budgets' : '/'));
+    return observeNotificationTaps((screen, scope) => router.navigate(screen === 'budgets' ? { pathname: '/budgets', params: scope ? { scope } : {} } : '/'));
   }, [navigation?.key]);
   return null;
 }

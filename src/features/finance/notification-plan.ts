@@ -1,4 +1,5 @@
 import { philippineDateTime } from './dates';
+import { budgetPeriodKey } from './budget-periods';
 import { budgetReport } from './budgets';
 import type { Budget, Transaction } from './types';
 
@@ -27,9 +28,11 @@ export function reminderPlan(now: Date, transactions: readonly Transaction[]) {
   return result;
 }
 
-export function budgetAlertPlan(budgets: readonly Budget[], transactions: readonly Transaction[], month: string) {
-  return budgetReport(budgets, transactions, month).rows.filter(row => row.progress >= 0.8).map(row => ({
-    key: month + ':' + row.category,
+export function budgetAlertPlan(budgets: readonly Budget[], transactions: readonly Transaction[], month: string, date = philippineDateTime().transactionDate) {
+  const keys = date.slice(0, 7) === month ? [month, budgetPeriodKey('daily', date), budgetPeriodKey('weekly', date)] : [month];
+  return keys.flatMap(key => budgetReport(budgets, transactions, key).rows).filter(row => row.progress >= 0.8).map(row => ({
+    key: row.month + ':' + row.category,
+    scope: row.month,
     level: row.spent > row.limitAmount ? 2 : 1,
     title: 'Budget update',
     body: row.spent > row.limitAmount

@@ -9,8 +9,8 @@ import { ThemedText } from '@/components/themed-text';
 import { philippineDateTime, pickedTransactionTime, formatTransactionTime, readableTransactionDate, transactionPickerValue } from '../dates';
 import { ActionButton } from './ui';
 
-type Props = { dateError?: string; timeError?: string; dateOnly?: boolean; optional?: boolean; date: string; time: string; disabled: boolean; onDateChange: (date: string) => void; onTimeChange: (time: string) => void };
-export function TransactionDateTime({ dateError, timeError, dateOnly = false, optional = false, date, time, disabled, onDateChange, onTimeChange }: Props) {
+type Props = { dateLabel?: string; dateError?: string; timeError?: string; dateOnly?: boolean; optional?: boolean; date: string; time: string; disabled: boolean; onDateChange: (date: string) => void; onTimeChange: (time: string) => void };
+export function TransactionDateTime({ dateLabel, dateError, timeError, dateOnly = false, optional = false, date, time, disabled, onDateChange, onTimeChange }: Props) {
   const theme = useTheme();
   const scheme = useColorScheme();
   const [picker, setPicker] = useState<{ mode: 'date' | 'time'; value: Date } | null>(null);
@@ -39,9 +39,9 @@ export function TransactionDateTime({ dateError, timeError, dateOnly = false, op
     } else setPicker({ mode, value });
   }
   return <>
-    <ThemedText type="smallBold">{dateOnly ? optional ? "Target date (optional)" : "Target date" : "Date and Time"}</ThemedText>
+    <ThemedText type="smallBold">{dateLabel ?? (dateOnly ? optional ? "Target date (optional)" : "Target date" : "Date and Time")}</ThemedText>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-      {(dateOnly ? ['date'] as const : ['date', 'time'] as const).map((mode) => <Pressable key={mode} accessibilityRole="button" accessibilityLabel={dateOnly ? 'Choose target date' : 'Choose transaction ' + mode} accessibilityState={{ disabled: disabled || Boolean(picker) }} disabled={disabled || Boolean(picker)}
+      {(dateOnly ? ['date'] as const : ['date', 'time'] as const).map((mode) => <Pressable key={mode} accessibilityRole="button" accessibilityLabel={dateLabel ? 'Choose ' + dateLabel.toLowerCase() : dateOnly ? 'Choose target date' : 'Choose transaction ' + mode} accessibilityState={{ disabled: disabled || Boolean(picker) }} disabled={disabled || Boolean(picker)}
         onPress={() => open(mode)} style={({ pressed }) => ({ flex: 1, minWidth: mode === 'date' ? 150 : 120, minHeight: 48, paddingHorizontal: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: (mode === 'date' ? dateError : timeError) ? theme.error : theme.border, backgroundColor: theme.backgroundElement, opacity: pressed || disabled ? 0.5 : 1 })}>
         <Ionicons name={mode === 'date' ? 'calendar-outline' : 'time-outline'} size={22} color={theme.textSecondary} />
         <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" adjustsFontSizeToFit minimumFontScale={0.85} style={{ flex: 1, fontSize: 13, lineHeight: 18 }}>{mode === 'time' ? formatTransactionTime(time) : !date && optional ? 'Choose a date' : readableTransactionDate(date)}</ThemedText>

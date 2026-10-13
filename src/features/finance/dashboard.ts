@@ -108,3 +108,28 @@ export function dashboardCategories(transactions: readonly Transaction[], start:
   }
   return { total, rows: [...amounts].map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category)) };
 }
+
+
+/** Browse complete calendar weeks; compare completed weeks only, never a partial current week. */
+export function activityWeek(transactions: readonly Transaction[], now: Date, offset = 0) {
+  if (!Number.isSafeInteger(offset) || offset > 0) throw new Error('Choose a current or previous week.');
+  const today = philippineDateTime(now).transactionDate;
+  const monday = new Date(today + 'T12:00:00Z');
+  monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7 + offset * 7);
+  const start = monday.toISOString().slice(0, 10);
+  if (start < '1900-01-01') throw new Error('No earlier week is available.');
+  const sunday = new Date(monday.getTime() + 6 * 86400000);
+  const end = sunday.toISOString().slice(0, 10);
+  const anchor = offset === 0 ? now : new Date(end + 'T12:00:00+08:00');
+  const days = dashboardSpending(transactions, 'week', start.slice(0, 7), anchor).map(day => ({ ...day, isToday: day.date === today }));
+  const sum = (rows: typeof days) => rows.reduce((total, day) => {
+    if (total > Number.MAX_SAFE_INTEGER - day.expenses) throw new Error('Weekly spending exceeds the supported range.');
+    return total + day.expenses;
+  }, 0);
+  const total = sum(days);
+  const priorEnd = new Date(monday.getTime() - 86400000).toISOString().slice(0, 10);
+  const canCompare = offset < 0 && start >= '1900-01-08';
+  const previous = canCompare ? sum(dashboardSpending(transactions, 'week', priorEnd.slice(0, 7), new Date(priorEnd + 'T12:00:00+08:00'))) : null;
+  const label = (date: string) => new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'));
+  return { days, total, start, end, label: label(start) + '-' + (start.slice(0, 7) === end.slice(0, 7) ? String(Number(end.slice(8))) : label(end)) + (end.slice(0, 4) === today.slice(0, 4) ? '' : ', ' + end.slice(0, 4)), canGoBack: start >= '1900-01-08', difference: previous === null ? null : total - previous };
+}

@@ -1,3 +1,6 @@
+import { exchangeRecords } from '../exchanges';
+import { useConfirmation } from '../components/confirmation';
+import { formatMoney } from '../money';
 import { QuickEntry } from '../components/quick-entry';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
@@ -16,9 +19,11 @@ import type { TransactionDraft, ManualTransactionType } from '../types';
 export default function TransactionScreen({ transferOnly = false, transferChoices }: { transferOnly?: boolean; transferChoices?: ReactNode } = {}) {
   const params = useLocalSearchParams<{ quick?: string; id?: string; type?: string; accountId?: string; destinationAccountId?: string }>();
   const initialType = transferOnly || params.type === 'TRANSFER' ? 'TRANSFER' : params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
-  const id = typeof params.id === 'string' ? params.id : undefined;
+  const requestedId = typeof params.id === 'string' ? params.id : undefined;
   const finance = useFinance();
   const theme = useTheme();
+  const confirmation = useConfirmation();
+  const id = finance.transactions.find(row=>row.id===requestedId)?.exchangeParentId ?? requestedId;
   const [entryType, setEntryType] = useState<ManualTransactionType>(initialType);
   const original = id ? finance.transactions.find((row) => row.id === id) : undefined;
   const [quickOpen, setQuickOpen] = useState(!id && params.quick === '1');
@@ -54,14 +59,18 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
     try {
       const account = finance.accounts.find((account) => account.id === draft.accountId);
       if (!account) throw new Error('Choose an account.');
+      if (draft.exchange && !finance.accounts.some(account=>account.id===draft.exchange!.receivedAccountId && !account.archived)) throw new Error('Choose an active receiving account.');
       validateDraft(draft, account, finance.accounts.find((account) => account.id === draft.destinationAccountId));
       if (original && finance.accounts.find((account) => account.id === original.accountId)?.archived) throw new Error('Unarchive the original account before editing its transactions.');
       if (original?.type === 'TRANSFER' && finance.accounts.find((account) => account.id === original.destinationAccountId)?.archived) throw new Error('Unarchive the original destination before editing this transfer.');
       const candidate = { ...draft, id: id ?? 'pending', createdAt: original?.createdAt ?? new Date().toISOString(), updatedAt: [new Date().toISOString(), original?.updatedAt ?? ''].sort().at(-1)! };
-      calculateFinanceSummary(finance.accounts, [...finance.transactions.filter((row) => row.id !== id), candidate], draft.transactionDate.slice(0, 7));
+      calculateFinanceSummary(finance.accounts, [...finance.transactions.filter((row) => row.id !== id && row.exchangeParentId !== id), ...(draft.exchange ? exchangeRecords(candidate.id,draft,candidate.createdAt,candidate.updatedAt) : [candidate])], draft.transactionDate.slice(0, 7));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid input.'); return; }
     Keyboard.dismiss(); pending.current = true;
-    void save(draft);
+    if (draft.exchange) {
+      const e=draft.exchange;
+      confirmation.alert('Save exchange?', 'The linked records will be saved together.', [{text:'Cancel',style:'cancel',onPress:()=>{pending.current=false;}},{text:'Save',onPress:()=>{void save(draft);}}], {icon:'swap-horizontal-outline',rows:[{label:'Paid from',value:(finance.accounts.find(account=>account.id===draft.accountId)?.name ?? '')+' | '+formatMoney(e.paid)},{label:'Received into',value:(finance.accounts.find(account=>account.id===e.receivedAccountId)?.name ?? '')+' | '+formatMoney(e.received)},...(e.kind!=='Service sale'&&e.paid!==e.received?[{label:e.paid>e.received?'Fee account':'Earnings account',value:finance.accounts.find(account=>account.id===e.extraAccountId)?.name ?? ''}]:[]),{label:e.kind==='Service sale'?'Profit / loss':e.received>=e.paid?'Earnings':'Fee',value:formatMoney(e.kind==='Service sale'?e.received-e.paid:Math.abs(e.received-e.paid))}]});
+    } else void save(draft);
   }
   if (original?.type === "ADJUSTMENT") return <FinanceScreen title="Balance adjustment" tabScreen={false}><ThemedText>Balance corrections are managed from the account.</ThemedText><ActionButton label="View account" onPress={() => router.replace({ pathname: "/account", params: { id: original.accountId } })} /><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   if (id && !original) return <FinanceScreen title="Transaction unavailable" tabScreen={false}><ThemedText>This transaction no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;

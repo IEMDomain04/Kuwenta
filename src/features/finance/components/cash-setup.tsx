@@ -112,7 +112,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         {step === 3 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Find budgets, savings, and goals in Plans.</ThemedText>
           <View style={{ padding: 16, borderRadius: 16, backgroundColor: theme.backgroundElement, gap: 10 }}>
-            <ThemedText type="small">Budgets help you follow monthly spending limits.</ThemedText>
+            <ThemedText type="small">Set daily, weekly, or monthly spending limits.</ThemedText>
             <ThemedText type="small">Savings accounts and goals show your progress.</ThemedText>
           </View>
         </> : null}

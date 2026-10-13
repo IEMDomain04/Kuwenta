@@ -38,7 +38,7 @@ export default function TransactionsScreen() {
     deleting.current = true; setError('');
     const accountName = accounts.find((account) => account.id === transaction.accountId)?.name ?? '';
     const accountLabel = transaction.type === 'TRANSFER' ? accountName + ' to ' + (accounts.find((account) => account.id === transaction.destinationAccountId)?.name ?? '') : accountName;
-    confirmation.alert('Delete transaction?', 'This removes the record and recalculates account balances and reports. This cannot be undone.', [
+    confirmation.alert(transaction.exchange || transaction.exchangeParentId ? 'Delete linked exchange?' : 'Delete transaction?', transaction.exchange || transaction.exchangeParentId ? 'This deletes the exchange and all its linked fee, earnings, or payment records. Balances and reports will be recalculated.' : 'This removes the record and recalculates account balances and reports. This cannot be undone.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { deleting.current = false; } },
       { text: 'Delete', style: 'destructive', onPress: () => {
         void removeTransaction(transaction.id).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not delete.'))

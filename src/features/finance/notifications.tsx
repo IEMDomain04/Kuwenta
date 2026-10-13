@@ -1,3 +1,4 @@
+import { budgetPeriodKey, isBudgetPeriodKey } from './budget-periods';
 import 'expo-sqlite/localStorage/install';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type { NotificationResponse } from 'expo-notifications';
@@ -76,17 +77,19 @@ export function syncNotifications(budgets: readonly Budget[], transactions: read
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: 'kuwenta' },
       });
     }
-    const month = philippineDateTime().transactionDate.slice(0, 7);
-    const alerts = budgetAlertPlan(budgets, transactions, month);
+    const date = philippineDateTime().transactionDate;
+    const month = date.slice(0, 7);
+    const alerts = budgetAlertPlan(budgets, transactions, month, date);
     let seen: Record<string, number> = {};
     try { seen = JSON.parse(localStorage.getItem(key + '.seen') || '{}'); } catch { /* Start a fresh ledger. */ }
     if (baseline) seen = {};
     const initialize = baseline || localStorage.getItem(key + '.seen') === null || localStorage.getItem(key + '.baseline') === '1';
-    // Keep this month's ledger only; enabling alerts does not replay past spending.
-    seen = Object.fromEntries(Object.entries(seen).filter(([entry]) => entry.startsWith(month + ':')));
+    // Keep all active-period entries, including temporarily lowered budgets, to avoid repeat alerts.
+    const activeKeys = [month, budgetPeriodKey('daily', date), budgetPeriodKey('weekly', date)];
+    seen = Object.fromEntries(Object.entries(seen).filter(([entry]) => activeKeys.some(scope => entry.startsWith(scope + ':'))));
     for (const alert of alerts) {
       if (allowed && settings.budgets && !initialize && alert.level > (seen[alert.key] || 0)) {
-        await Notifications.scheduleNotificationAsync({ identifier: 'kuwenta-budget-' + alert.key + ':' + alert.level, content: { title: alert.title, body: alert.body, sound: false, data: { screen: 'budgets' } }, trigger: { channelId: 'kuwenta' } });
+        await Notifications.scheduleNotificationAsync({ identifier: 'kuwenta-budget-' + alert.key + ':' + alert.level, content: { title: alert.title, body: alert.body, sound: false, data: { screen: 'budgets', scope: alert.scope } }, trigger: { channelId: 'kuwenta' } });
       }
       seen[alert.key] = Math.max(seen[alert.key] || 0, alert.level);
       // Persist each successful alert before processing the next budget.
@@ -97,11 +100,11 @@ export function syncNotifications(budgets: readonly Budget[], transactions: read
   });
 }
 
-export function observeNotificationTaps(onTap: (screen: 'home' | 'budgets') => void) {
+export function observeNotificationTaps(onTap: (screen: 'home' | 'budgets', scope?: string) => void) {
   if (!Notifications) return () => {};
   function handle(response: NotificationResponse | null) {
     const screen = response?.notification.request.content.data?.screen;
-    if (screen === 'home' || screen === 'budgets') { onTap(screen); void Notifications?.clearLastNotificationResponseAsync(); }
+    if (screen === 'home' || screen === 'budgets') { const scope = response?.notification.request.content.data?.scope; onTap(screen, typeof scope === 'string' && isBudgetPeriodKey(scope) ? scope : undefined); void Notifications?.clearLastNotificationResponseAsync(); }
   }
   handle(Notifications.getLastNotificationResponse());
   const subscription = Notifications.addNotificationResponseReceivedListener(handle);

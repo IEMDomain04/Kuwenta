@@ -14,10 +14,11 @@ function render(visible) {
     if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
     if(name==='@/components/themed-text')return{ThemedText:'Text'};
     if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
+    if(name==='./selection-sheet')return{SelectionSheet:'SelectionSheet'};
     if(name==='./dashboard-charts')return{SpendingTrend:'Trend',IncomeExpenseChart:'Comparison'};
     if(name==='./category-spending')return{CategorySpending:'Chart'};
     if(name==='../provider')return{useFinance:()=>({transactions:[]})};
-    if(name==='../dashboard')return{dashboardReport:()=>{reportCalls++;return{start:'2026-10-12',end:'2026-10-12',income:0,expenses:0};},dashboardSpending:()=>{activityCalls++;return[];}};
+    if(name==='../dashboard')return{activityWeek:(...args)=>{activityCalls++;return require('../../.expo/finance-tests/dashboard.js').activityWeek(...args);},dashboardReport:()=>{reportCalls++;return{start:'2026-10-12',end:'2026-10-12',income:0,expenses:0};},dashboardSpending:()=>{activityCalls++;return[];}};
     if(['../dates','../money','../home-visualizations'].includes(name))return require('../../.expo/finance-tests/'+name.slice(3)+'.js');
     throw new Error(name);
   }};
@@ -36,6 +37,13 @@ test('every visualization combination renders only selected sections and skips h
     assert.equal(h.nodes.some(node=>node.type==='Comparison'),visible.includes('comparison'));
     assert.equal(h.nodes.some(node=>node.type==='Chart'),visible.includes('categories'));
     assert.equal(h.nodes.some(node=>node.type==='Text'&&node.props.children==='THIS WEEK'),visible.includes('activity'));
+    assert.equal(h.nodes.some(node=>node.props.accessibilityLabel==='Choose spending week'),visible.includes('activity'));
+    if(visible.includes('activity')){
+      const title=h.nodes.find(node=>node.type==='Text'&&node.props.children==='THIS WEEK');assert.equal(title.props.numberOfLines,1);assert.equal(title.props.style.flexShrink,0);
+      const picker=h.nodes.find(node=>node.props.accessibilityLabel==='Choose spending week');assert.equal(picker.props.style.minHeight,24);
+    }
+    assert.ok(!h.nodes.some(node=>['Previous spending week','Next spending week'].includes(node.props.accessibilityLabel)));
+    assert.ok(!h.nodes.some(node=>node.type==='Text'&&JSON.stringify(node.props.children).includes('so far')));
     assert.equal(h.nodes.some(node=>node.type==='Text'&&node.props.children==='Income'),visible.includes('summary'));
     assert.equal(h.nodes.filter(node=>node.props.accessibilityLabel==='day report').length,visible.includes('summary')||visible.includes('categories')||visible.includes('comparison')||visible.includes('trend')?1:0);
     if(mask===0)assert.equal(h.tree,null);

@@ -1,3 +1,4 @@
+import { exchangeLabel } from '../exchanges';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { router } from 'expo-router';
 import { CategoryIcon } from './category-visual';
@@ -50,7 +51,7 @@ export function TransactionRow({ transaction, accountName, destinationName, disa
       <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <CategoryIcon category={transaction.category} income={income} compact />
         <View style={{ flex: 1, minWidth: 90, gap: 1 }}>
-          <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18 }}>{transaction.notes || transaction.category}</ThemedText>
+          <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18 }}>{transaction.notes || (transaction.exchange ? exchangeLabel(transaction.exchange.kind) : transaction.category)}</ThemedText>
           {transaction.type === 'TRANSFER' ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1, fontSize: 11, lineHeight: 16 }}>{accountName}</ThemedText>
             <Ionicons accessible={false} name="arrow-forward" size={12} color={theme.textSecondary} />

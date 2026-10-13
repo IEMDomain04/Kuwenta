@@ -1,3 +1,4 @@
+import { AccountIcon } from './account-icon';
 import { FieldError } from './field-error';
 import { useRef, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, TextInput, View } from 'react-native';
@@ -26,8 +27,9 @@ export function QuickEntry({ disabled, accountId, onReview, onCancel }: { disabl
     <ThemedText type="small" themeColor="textSecondary">Try: Mobile load 100 from Cash</ThemedText>
     <ThemedText type="small">Account</ThemedText>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-      {accounts.filter((row) => !row.archived).map((account) => <Pressable key={account.id} accessibilityRole="button" accessibilityState={{ selected: selectedAccount === account.id, disabled }} disabled={disabled} onPress={() => setSelectedAccount(account.id)} style={{ minHeight: 44, maxWidth: 160, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 12, backgroundColor: selectedAccount === account.id ? theme.backgroundSelected : theme.background }}>
-        <ThemedText type="small" numberOfLines={1}>{account.name}</ThemedText>
+      {accounts.filter((row) => !row.archived).map((account) => <Pressable key={account.id} accessibilityRole="button" accessibilityState={{ selected: selectedAccount === account.id, disabled }} disabled={disabled} onPress={() => setSelectedAccount(account.id)} style={{ minHeight: 44, maxWidth: 160, paddingHorizontal: 12, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, backgroundColor: selectedAccount === account.id ? theme.backgroundSelected : theme.background }}>
+        <AccountIcon account={account} size={20} color={theme.accent} />
+        <ThemedText type="small" numberOfLines={1} style={{ flexShrink: 1 }}>{account.name}</ThemedText>
       </Pressable>)}
     </ScrollView>
     <View style={{ borderWidth: 1, borderColor: fieldErrors.phrase ? theme.error : theme.border, borderRadius: 12, overflow: 'hidden', backgroundColor: theme.backgroundElement }}>

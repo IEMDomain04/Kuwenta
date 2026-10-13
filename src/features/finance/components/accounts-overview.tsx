@@ -1,3 +1,4 @@
+import { AccountIcon } from './account-icon';
 import { accountCardColor } from '../account-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -131,7 +132,7 @@ export function AccountsOverview({ compact = false, showAdd = true, onDraggingCh
             onPress={() => { if (!held.current) router.push({ pathname: '/account', params: { id: account.id } }); }}
             style={({ pressed }) => ({ ...(cards ? { minHeight: 154 } : { width: '100%' }), padding: 14, borderRadius: cards ? 20 : 16, borderWidth: 1, borderColor: drag?.target === account.id ? theme.accent : account.archived || !cards ? theme.border : color, boxShadow: cards ? '0 3px 8px rgba(20, 36, 67, 0.08)' : undefined, flexDirection: cards ? 'column' : 'row', alignItems: cards ? 'stretch' : 'center', gap: 10, backgroundColor: cards && !account.archived ? color : theme.backgroundElement, opacity: busy ? 0.5 : drag?.id === account.id ? 0.95 : pressed ? 0.5 : 1, zIndex: drag?.id === account.id ? 10 : 0, elevation: drag?.id === account.id ? 8 : 0, transform: drag?.id === account.id ? [{ scale: 1.04 }] : [] })}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: cards ? undefined : 1 }}>
-              <Ionicons name={purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={20} color={cards && !account.archived ? cardText : color} />
+              <AccountIcon account={account} size={24} color={cards && !account.archived ? cardText : color} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: cards && !account.archived ? cardText : theme.text }}>{account.name}</ThemedText>
                 <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: cards && !account.archived ? cardText : theme.textSecondary }}>{account.archived ? 'Archived / PHP' : purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>

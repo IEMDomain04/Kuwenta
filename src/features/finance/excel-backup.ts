@@ -1,9 +1,10 @@
+import { budgetPeriodRange } from './budget-periods';
 import * as XLSX from 'xlsx';
 import { parseBackup, type FinanceBackup } from './backup';
 import { moneyInput, parseMoney } from './money';
 
 // Preserve exact centavos, stable IDs, and date strings while keeping sheets readable.
-type Column = [key: string, label: string, kind?: 'money' | 'boolean', optional?: boolean];
+type Column = [key: string, label: string, kind?: 'money' | 'boolean' | 'json', optional?: boolean];
 const tables: { name: string; key: 'accounts' | 'transactions' | 'budgets' | 'goals'; columns: Column[] }[] = [
   { name: 'Transactions', key: 'transactions', columns: [
     ['transactionDate', 'Date'], ['transactionTime', 'Time'], ['type', 'Type'], ['category', 'Category'],
@@ -11,15 +12,15 @@ const tables: { name: string; key: 'accounts' | 'transactions' | 'budgets' | 'go
     ['notes', 'Notes', undefined, true], ['id', 'Record ID'], ['accountId', 'Account ID'],
     ['destinationAccountId', 'Destination ID', undefined, true], ['sourcePurpose', 'Source purpose', undefined, true],
     ['destinationPurpose', 'Destination purpose', undefined, true], ['adjustmentDirection', 'Adjustment direction', undefined, true],
-    ['externalName', 'External source', undefined, true], ['createdAt', 'Created at'], ['updatedAt', 'Updated at'],
+    ['externalName', 'External source', undefined, true], ['exchange', 'Exchange details', 'json', true], ['exchangeParentId', 'Linked exchange ID', undefined, true], ['createdAt', 'Created at'], ['updatedAt', 'Updated at'],
   ] },
   { name: 'Accounts', key: 'accounts', columns: [
     ['id', 'Account ID'], ['name', 'Name'], ['currency', 'Currency'], ['openingBalance', 'Starting balance (PHP)', 'money'],
     ['purpose', 'Purpose'], ['includedInAvailable', 'Included in available', 'boolean'], ['archived', 'Archived', 'boolean'],
-    ['color', 'Card color', undefined, true],
+    ['color', 'Card color', undefined, true], ['icon', 'Account icon', undefined, true],
   ] },
   { name: 'Budgets', key: 'budgets', columns: [
-    ['month', 'Month'], ['category', 'Category'], ['limitAmount', 'Limit (PHP)', 'money'],
+    ['_period', 'Period'], ['_start', 'Start date'], ['_end', 'End date'], ['month', 'Month'], ['category', 'Category'], ['limitAmount', 'Limit (PHP)', 'money'],
   ] },
   { name: 'Goals', key: 'goals', columns: [
     ['id', 'Goal ID'], ['name', 'Name'], ['accountId', 'Account ID'], ['targetAmount', 'Target (PHP)', 'money'],
@@ -49,15 +50,16 @@ export function createExcelBackup(backup: FinanceBackup): Uint8Array {
     const rows = records.map(record => {
       const row = record as unknown as Record<string, unknown>;
       return table.columns.map(([key, , kind]) => {
+        if (table.key === 'budgets' && key.startsWith('_')) { const range = budgetPeriodRange(row.month as string); return key === '_period' ? range.period : key === '_start' ? range.start : range.end; }
         if (key === '_accountName') return names.get(row.accountId as string) ?? '';
         if (key === '_destinationName') return names.get(row.destinationAccountId as string) ?? null;
         const value = row[key];
         if (typeof value === 'string' && value.length > 32767) throw new Error('A text field is too long for Excel. Export JSON instead.');
-        return value === undefined ? null : kind === 'money' ? moneyCell(value as number) : value as string | boolean;
+        return value === undefined ? null : kind === 'money' ? moneyCell(value as number) : kind === 'json' ? JSON.stringify(value) : value as string | boolean;
       });
     });
     const sheet = XLSX.utils.aoa_to_sheet([table.columns.map(column => column[1]), ...rows]);
-    sheet['!cols'] = table.columns.map(([key, , kind]) => ({ wch: kind === 'money' ? 20 : key === 'notes' ? 36 : 22, hidden: table.name === 'Transactions' && (key === 'id' || key.endsWith('Id')) }));
+    sheet['!cols'] = table.columns.map(([key, , kind]) => ({ wch: kind === 'money' ? 20 : key === 'notes' ? 36 : 22, hidden: table.name === 'Transactions' && (key === 'id' || key.endsWith('Id')) || table.key === 'budgets' && key === 'month' }));
     sheet['!autofilter'] = { ref: sheet['!ref']! };
     table.columns.forEach(([, , kind], column) => {
       if (kind !== 'money') return;
@@ -69,7 +71,7 @@ export function createExcelBackup(backup: FinanceBackup): Uint8Array {
     XLSX.utils.book_append_sheet(workbook, sheet, table.name);
   }
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
-    ['Key', 'Value'], ['format', 'kuwenta-excel'], ['workbookVersion', 1], ['backupVersion', validated.version],
+    ['Key', 'Value'], ['format', 'kuwenta-excel'], ['workbookVersion', 3], ['backupVersion', validated.version],
     ['currency', validated.currency], ['timezone', validated.timezone], ['exportedAt', validated.exportedAt],
   ]), 'Kuwenta');
   const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx', compression: true }));
@@ -119,9 +121,10 @@ export function parseExcelBackup(bytes: Uint8Array): FinanceBackup {
     if (cell(metadata, index + 1, 0) !== key) throw new Error('Invalid Kuwenta backup information.');
     info[key] = cell(metadata, index + 1, 1);
   });
-  if (info.format !== 'kuwenta-excel' || info.workbookVersion !== 1) throw new Error('Unsupported Kuwenta Excel backup version.');
+  if (info.format !== 'kuwenta-excel' || (info.workbookVersion !== 1 && info.workbookVersion !== 2 && info.workbookVersion !== 3)) throw new Error('Unsupported Kuwenta Excel backup version.');
   const result: Record<string, unknown> = { format: 'kuwenta-finance', version: info.backupVersion, currency: info.currency, timezone: info.timezone, exportedAt: info.exportedAt };
-  for (const table of tables) {
+  for (const original of tables) {
+    const table = info.workbookVersion === 1 ? { ...original, columns: original.columns.filter(([key]) => key !== 'icon' && !(original.key === 'budgets' && key.startsWith('_')) && !['exchange','exchangeParentId'].includes(key)) } : info.workbookVersion === 2 ? { ...original, columns: original.columns.filter(([key]) => !['exchange','exchangeParentId'].includes(key)) } : original;
     const sheet = workbook.Sheets[table.name];
     const range = XLSX.utils.decode_range(sheet['!fullref'] ?? sheet['!ref'] ?? 'A1');
     if (range.s.r !== 0 || range.s.c !== 0 || range.e.r > MAX_ROWS || range.e.c !== table.columns.length - 1) throw new Error('Invalid or oversized ' + table.name + ' backup sheet.');
@@ -141,6 +144,9 @@ export function parseExcelBackup(bytes: Uint8Array): FinanceBackup {
         if (kind === 'money') {
           if (typeof value !== 'number' && typeof value !== 'string') throw new Error('Invalid amount in Excel backup.');
           record[key] = parseMoney(String(value), { allowNegative: key === 'openingBalance', allowZero: key === 'openingBalance' });
+        } else if (kind === 'json') {
+          if (typeof value !== 'string') throw new Error('Invalid exchange details in Excel backup.');
+          try { record[key] = JSON.parse(value); } catch { throw new Error('Invalid exchange details in Excel backup.'); }
         } else {
           if (typeof value !== (kind === 'boolean' ? 'boolean' : 'string')) throw new Error('Invalid value in ' + table.name + ', row ' + (row + 1) + '.');
           record[key] = value;

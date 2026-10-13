@@ -42,6 +42,11 @@ const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof
   Subscriptions: { color: '#5C8B9A', icon: 'phone-portrait' },
   Other: { color: '#7D929D', icon: 'ellipsis-horizontal' },
 };
+visuals['E-bank Cash-in'] = { color: '#0B6575', icon: 'arrow-down-circle' };
+visuals['E-bank Cash-out'] = { color: '#0B6575', icon: 'arrow-up-circle' };
+visuals['Service sale'] = { color: '#087443', icon: 'storefront' };
+visuals['Cash-in (E-bank)'] = visuals['E-bank Cash-in'];
+visuals['Cash-out (E-bank)'] = visuals['E-bank Cash-out'];
 const incomeVisual = { color: Colors.light.income, icon: 'cash' as const };
 export function categoryVisual(category: string, income = false, dark = false) {
   const visual = income ? incomeVisual : visuals[category] ?? visuals.Other;

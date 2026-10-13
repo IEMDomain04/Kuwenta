@@ -15,6 +15,7 @@ function harness() {
   };
   const jsx = (type, props) => ({ type, props });
   const sandbox = { exports: {}, require(name) {
+    if (name === './account-icon') return { AccountIcon: 'AccountIcon' };
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect() {} };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === 'react-native') return { View: 'View', Pressable: 'Pressable', useWindowDimensions: () => ({ fontScale: 1 }), Vibration: { vibrate() {} }, PanResponder: { create: handlers => ({ panHandlers: handlers }) } };

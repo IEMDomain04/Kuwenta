@@ -1,3 +1,4 @@
+import { AccountIcon } from '../components/account-icon';
 import { FieldError } from '../components/field-error';
 import { useConfirmation } from '../components/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -113,7 +114,7 @@ export default function GoalScreen() {
         <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="New savings account name" value={newAccountName} onChangeText={setNewAccountName} editable={!locked} placeholder={name || 'Uses the goal name'} placeholderTextColor={theme.textSecondary} style={inputStyle} />
         <ThemedText type="small" themeColor="textSecondary">Created with this goal at zero balance. Add money by transferring from another account.</ThemedText>
       </> : null}
-      <SelectionSheet visible={accountOpen} title="Savings account" selected={createAccount ? '__new__' : accountId} disabled={locked} options={[...available.map((account) => ({ value: account.id, label: account.name })), ...(!original ? [{ value: '__new__', label: '+ Create savings account' }] : [])]} onClose={() => setAccountOpen(false)} onSelect={(value) => { setCreateAccount(value === '__new__'); if (value !== '__new__') setAccountId(value); setFieldErrors({}); setError(''); }} />
+      <SelectionSheet visible={accountOpen} title="Savings account" selected={createAccount ? '__new__' : accountId} disabled={locked} options={[...available.map((account) => ({ value: account.id, label: account.name, leading: <AccountIcon account={account} color={theme.accent} /> })), ...(!original ? [{ value: '__new__', label: '+ Create savings account' }] : [])]} onClose={() => setAccountOpen(false)} onSelect={(value) => { setCreateAccount(value === '__new__'); if (value !== '__new__') setAccountId(value); setFieldErrors({}); setError(''); }} />
       <TransactionDateTime dateOnly optional dateError={fieldErrors.date} date={date} time="00:00:00" disabled={locked} onDateChange={value => { setDate(value); setFieldErrors({}); }} onTimeChange={() => {}} />
       {date ? <Pressable accessibilityRole="button" accessibilityLabel="Clear target date" disabled={locked} onPress={() => setDate('')} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="accent">Clear date</ThemedText></Pressable> : null}
 

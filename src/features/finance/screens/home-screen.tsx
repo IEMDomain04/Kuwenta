@@ -1,3 +1,4 @@
+import { exchangeLabel } from '../exchanges';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -105,7 +106,7 @@ export default function HomeScreen() {
           style={({ pressed }) => ({ minHeight: 64, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, borderTopWidth: index ? 1 : 0, borderColor: theme.border, opacity: pressed || busy ? 0.5 : 1 })}>
           <CategoryIcon category={transaction.category} income={transaction.type === 'INCOME'} compact />
           <View style={{ flex: 1, minWidth: 100, gap: 2 }}>
-            <ThemedText type="smallBold" numberOfLines={1}>{transaction.notes || transaction.category}</ThemedText>
+            <ThemedText type="smallBold" numberOfLines={1}>{transaction.notes || (transaction.exchange ? exchangeLabel(transaction.exchange.kind) : transaction.category)}</ThemedText>
             {transfer ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1 }}>{account}</ThemedText>
               <Ionicons accessible={false} name="arrow-forward" size={12} color={theme.textSecondary} />

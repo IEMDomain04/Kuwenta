@@ -58,8 +58,12 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
   const scheduledCalls = [];
   let allowed = true;
   let requests = 0;
+  let tapListener;
   const native = {
     setNotificationHandler() {},
+    getLastNotificationResponse: () => null,
+    clearLastNotificationResponseAsync: async () => {},
+    addNotificationResponseReceivedListener: listener => { tapListener = listener; return { remove() { tapListener = undefined; } }; },
     setNotificationChannelAsync: async () => {},
     getPermissionsAsync: async () => ({ granted: allowed }),
     requestPermissionsAsync: async () => { requests++; return { granted: allowed }; },
@@ -86,11 +90,12 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
     if (name === 'react-native') return { Platform: { OS: 'android' } };
     if (name === 'expo-sqlite/localStorage/install') return {};
     if (name === './notification-plan') return { reminderPlan, budgetAlertPlan };
+    if (name === './budget-periods') return require('../../.expo/finance-tests/budget-periods.js');
     if (name === './dates') return { philippineDateTime };
     throw new Error('Unexpected dependency: ' + name);
   } };
   vm.runInNewContext(source, sandbox);
-  return { api: sandbox.exports, store: existingStore, scheduled, delivered, scheduledCalls, deny: () => { allowed = false; }, requestCount: () => requests };
+  return { tap: data => tapListener({ notification: { request: { content: { data } } } }), api: sandbox.exports, store: existingStore, scheduled, delivered, scheduledCalls, deny: () => { allowed = false; }, requestCount: () => requests };
 }
 test('notification bridge cancels logged-day reminders, avoids duplicates, and respects disabling', async () => {
   const h = notificationHarness();
@@ -198,4 +203,15 @@ test('phone budget messages stay neutral and private at both thresholds', () => 
   assert.equal(over.title, 'Budget update');
   assert.equal(over.body, 'Your recorded spending is over a budget limit.');
   for (const item of [near, over]) assert.doesNotMatch(item.body, /Kuwenta|Plans|Food|1000|1001/);
+});
+
+
+test('budget notification taps open their period and discard malformed scope data', () => {
+ const h=notificationHarness(); const taps=[];
+ const stop=h.api.observeNotificationTaps((screen,scope)=>taps.push([screen,scope]));
+ h.tap({screen:'budgets',scope:'weekly:2026-10-12'});
+ h.tap({screen:'budgets',scope:'daily:2026-10-13'});
+ h.tap({screen:'budgets',scope:'weekly:not-a-date'});
+ assert.deepEqual(taps,[['budgets','weekly:2026-10-12'],['budgets','daily:2026-10-13'],['budgets',undefined]]);
+ stop();
 });

@@ -1,3 +1,4 @@
+import { AccountIcon } from '../components/account-icon';
 import { FieldError } from '../components/field-error';
 import { useConfirmation } from '../components/confirmation';
 import { useEffect, useRef, useState } from 'react';
@@ -113,8 +114,8 @@ export default function TransferScreen() {
     return <View style={{ gap: 6 }}>
       <ThemedText type="smallBold">{side === 'from' ? 'From' : 'To'}</ThemedText>
       <Pressable accessibilityRole="button" accessibilityLabel={'Choose ' + side} disabled={locked} onPress={() => setPicker(side)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, padding: 12, borderWidth: 1, borderColor: fieldErrors[side] ? theme.error : theme.border, borderRadius: 12 }}>
-        <Ionicons name={isExternal ? 'person-outline' : 'wallet-outline'} size={20} color={theme.textSecondary} />
-        <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{isExternal ? 'External' : selected?.name ?? 'Choose account'}</ThemedText>
+        {isExternal || !selected ? <Ionicons name="person-outline" size={20} color={theme.textSecondary} /> : <AccountIcon account={selected} color={theme.textSecondary} />}
+        <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{isExternal ? side === 'from' ? 'External source' : 'External destination' : selected?.name ?? 'Choose account'}</ThemedText>
         <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
       </Pressable>
       <FieldError message={fieldErrors[side]} />
@@ -144,7 +145,7 @@ export default function TransferScreen() {
       <ActionButton primary label={saving ? 'Saving...' : 'Save transfer'} disabled={locked || rejected} onPress={save} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } }} />
       </View>
-      <SelectionSheet visible={Boolean(picker)} title={picker === 'from' ? 'From' : 'To'} selected={external === (picker === 'from' ? 'increase' : 'decrease') ? 'external' : picker === 'from' ? accountId : destinationId} disabled={locked} options={[...finance.accounts.filter((row) => !row.archived).map((row) => ({ value: row.id, label: row.name })), { value: 'external', label: 'External (outside Kuwenta)' }]} onClose={() => setPicker(null)} onSelect={(value) => {
+      <SelectionSheet visible={Boolean(picker)} title={picker === 'from' ? 'From' : 'To'} selected={external === (picker === 'from' ? 'increase' : 'decrease') ? 'external' : picker === 'from' ? accountId : destinationId} disabled={locked} options={[...finance.accounts.filter((row) => !row.archived).map((row) => ({ value: row.id, label: row.name, leading: <AccountIcon account={row} color={theme.textSecondary} /> })), { value: 'external', label: picker === 'from' ? 'External source' : 'External destination' }]} onClose={() => setPicker(null)} onSelect={(value) => {
         setFieldErrors({}); setError('');
         if (value === 'external') { setExternal(picker === 'from' ? 'increase' : 'decrease'); }
         else if (picker === 'from') { setAccountId(value); if (external === 'increase') setExternal(null); }

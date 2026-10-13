@@ -16,7 +16,7 @@ function reject(change) {
 test('backup round trip preserves money, Philippine time, notes, IDs and audit timestamps', () => {
   const rows = [
     record({ id: 'income', type: 'INCOME', category: 'Salary', amount: 50000 }),
-    record({ notes: 'Lunch ₱120', updatedAt: '2026-10-09T07:00:00.000Z' }),
+    record({ notes: 'Lunch Ã¢â€šÂ±120', updatedAt: '2026-10-09T07:00:00.000Z' }),
   ];
   const restored = parseBackup(serializeBackup(cash, rows, exportedAt));
   assert.deepEqual(restored.accounts, [cash]);
@@ -45,7 +45,7 @@ test('backdated records retain their reporting month after round trip', () => {
 
 test('malformed JSON, metadata, unknown versions and unsupported fields are rejected', () => {
   for (const value of ['{', 'null', '[]', '1']) assert.throws(() => parseBackup(value));
-  reject((v) => { v.version = 9; });
+  reject((v) => { v.version = 11; });
   reject((v) => { v.format = 'other'; });
   reject((v) => { v.currency = 'USD'; });
   reject((v) => { v.timezone = 'UTC'; });

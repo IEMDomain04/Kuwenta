@@ -3,11 +3,11 @@ import { validateAccount } from '../validation';
 import { calculateAccountSummary, calculateCurrentMoney, calculateFinanceSummary, calculateSavings } from '../calculations';
 import type { FinanceDatabase } from './database';
 
-type AccountRow = Omit<Account, 'includedInAvailable' | 'archived' | 'color'> & { includedInAvailable: number; archived: number; color?: Account['color'] | null };
+type AccountRow = Omit<Account, 'includedInAvailable' | 'archived' | 'color' | 'icon'> & { includedInAvailable: number; archived: number; color?: Account['color'] | null; icon?: Account['icon'] | null };
 function fromRow(row: AccountRow): Account {
   if (![0, 1].includes(row.includedInAvailable) || ![0, 1].includes(row.archived)) throw new Error('Invalid stored account flags.');
-  const { color, ...fields } = row;
-  const account: Account = { ...fields, includedInAvailable: row.includedInAvailable === 1, archived: row.archived === 1, ...(color == null ? {} : { color }) };
+  const { color, icon, ...fields } = row;
+  const account: Account = { ...fields, includedInAvailable: row.includedInAvailable === 1, archived: row.archived === 1, ...(color == null ? {} : { color }), ...(icon == null ? {} : { icon }) };
   validateAccount(account);
   return account;
 }
@@ -35,16 +35,16 @@ export async function saveAccount(db: FinanceDatabase, account: Account, creatin
     if (creating) {
       const existing = await transaction.getFirstAsync<{ id: string }>('SELECT id FROM accounts WHERE id = ?', account.id);
       if (existing) return; // Retrying a submission cannot duplicate or overwrite its account.
-      await transaction.runAsync('INSERT INTO accounts (id, name, currency, openingBalance, purpose, includedInAvailable, archived, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        account.id, account.name.trim(), account.currency, account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.color ?? null);
+      await transaction.runAsync('INSERT INTO accounts (id, name, currency, openingBalance, purpose, includedInAvailable, archived, color, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        account.id, account.name.trim(), account.currency, account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.color ?? null, account.icon ?? null);
     } else {
       if (account.purpose !== 'savings' && await transaction.getFirstAsync('SELECT id FROM goals WHERE accountId = ?', account.id)) throw new Error('Delete or relink the goal before changing this savings account to spending.');
       const original = await getAccount(transaction, account.id);
       if (original.archived && account.archived) throw new Error('Unarchive the account before editing its details.');
       const rows = await transaction.getAllAsync<Transaction>('SELECT * FROM transactions WHERE accountId = ? OR destinationAccountId = ?', account.id, account.id);
-      calculateAccountSummary(account, rows.map((row) => ({ ...row, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined })), '1900-01');
-      await transaction.runAsync('UPDATE accounts SET name = ?, openingBalance = ?, purpose = ?, includedInAvailable = ?, archived = ?, color = ? WHERE id = ?',
-        account.name.trim(), account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.color ?? null, account.id);
+      calculateAccountSummary(account, rows.map((row) => ({ ...row, exchange: typeof row.exchange === 'string' ? JSON.parse(row.exchange) : row.exchange ?? undefined, exchangeParentId: row.exchangeParentId ?? undefined, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined })), '1900-01');
+      await transaction.runAsync('UPDATE accounts SET name = ?, openingBalance = ?, purpose = ?, includedInAvailable = ?, archived = ?, color = ?, icon = ? WHERE id = ?',
+        account.name.trim(), account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.color ?? null, account.icon ?? null, account.id);
     }
   });
 }
@@ -75,6 +75,8 @@ export async function deleteAccount(db: FinanceDatabase, id: string): Promise<vo
     const account = await transaction.getFirstAsync<AccountRow>('SELECT * FROM accounts WHERE id = ?', id);
     if (!account) return; // Repeated deletion cannot affect another account.
     const removed = await transaction.getAllAsync<{ transactionDate: string }>('SELECT transactionDate FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
+    const linked = await transaction.getAllAsync<{ id: string; exchangeParentId?: string }>('SELECT id, exchangeParentId FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
+    for (const row of linked) if (row.exchangeParentId) await transaction.runAsync('DELETE FROM transactions WHERE id = ?', row.exchangeParentId);
     await transaction.runAsync('DELETE FROM goals WHERE accountId = ?', id);
     await transaction.runAsync('DELETE FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
     await transaction.runAsync("DELETE FROM preferences WHERE key = 'lastEntryAccount' AND value = ?", id);
@@ -91,7 +93,7 @@ export async function deleteAccount(db: FinanceDatabase, id: string): Promise<vo
     await transaction.runAsync('DELETE FROM accounts WHERE id = ?', id);
     const remainingAccounts = await listAccounts(transaction);
     const remainingRows = (await transaction.getAllAsync<Transaction>('SELECT * FROM transactions')).map(row => ({
-      ...row, notes: row.notes ?? undefined, externalName: row.externalName ?? undefined,
+      ...row, exchange: typeof row.exchange === 'string' ? JSON.parse(row.exchange) : row.exchange ?? undefined, exchangeParentId: row.exchangeParentId ?? undefined, notes: row.notes ?? undefined, externalName: row.externalName ?? undefined,
       sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined,
       destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined,
     }));

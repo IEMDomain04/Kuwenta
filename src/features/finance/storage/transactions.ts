@@ -1,3 +1,4 @@
+import { exchangeRecords, validateExchangeLinks } from '../exchanges';
 import { philippineDateTime } from '../dates';
 import type { Transaction, TransactionDraft } from '../types';
 import { validateDraft, validateManualRecord } from '../validation';
@@ -5,13 +6,14 @@ import { getAccount, listAccounts } from './accounts';
 import { calculateFinanceSummary, calculateAccountSummary } from '../calculations';
 import type { FinanceDatabase } from './database';
 
-type TransactionRow = Omit<Transaction, 'notes' | 'destinationAccountId' | 'adjustmentDirection' | 'sourcePurpose' | 'destinationPurpose' | 'externalName'> & {
+type TransactionRow = Omit<Transaction, 'notes' | 'destinationAccountId' | 'adjustmentDirection' | 'sourcePurpose' | 'destinationPurpose' | 'externalName' | 'exchange' | 'exchangeParentId'> & {
   sourcePurpose?: 'spending' | 'savings' | null; destinationPurpose?: 'spending' | 'savings' | null;
+  exchange?: string | null; exchangeParentId?: string | null;
   externalName: string | null;
   notes: string | null; destinationAccountId: string | null; adjustmentDirection: 'increase' | 'decrease' | null;
 };
 function fromRow(row: TransactionRow): Transaction {
-  const record = { ...row, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined };
+  const record = { ...row, exchange: row.exchange ? JSON.parse(row.exchange) : undefined, exchangeParentId: row.exchangeParentId ?? undefined, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined };
   validateManualRecord(record);
   return record;
 }
@@ -30,9 +32,11 @@ export async function getTransaction(db: FinanceDatabase, id: string): Promise<T
   return row ? fromRow(row) : null;
 }
 export async function listTransactions(db: FinanceDatabase): Promise<Transaction[]> {
-  return (await db.getAllAsync<TransactionRow>('SELECT * FROM transactions ORDER BY transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC')).map(fromRow);
+  const rows = (await db.getAllAsync<TransactionRow>('SELECT * FROM transactions ORDER BY transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC')).map(fromRow);
+  validateExchangeLinks(rows); return rows;
 }
 export async function createTransaction(db: FinanceDatabase, id: string, draft: TransactionDraft): Promise<Transaction> {
+  if (draft.exchange) return saveExchange(db, id, draft, false);
   validateId(id);
   let saved: Transaction | undefined;
   await db.withExclusiveTransactionAsync(async (transaction) => {
@@ -53,12 +57,14 @@ export async function createTransaction(db: FinanceDatabase, id: string, draft: 
 }
 /** Only after confirmation; validates both account balances before committing a move. */
 export async function updateTransaction(db: FinanceDatabase, id: string, draft: TransactionDraft): Promise<Transaction> {
+  if (draft.exchange) return saveExchange(db, id, draft, true);
   validateId(id);
   let saved: Transaction | undefined;
   await db.withExclusiveTransactionAsync(async (transaction) => {
     validateDraft(draft, await getAccount(transaction, draft.accountId), draft.type === 'TRANSFER' ? await getAccount(transaction, draft.destinationAccountId!) : undefined);
     const original = await getTransaction(transaction, id);
     if (!original) throw new Error('Transaction no longer exists.');
+    if (original.exchange || original.exchangeParentId) throw new Error('Edit this through its linked exchange.');
     if (original.type === 'ADJUSTMENT') throw new Error('Use Adjust balance on the account to make another correction.');
     if ((await getAccount(transaction, original.accountId)).archived) throw new Error('Unarchive the original account before editing its transactions.');
     if (original.type === 'TRANSFER' && (await getAccount(transaction, original.destinationAccountId!)).archived) throw new Error('Unarchive the original destination before editing this transfer.');
@@ -82,7 +88,7 @@ export async function deleteTransaction(db: FinanceDatabase, id: string): Promis
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const original = await getTransaction(transaction, id);
     if (!original) return;
-    await transaction.runAsync('DELETE FROM transactions WHERE id = ?', id);
+    await transaction.runAsync('DELETE FROM transactions WHERE id = ?', original.exchangeParentId ?? id);
     calculateFinanceSummary(await listAccounts(transaction), await listTransactions(transaction), original.transactionDate.slice(0, 7));
   });
 }
@@ -132,4 +138,32 @@ export async function createExternalTransfer(db: FinanceDatabase, id: string, re
       id, record.accountId, record.type, record.amount, record.category, record.transactionDate, record.transactionTime, record.notes ?? null, record.createdAt, record.updatedAt, record.adjustmentDirection!, record.externalName!);
     calculateFinanceSummary(await listAccounts(transaction), await listTransactions(transaction), record.transactionDate.slice(0, 7));
   });
+}
+
+
+async function saveExchange(db: FinanceDatabase, id: string, draft: TransactionDraft, editing: boolean): Promise<Transaction> {
+  validateId(id); let saved: Transaction | undefined;
+  await db.withExclusiveTransactionAsync(async transaction => {
+    const original = await getTransaction(transaction,id);
+    if (!editing && original) { if (!original.exchange) throw new Error('Submission ID is already in use.'); saved=original; return; }
+    if (editing && !original?.exchange) throw new Error('Exchange no longer exists.');
+    const accounts = await listAccounts(transaction);
+    for (const accountId of new Set([draft.accountId,draft.exchange!.receivedAccountId,...(original?.exchange ? [original.accountId,original.exchange.receivedAccountId] : [])])) {
+      const account=accounts.find(account=>account.id===accountId); if (!account || account.archived) throw new Error('Choose active accounts, or unarchive the original accounts before editing.');
+    }
+    const now=[new Date().toISOString(),original?.updatedAt ?? ''].sort().at(-1)!;
+    const records=exchangeRecords(id,draft,original?.createdAt ?? now,now);
+    if (editing) await transaction.runAsync('DELETE FROM transactions WHERE id = ?',id);
+    for (const row of records) {
+      validateDraft(row as TransactionDraft,accounts.find(account=>account.id===row.accountId)!,accounts.find(account=>account.id===row.destinationAccountId));
+      if (row.type==='TRANSFER') { row.sourcePurpose=(original?.accountId===row.accountId ? original.sourcePurpose : undefined) ?? accounts.find(account=>account.id===row.accountId)!.purpose; row.destinationPurpose=(original && original.destinationAccountId===row.destinationAccountId ? original.destinationPurpose : undefined) ?? accounts.find(account=>account.id===row.destinationAccountId)!.purpose; }
+      await transaction.runAsync('INSERT INTO transactions(id,accountId,type,amount,category,transactionDate,transactionTime,notes,createdAt,updatedAt,destinationAccountId,sourcePurpose,destinationPurpose,exchange,exchangeParentId) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',row.id,row.accountId,row.type,row.amount,row.category,row.transactionDate,row.transactionTime,row.notes ?? null,row.createdAt,row.updatedAt,row.destinationAccountId ?? null,row.sourcePurpose ?? null,row.destinationPurpose ?? null,row.exchange ? JSON.stringify(row.exchange) : null,row.exchangeParentId ?? null);
+    }
+    await transaction.runAsync("INSERT INTO preferences(key,value) VALUES ('lastEntryAccount',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",draft.accountId);
+    const rows=await listTransactions(transaction);
+    calculateFinanceSummary(accounts,rows,draft.transactionDate.slice(0,7));
+    if (original) calculateFinanceSummary(accounts,rows,original.transactionDate.slice(0,7));
+    saved=await getTransaction(transaction,id) ?? undefined;
+  });
+  return saved!;
 }
