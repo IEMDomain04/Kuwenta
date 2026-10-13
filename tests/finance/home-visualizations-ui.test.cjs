@@ -14,6 +14,7 @@ function render(visible) {
     if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
     if(name==='@/components/themed-text')return{ThemedText:'Text'};
     if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
+    if(name==='./account-balances')return{AccountBalances:'Balances'};
     if(name==='./selection-sheet')return{SelectionSheet:'SelectionSheet'};
     if(name==='./dashboard-charts')return{SpendingTrend:'Trend',IncomeExpenseChart:'Comparison'};
     if(name==='./category-spending')return{CategorySpending:'Chart'};
@@ -28,8 +29,8 @@ function render(visible) {
   return{tree,nodes,reportCalls,activityCalls};
 }
 test('every visualization combination renders only selected sections and skips hidden calculations',()=>{
-  for(let mask=0;mask<32;mask++){
-    const visible=['activity','summary','categories','trend','comparison'].filter((_,i)=>mask&(1<<i));
+  for(let mask=0;mask<64;mask++){
+    const visible=['activity','summary','categories','trend','comparison','balances'].filter((_,i)=>mask&(1<<i));
     const h=render(visible);
     assert.equal(h.activityCalls,Number(visible.includes('activity'))+Number(visible.includes('trend')));
     assert.equal(h.reportCalls,visible.includes('summary')||visible.includes('categories')||visible.includes('comparison')?1:0);
@@ -46,6 +47,9 @@ test('every visualization combination renders only selected sections and skips h
     assert.ok(!h.nodes.some(node=>node.type==='Text'&&JSON.stringify(node.props.children).includes('so far')));
     assert.equal(h.nodes.some(node=>node.type==='Text'&&node.props.children==='Income'),visible.includes('summary'));
     assert.equal(h.nodes.filter(node=>node.props.accessibilityLabel==='day report').length,visible.includes('summary')||visible.includes('categories')||visible.includes('comparison')||visible.includes('trend')?1:0);
+    assert.equal(h.nodes.some(node=>node.type==='Balances'),visible.includes('balances'));
+    if(visible.includes('balances') && visible.includes('summary'))assert.ok(h.nodes.findIndex(node=>node.props.children==='Income')<h.nodes.findIndex(node=>node.type==='Balances'));
+    if(visible.includes('balances') && visible.includes('categories'))assert.ok(h.nodes.findIndex(node=>node.type==='Balances')<h.nodes.findIndex(node=>node.type==='Chart'));
     if(mask===0)assert.equal(h.tree,null);
   }
 });

@@ -1,3 +1,4 @@
+import { AccountBalances } from './account-balances';
 import { SelectionSheet } from './selection-sheet';
 import { SpendingTrend, IncomeExpenseChart } from './dashboard-charts';
 import { DEFAULT_HOME_VISUALIZATIONS, type HomeVisualization } from '../home-visualizations';
@@ -22,6 +23,7 @@ export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: {
   const [weekOffset, setWeekOffset] = useState(0);
   const [weekOpen, setWeekOpen] = useState(false);
   const [weekCount, setWeekCount] = useState(12);
+  const showBalances = visible.includes('balances');
   const showActivity = visible.includes('activity');
   const showSummary = visible.includes('summary');
   const showCategories = visible.includes('categories');
@@ -41,7 +43,7 @@ export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: {
           <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: period === value ? theme.onAccent : theme.textSecondary }}>{value === 'day' ? 'Day' : value === 'week' ? 'Week' : 'Month'}</ThemedText>
         </Pressable>)}
       </View>;
-  if (!showActivity && !showSummary && !showCategories && !showTrend && !showComparison) return null;
+  if (!showBalances && !showActivity && !showSummary && !showCategories && !showTrend && !showComparison) return null;
   return <View style={{ gap: 12 }}>
     {showActivity || showSummary ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
     {showActivity ? <View style={{ flexGrow: 1, flexBasis: fontScale > 1.3 ? '100%' : 130, minWidth: 120, padding: 8, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 4 }}>
@@ -79,6 +81,7 @@ export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: {
       {periodPicker}
     </View> : null}
     </View> : null}
+    {showBalances ? <AccountBalances /> : null}
     {!showSummary && (showCategories || showTrend || showComparison) ? periodPicker : null}
     {showCategories && report ? <CategorySpending transactions={transactions} start={report.start} end={report.end} period={period} /> : null}
     {showTrend ? <SpendingTrend days={trendDays} period={period} /> : null}

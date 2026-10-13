@@ -1277,6 +1277,9 @@ test('Home visualization selections persist, support none, and never change fina
     await initializeDatabase(db);
     await createTransaction(db,'expense',expense());
     assert.deepEqual(await loadHomeVisualizations(db), ['activity','summary','categories','budgets']);
+    await saveHomeVisualizations(db,['balances']);
+    db.close(); db=connect(filename);
+    assert.deepEqual(await loadHomeVisualizations(db),['balances']);
     await saveHomeVisualizations(db,['categories','activity']);
     db.close(); db=connect(filename);
     assert.deepEqual(await loadHomeVisualizations(db),['activity','categories']);

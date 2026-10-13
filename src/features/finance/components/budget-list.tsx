@@ -74,7 +74,6 @@ export function BudgetList({ rows, disabled, onReorder, onDraggingChange, render
   let top = bounds.current[order[0]]?.top ?? 0;
   for (const id of preview ?? order) { projectedTops[id] = top; top += (bounds.current[id]?.height ?? 0) + 12; }
   return <View style={{ gap: 12 }}>
-    {rows.length > 1 ? <ThemedText type="small" themeColor="textSecondary">Hold a budget card to rearrange.</ThemedText> : null}
     <View {...pan.panHandlers} onTouchEnd={() => finish.current(true)} onTouchCancel={() => finish.current(false)} style={{ gap: 12 }}>
       {rows.map(row => {
         const active = drag?.id === row.category;

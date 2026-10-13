@@ -39,8 +39,12 @@ export function BudgetOverview({ compact = false, reportingMonth, onDraggingChan
         <ThemedText type="smallBold" accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={{ color: theme.budget, fontSize: 12, lineHeight: 18, flexShrink: 1 }}>{compact ? period === 'all' ? 'Budgets' : period === 'monthly' ? 'Monthly budgets' : period === 'weekly' ? 'Weekly budgets' : 'Daily budgets' : 'Budgets'}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={{ fontSize: 10, lineHeight: 16, marginLeft: 'auto' }}>{period === 'all' ? 'All periods' : 'All dates'}</ThemedText>
       </View>
-      <BudgetPeriodPicker period={period} date={date} disabled={finance.busy} onPeriodChange={setPeriod} allowAll showDate={false} />
-      <ActionButton compact label="Manage" disabled={finance.busy} onPress={() => openBudget()} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <BudgetPeriodPicker period={period} date={date} disabled={finance.busy} onPeriodChange={setPeriod} allowAll showDate={false} />
+        </View>
+        <ActionButton compact label="Manage" disabled={finance.busy} onPress={() => openBudget()} />
+      </View>
       {groups.map(group => <View key={group.scope} style={{ gap: 8 }}>
         <ThemedText type="smallBold">{group.period === 'daily' ? 'Daily' : group.period === 'weekly' ? 'Weekly' : 'Monthly'} | {budgetPeriodLabel(group.scope)}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">{formatMoney(group.budgetedSpent, true)} spent of {formatMoney(group.totalLimit, true)}</ThemedText>
