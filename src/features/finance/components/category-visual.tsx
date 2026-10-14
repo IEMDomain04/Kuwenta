@@ -10,6 +10,18 @@ import { useTheme } from '@/hooks/use-theme';
 const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
   'Balance adjustment': { color: Colors.light.accent, icon: 'options-outline' },
   Transfer: { color: Colors.light.accent, icon: 'swap-horizontal' },
+  Groceries: { color: '#527326', icon: 'cart' },
+  'Personal Care': { color: '#0B6575', icon: 'body' },
+  'Cleaning Supplies': { color: '#17658F', icon: 'sparkles' },
+  Snacks: { color: '#94620B', icon: 'fast-food' },
+  Drinks: { color: '#0B6575', icon: 'water' },
+  'Mobile Load': { color: '#0B6575', icon: 'phone-portrait' },
+  'Mobile Data': { color: '#17658F', icon: 'cellular' },
+  Games: { color: '#6543A0', icon: 'game-controller' },
+  Tech: { color: '#033F77', icon: 'desktop' },
+  Accessories: { color: '#805436', icon: 'headset' },
+  'School Supplies': { color: '#6651A0', icon: 'pencil' },
+  'Personal Items': { color: '#855006', icon: 'bag-handle' },
   Meals: { color: '#A65313', icon: 'restaurant' },
   'Snacks & Drinks': { color: '#94620B', icon: 'fast-food' },
   Transport: { color: '#17658F', icon: 'bus' },
@@ -23,13 +35,18 @@ const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof
   Transportation: { color: '#3196D5', icon: 'bus' },
   Shopping: { color: '#8964CF', icon: 'bag-handle' },
   Bills: { color: '#3196D5', icon: 'document-text' },
-  Entertainment: { color: '#8571C6', icon: 'game-controller' },
+  Entertainment: { color: '#8571C6', icon: 'film' },
   Health: { color: '#D66A82', icon: 'heart' },
   Education: { color: '#558BB3', icon: 'book' },
   Family: { color: '#CC8154', icon: 'home' },
   Subscriptions: { color: '#5C8B9A', icon: 'phone-portrait' },
   Other: { color: '#7D929D', icon: 'ellipsis-horizontal' },
 };
+visuals['E-bank Cash-in'] = { color: '#0B6575', icon: 'arrow-down-circle' };
+visuals['E-bank Cash-out'] = { color: '#0B6575', icon: 'arrow-up-circle' };
+visuals['Service sale'] = { color: '#087443', icon: 'storefront' };
+visuals['Cash-in (E-bank)'] = visuals['E-bank Cash-in'];
+visuals['Cash-out (E-bank)'] = visuals['E-bank Cash-out'];
 const incomeVisual = { color: Colors.light.income, icon: 'cash' as const };
 export function categoryVisual(category: string, income = false, dark = false) {
   const visual = income ? incomeVisual : visuals[category] ?? visuals.Other;

@@ -1,9 +1,14 @@
+import { validateExchange } from './exchanges';
+import { isAccountIcon } from './account-icons';
+import { ACCOUNT_CARD_COLORS } from './account-colors';
 import { isUtcTimestamp, isValidDate, isValidTime } from './dates';
-import { CATEGORIES, type Account, type Transaction, type TransactionDraft, type SavingsGoal } from './types';
+import { CATEGORIES, LEGACY_EXPENSE_CATEGORIES, type Account, type Transaction, type TransactionDraft, type SavingsGoal } from './types';
 
 export function validateAccount(account: Account): void {
   if (!account.name?.trim()) throw new Error('Enter an account name.');
   if (!account.id?.trim()) throw new Error('Could not identify this account. Try again.');
+  if (account.icon !== undefined && !isAccountIcon(account.icon)) throw new Error('Choose a valid account icon.');
+  if (account.color !== undefined && (typeof account.color !== 'string' || !Object.hasOwn(ACCOUNT_CARD_COLORS, account.color))) throw new Error('Choose a valid account color.');
   if (account.currency !== 'PHP') throw new Error('Only PHP accounts are supported.');
   if (!Number.isSafeInteger(account.openingBalance)) throw new Error('Opening balance must be safe integer centavos.');
   if (!['spending', 'savings'].includes(account.purpose)) throw new Error('Invalid account purpose.');
@@ -20,7 +25,8 @@ export function validateTransactionFields(draft: TransactionDraft): void {
   if (draft.type === 'TRANSFER') {
     if (draft.category !== 'Transfer' || typeof draft.destinationAccountId !== 'string' || !draft.destinationAccountId.trim() || draft.destinationAccountId === draft.accountId) throw new Error('Choose two different accounts for the transfer.');
   } else if (draft.destinationAccountId !== undefined) throw new Error('Only transfers can have a destination account.');
-  if (draft.type !== 'TRANSFER' && !(CATEGORIES[draft.type] as readonly string[]).includes(draft.category)) throw new Error('Choose a category for this transaction type.');
+  if (draft.type !== 'TRANSFER' && !(CATEGORIES[draft.type] as readonly string[]).includes(draft.category) && !(draft.type === 'EXPENSE' && LEGACY_EXPENSE_CATEGORIES.includes(draft.category))) throw new Error('Choose a category for this transaction type.');
+  if (draft.exchange !== undefined) validateExchange(draft);
   if (!isValidDate(draft.transactionDate)) throw new Error('Enter a valid Philippine date as YYYY-MM-DD.');
   if (!isValidTime(draft.transactionTime)) throw new Error('Enter a valid time as HH:mm:ss.');
   if (draft.notes !== undefined && typeof draft.notes !== 'string') throw new Error('Notes must be text.');
@@ -54,6 +60,7 @@ export function validateManualRecord(record: Transaction): void {
     if ((record.sourcePurpose === undefined) !== (record.destinationPurpose === undefined)
       || record.sourcePurpose !== undefined && (!purposes.includes(record.sourcePurpose) || !purposes.includes(record.destinationPurpose!))) throw new Error('Invalid transfer account purposes.');
   } else if (record.sourcePurpose !== undefined || record.destinationPurpose !== undefined) throw new Error('Only transfers can contain account purposes.');
+  if (record.exchangeParentId !== undefined && (typeof record.exchangeParentId !== 'string' || !record.exchangeParentId.trim() || record.exchangeParentId === record.id || record.exchange)) throw new Error('Invalid linked exchange.');
   if (!record.id?.trim()) throw new Error('Transaction ID is required.');
   if (!isUtcTimestamp(record.createdAt) || !isUtcTimestamp(record.updatedAt)) throw new Error('Record timestamps must be ISO UTC timestamps.');
   if (record.updatedAt < record.createdAt) throw new Error('Update timestamp cannot precede creation.');

@@ -1,6 +1,6 @@
 import type { FinanceDatabase } from './database';
 
-const VERSION = 9;
+const VERSION = 13;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -77,5 +77,26 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       await transaction.execAsync('INSERT INTO transactions_new SELECT * FROM transactions; DROP TABLE transactions; ALTER TABLE transactions_new RENAME TO transactions; ALTER TABLE transactions ADD COLUMN externalName TEXT; CREATE INDEX transactions_history ON transactions(accountId, transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_all_history ON transactions(transactionDate DESC, transactionTime DESC, createdAt DESC, id DESC); CREATE INDEX transactions_destination ON transactions(destinationAccountId); PRAGMA user_version = 9;');
     }
     if (version < 9) await transaction.execAsync('PRAGMA user_version = 9;');
+    if (version < 10) {
+      if (!(await transaction.getAllAsync<{ name: string }>('PRAGMA table_info(accounts)')).some(column => column.name === 'color')) {
+        await transaction.execAsync("ALTER TABLE accounts ADD COLUMN color TEXT CHECK(color IS NULL OR color IN ('green', 'blue', 'teal', 'plum', 'amber', 'cyan', 'indigo', 'rose', 'coral', 'brown', 'slate'));");
+      }
+      await transaction.execAsync('PRAGMA user_version = 10;');
+    }
+    if (version < 11) {
+      if (version === 10) {
+        // Replace only the color column constraint; account IDs and foreign keys stay intact.
+        await transaction.execAsync("ALTER TABLE accounts RENAME COLUMN color TO previousColor; ALTER TABLE accounts ADD COLUMN color TEXT CHECK(color IS NULL OR color IN ('green', 'blue', 'teal', 'plum', 'amber', 'cyan', 'indigo', 'rose', 'coral', 'brown', 'slate')); UPDATE accounts SET color = previousColor; ALTER TABLE accounts DROP COLUMN previousColor;");
+      }
+      await transaction.execAsync('PRAGMA user_version = 11;');
+    }
+    if (version < 12 && !(await transaction.getAllAsync<{ name: string }>('PRAGMA table_info(accounts)')).some(column => column.name === 'icon')) await transaction.execAsync("ALTER TABLE accounts ADD COLUMN icon TEXT CHECK(icon IS NULL OR icon IN ('wallet', 'bank', 'gcash', 'maya', 'maribank', 'gotyme', 'uniondigital'));");
+    if (version < 12) await transaction.execAsync('PRAGMA user_version = 12;');
+    if (version < 13) {
+      const columns = await transaction.getAllAsync<{ name: string }>('PRAGMA table_info(transactions)');
+      if (!columns.some(column => column.name === 'exchange')) await transaction.execAsync('ALTER TABLE transactions ADD COLUMN exchange TEXT;');
+      if (!columns.some(column => column.name === 'exchangeParentId')) await transaction.execAsync('ALTER TABLE transactions ADD COLUMN exchangeParentId TEXT REFERENCES transactions(id) ON DELETE CASCADE;');
+      await transaction.execAsync('CREATE INDEX IF NOT EXISTS transactions_exchange_parent ON transactions(exchangeParentId); PRAGMA user_version = 13;');
+    }
   });
 }

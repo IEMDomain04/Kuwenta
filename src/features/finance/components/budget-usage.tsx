@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, View, type GestureResponderEvent } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -8,10 +8,11 @@ import { budgetFeedback, type budgetReport } from '../budgets';
 import { formatMoney } from '../money';
 import { CategoryIcon } from './category-visual';
 
-export function BudgetUsage({ row, available, totalRemaining, currentMonth, actions }: {
-  row: ReturnType<typeof budgetReport>['rows'][number]; available: number; totalRemaining: number; currentMonth: boolean; actions?: ReactNode;
+export function BudgetUsage({ row, available, totalRemaining, currentMonth, actions, onHold }: {
+  row: ReturnType<typeof budgetReport>['rows'][number]; available: number; totalRemaining: number; currentMonth: boolean; actions?: ReactNode; onHold?: (event: GestureResponderEvent) => void;
 }) {
   const theme = useTheme();
+  const held = useRef(false);
   const [expanded, setExpanded] = useState(false);
   const feedback = budgetFeedback(row, available, totalRemaining, currentMonth);
   return <View style={{ gap: 8 }}>
@@ -24,7 +25,7 @@ export function BudgetUsage({ row, available, totalRemaining, currentMonth, acti
       <View style={{ height: 6, width: `${Math.min(1, row.progress) * 100}%`, backgroundColor: row.remaining < 0 ? theme.expense : theme.budget }} />
     </View>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-    <Pressable accessibilityRole="button" accessibilityLabel={row.category + ' budget feedback'} accessibilityState={{ expanded }} onPress={() => setExpanded(value => !value)} style={{ flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={row.category + ' budget feedback'} accessibilityState={{ expanded }} onPressIn={() => { held.current = false; }} delayLongPress={350} onLongPress={onHold ? event => { held.current = true; onHold(event); } : undefined} onPress={() => { if (!held.current) setExpanded(value => !value); }} style={{ flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <Ionicons name="bulb-outline" size={16} color={theme.budget} />
       <ThemedText type="small" style={{ flex: 1, color: row.remaining < 0 ? theme.expense : theme.textSecondary }}>{feedback.message}</ThemedText>
       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={theme.textSecondary} />

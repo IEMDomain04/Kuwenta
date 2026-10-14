@@ -1,24 +1,31 @@
+import { FieldError } from './field-error';
+import { useConfirmation } from './confirmation';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, TextInput } from 'react-native';
+import { Keyboard, TextInput } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import { decryptBackup, pickBackupFile, validateBackupPassword } from '../encrypted-backup';
+import { pickBackupFile } from '../backup-files';
 import { previewBackup, type FinanceBackup } from '../backup';
+import { calculateCurrentMoney } from '../calculations';
 import { formatMoney } from '../money';
-import { philippineDateTime } from '../dates';
+import { formatTransactionDateTime, philippineDateTime } from '../dates';
 import { ActionButton } from './ui';
-import { useFinance } from '../provider';
 
-export function BackupImportPreview({ disabled = false }: { disabled?: boolean }) {
+export function BackupImportPreview({ disabled = false, busy = false, onRestore: restoreBackup, onNotice: showNotice, recovery = false }: {
+  disabled?: boolean; busy?: boolean; recovery?: boolean;
+  onRestore: (backup: FinanceBackup) => Promise<void>;
+  onNotice: (message: string, error?: boolean) => void;
+}) {
   const theme = useTheme();
-  const { busy, restoreBackup, showNotice } = useFinance();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const confirmation = useConfirmation();
   const confirming = useRef(false);
   const passwordInput = useRef<TextInput>(null);
   const [restoring, setRestoring] = useState(false);
   const [selected, setSelected] = useState<{ name: string; json: string } | null>(null);
   const [password, setPassword] = useState('');
   const [preview, setPreview] = useState<{
-    backup: FinanceBackup; summary: ReturnType<typeof previewBackup>; account: FinanceBackup['accounts'][number]; exported: string;
+    backup: FinanceBackup; summary: ReturnType<typeof previewBackup>; total: number; name: string; exported: string;
   } | null>(null);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState('');
@@ -31,42 +38,51 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
   }, []);
   function clear() {
     generation.current++;
-    setSelected(null); setPassword(''); setPreview(null); setMessage('');
+    setSelected(null); setPassword(''); setFieldErrors({}); setPreview(null); setMessage('');
+  }
+  function showPreview(backup: FinanceBackup, name: string) {
+    const time = philippineDateTime(new Date(backup.exportedAt));
+    setPreview({
+      backup, name, summary: previewBackup(backup),
+      total: calculateCurrentMoney(backup.accounts, backup.transactions).totalMoney,
+      exported: formatTransactionDateTime(time.transactionDate, time.transactionTime) + ' PH',
+    });
+    setSelected(null); setMessage('');
   }
   async function chooseFile() {
-    if (pending.current || disabled) return;
+    if (pending.current || disabled || busy || confirming.current) return;
     pending.current = true; setWorking(true); clear();
     const token = generation.current;
     try {
       const file = await pickBackupFile();
-      if (mounted.current && token === generation.current) setSelected(file);
+      if (file && mounted.current && token === generation.current) {
+        if (file.backup) showPreview(file.backup, file.name);
+        else setSelected(file);
+      }
     } catch (error) {
-      if (mounted.current && token === generation.current) { setMessage(''); showNotice(error instanceof Error ? error.message : 'Could not open backup.', true); }
+      if (mounted.current && token === generation.current) showNotice(error instanceof Error ? error.message : 'Could not open backup.', true);
     } finally {
       pending.current = false;
       if (mounted.current) setWorking(false);
     }
   }
   async function unlock() {
-    if (pending.current || disabled || !selected) return;
-    try { validateBackupPassword(password); }
-    catch (error) { showNotice(error instanceof Error ? error.message : 'Enter your backup password.', true); passwordInput.current?.focus(); return; }
-    pending.current = true; setWorking(true); setMessage('Unlocking and checking backup...');
+    if (pending.current || disabled || busy || !selected) return;
+    pending.current = true; setWorking(true); setMessage('Checking backup...');
     const token = generation.current;
     const enteredPassword = password;
-    setPassword(''); Keyboard.dismiss();
+    Keyboard.dismiss();
     try {
+      const { decryptBackup, validateBackupPassword } = await import('../encrypted-backup');
+      validateBackupPassword(enteredPassword);
+      setPassword('');
       const backup = await decryptBackup(selected.json, enteredPassword);
-      const time = philippineDateTime(new Date(backup.exportedAt));
-      const result = {
-        backup, summary: previewBackup(backup), account: backup.accounts.find((account) => account.id === 'cash')!,
-        exported: time.transactionDate + ' ' + time.transactionTime + ' PH (UTC+8)',
-      };
-      if (mounted.current && token === generation.current) {
-        setPreview(result); setSelected(null); setMessage('');
-      }
+      if (mounted.current && token === generation.current) showPreview(backup, selected.name);
     } catch (error) {
-      if (mounted.current && token === generation.current) { setMessage(''); showNotice(error instanceof Error ? error.message : 'Could not preview backup.', true); }
+      if (mounted.current && token === generation.current) {
+        setMessage(''); setFieldErrors({ password: error instanceof Error ? error.message : 'Could not unlock backup.' }); showNotice(error instanceof Error ? error.message : 'Could not preview backup.', true);
+        passwordInput.current?.focus();
+      }
     } finally {
       pending.current = false;
       if (mounted.current) setWorking(false);
@@ -77,15 +93,16 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
     const backup = preview.backup;
     confirming.current = true;
     Keyboard.dismiss();
-    Alert.alert('Replace your financial records?',
-      'This replaces ALL your current accounts, transactions, savings goals, and budgets with this backup. Export your current records first if you want to keep a copy. This cannot be undone.',
+    confirmation.alert(recovery ? 'Recover records from this backup?' : 'Replace current records?',
+      recovery ? 'Kuwenta will use the records in this backup. Changes made after its export will not be recovered. The inaccessible database will be kept on this device. Continue?'
+        : 'This replaces your accounts, transactions, budgets, and goals with this backup. Changes made after its export will be lost. Export your current records first if you want to keep them.',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; } },
-        { text: 'Restore backup', style: 'destructive', onPress: () => {
+        { text: recovery ? 'Restore' : 'Replace', style: 'destructive', onPress: () => {
           if (!mounted.current) { confirming.current = false; return; }
           pending.current = true; setRestoring(true); setMessage('Restoring backup...');
           void restoreBackup(backup).then(() => {
-            if (mounted.current) { clear(); setMessage(''); }
+            if (mounted.current) clear();
           }).catch((error: unknown) => {
             if (mounted.current) { setMessage(''); showNotice(error instanceof Error ? error.message : 'Could not restore backup.', true); }
           }).finally(() => {
@@ -93,41 +110,45 @@ export function BackupImportPreview({ disabled = false }: { disabled?: boolean }
             if (mounted.current) setRestoring(false);
           });
         } },
-      ], { cancelable: false });
+      ], { icon: 'cloud-download-outline', rows: [{ label: 'Backup', value: preview.name }, { label: 'Exported', value: preview.exported }, { label: 'Accounts / records', value: preview.summary.accountCount + ' / ' + preview.summary.transactionCount }, { label: 'Budgets / goals', value: preview.summary.budgetCount + ' / ' + preview.summary.goalCount }] });
   }
+  function openPreview() {
+    if (!preview || pending.current || confirming.current || disabled || busy) return;
+    confirming.current = true;
+    confirmation.alert('Backup preview', preview.summary.cashBalance < 0 ? 'Review these records before continuing. This backup has a negative Cash balance.' : 'Review these records before continuing. Your current data has not changed.', [
+      { text: 'Cancel', style: 'cancel', onPress: () => { confirming.current = false; clear(); } },
+      { text: 'Continue', onPress: () => { confirming.current = false; reviewRestore(); } },
+    ], { icon: 'document-text-outline', rows: [
+      { label: 'Total money', value: formatMoney(preview.total, true) },
+      { label: 'Backup file', value: preview.name },
+      { label: 'Exported', value: preview.exported },
+      { label: 'Accounts', value: String(preview.summary.accountCount) },
+      { label: 'Transactions', value: String(preview.summary.transactionCount) },
+      { label: 'Budgets', value: String(preview.summary.budgetCount) },
+      { label: 'Savings goals', value: String(preview.summary.goalCount) },
+    ] });
+  }
+  useEffect(() => {
+    if (preview && !working && !restoring) openPreview();
+    // Open once after file validation; canceled replacement remains available for review.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, working]);
   const locked = disabled || busy || working || restoring;
   return <>
-    <ThemedText type="smallBold">Preview a backup</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Open an encrypted .kuwenta file to check its contents. This does not restore or change your current records.</ThemedText>
+    <ThemedText type="smallBold">{recovery ? 'Recover from backup' : 'Import backup'}</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Choose a Kuwenta JSON or Excel backup, review it, then confirm replacement.</ThemedText>
     <ActionButton label={working ? 'Checking backup...' : 'Choose backup file'} disabled={locked} onPress={() => { void chooseFile(); }} />
     {selected ? <>
-      <ThemedText>Selected: {selected.name}</ThemedText>
-      <TextInput ref={passwordInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Password for selected backup" placeholder="Backup password"
-        placeholderTextColor={theme.textSecondary} value={password} onChangeText={setPassword}
+      <ThemedText type="small">This older backup is protected. Enter its original password.</ThemedText>
+      <TextInput ref={passwordInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Password for older backup" placeholder="Original backup password"
+        placeholderTextColor={theme.textSecondary} value={password} onChangeText={value => { setPassword(value); setFieldErrors({}); }}
         secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={128} editable={!locked}
-        style={{ color: theme.text, borderColor: theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 }} />
+        style={{ color: theme.text, borderColor: fieldErrors.password ? theme.error : theme.textSecondary, borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 14 }} />
+      <FieldError message={fieldErrors.password} />
       <ActionButton label="Unlock and preview" disabled={locked} onPress={() => { void unlock(); }} />
     </> : null}
-    {preview ? <>
-      <ThemedText type="smallBold">Backup contents</ThemedText>
-      <ThemedText>Exported: {preview.exported}</ThemedText>
-      <ThemedText>Accounts: {preview.summary.accountCount} (PHP)</ThemedText>
-      {preview.backup.accounts.map((account) => <ThemedText key={account.id} type="small">{account.name} | {account.purpose}{account.archived ? ' | Archived' : ''}</ThemedText>)}
-      <ThemedText>Opening balance: {formatMoney(preview.account.openingBalance)}</ThemedText>
-      <ThemedText>Transactions: {preview.summary.transactionCount}</ThemedText>
-      <ThemedText>Income records: {preview.summary.incomeCount}</ThemedText>
-      <ThemedText>Savings goals: {preview.summary.goalCount}</ThemedText>
-      <ThemedText>Budgets: {preview.summary.budgetCount}</ThemedText>
-      <ThemedText>Transfers: {preview.summary.transferCount}</ThemedText>
-      <ThemedText>External movements: {preview.summary.externalCount}</ThemedText>
-      <ThemedText>Balance adjustments: {preview.summary.adjustmentCount}</ThemedText>
-      <ThemedText>Expense records: {preview.summary.expenseCount}</ThemedText>
-      <ThemedText>Cash balance: {formatMoney(preview.summary.cashBalance)}</ThemedText>
-      {preview.summary.cashBalance < 0 ? <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this backup has a negative Cash balance.</ThemedText> : null}
-      <ThemedText>Your current records have not changed. Restoring also replaces savings goals and budgets.</ThemedText>
-      <ActionButton label={restoring ? "Restoring backup..." : "Restore this backup"} disabled={locked} onPress={reviewRestore} />
-    </> : null}
+    {preview ? <ActionButton label="Review backup" disabled={locked} onPress={openPreview} /> : null}
     {selected || preview || working ? <ActionButton label={working ? 'Cancel preview' : 'Close preview'} disabled={restoring} onPress={clear} /> : null}
-    {message ? <ThemedText accessibilityLiveRegion="polite">{message}</ThemedText> : null}
+    {message ? <ThemedText type="small" accessibilityLiveRegion="polite">{message}</ThemedText> : null}
   </>;
 }

@@ -1,3 +1,4 @@
+import { FieldError } from './field-error';
 import { NotificationSettingsPanel } from './notification-settings';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
@@ -37,6 +38,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   const [accountName, setAccountName] = useState('Cash');
   const [amount, setAmount] = useState('');
   const [cents, setCents] = useState(0);
+  const [invalidField, setInvalidField] = useState<string>();
   const [error, setError] = useState('');
   const [rejected, setRejected] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,12 +46,12 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   const locked = busy || saving;
   function back() {
     if (locked || pending.current) return;
-    Keyboard.dismiss(); setStep(step === 4 && skipIntro ? 1 : Math.max(0, step - 1)); setError('');
+    Keyboard.dismiss(); setStep(step === 4 && skipIntro ? 1 : Math.max(0, step - 1)); setInvalidField(undefined); setError('');
   }
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (pending.current || locked) return true;
-      if (step > 0) { Keyboard.dismiss(); setStep(step === 4 && skipIntro ? 1 : step - 1); setError(''); return true; }
+      if (step > 0) { Keyboard.dismiss(); setStep(step === 4 && skipIntro ? 1 : step - 1); setInvalidField(undefined); setError(''); return true; }
       return false;
     });
     return () => listener.remove();
@@ -57,20 +59,21 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   function next() {
     if (locked || pending.current) return;
     try {
-      if (step === 1 && !name.trim()) throw new Error('Enter your name.');
-      if (step === 1 && (name.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(name))) throw new Error('Use a name up to 50 characters.');
+      if (step === 1 && !name.trim()) { setInvalidField('name'); throw new Error('Enter your name.'); }
+      if (step === 1 && (name.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(name))) { setInvalidField('name'); throw new Error('Use a name up to 50 characters.'); }
       if (step === 4) {
-        if (!accountName.trim() || accountName.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(accountName)) throw new Error('Enter an account name up to 50 characters.');
+        if (!accountName.trim() || accountName.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(accountName)) { setInvalidField('account'); throw new Error('Enter an account name up to 50 characters.'); }
         if (rejected) return;
+        setInvalidField('amount');
         setCents(parseMoney(amount.replace(/,/g, '') || '0', { allowZero: true }));
       }
-      Keyboard.dismiss(); setError(''); setStep(step === 1 && skipIntro ? 4 : step + 1);
+      Keyboard.dismiss(); setInvalidField(undefined); setError(''); setStep(step === 1 && skipIntro ? 4 : step + 1);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check your details.'); if (step === 1) nameInput.current?.focus(); else if (!accountName.trim()) accountInput.current?.focus(); else amountInput.current?.focus(); }
   }
   async function finish() {
     if (locked || pending.current) return;
     if (!name.trim()) { setError('Enter your name.'); setStep(1); return; }
-    pending.current = true; setSaving(true); setError('');
+    pending.current = true; setSaving(true); setInvalidField(undefined); setError('');
     try { await onComplete(cents, name.trim(), accountName.trim()); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not finish setup. Your details are kept.'); }
     finally { pending.current = false; setSaving(false); }
@@ -78,24 +81,26 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
   const inputStyle = { color: theme.text, backgroundColor: theme.backgroundElement, padding: 14, borderWidth: 1, borderColor: theme.border, borderRadius: 16, fontSize: 12 };
   return <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        {error ? <ThemedText accessibilityRole="alert" type="small" style={{ color: theme.error, backgroundColor: theme.errorSurface, padding: 12, borderRadius: 12 }}>{error}</ThemedText> : null}
+
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingTop: 8 }}>
         <View accessibilityRole="progressbar" accessibilityLabel="Onboarding progress" accessibilityValue={{ min: 1, max: titles.length, now: step + 1, text: 'Step ' + (step + 1) + ' of ' + titles.length }} style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
           {titles.map((title, index) => <View key={title} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: index <= step ? theme.accent : theme.border }} />)}
         </View>
-        {step < 4 && !skipIntro ? <Pressable accessibilityRole="button" accessibilityLabel="Skip introduction and go to account setup" disabled={locked} onPress={() => { Keyboard.dismiss(); setError(''); setSkipIntro(true); setStep(1); }} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="textSecondary">Skip intro</ThemedText></Pressable> : null}
+        {step < 4 && !skipIntro ? <Pressable accessibilityRole="button" accessibilityLabel="Skip introduction and go to account setup" disabled={locked} onPress={() => { Keyboard.dismiss(); setInvalidField(undefined); setError(''); setSkipIntro(true); setStep(1); }} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="small" themeColor="textSecondary">Skip intro</ThemedText></Pressable> : null}
       </View>
       <ScrollView key={step} style={{ flex: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: keyboardVisible ? 'flex-start' : 'center', padding: 24, gap: 16, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
         {!keyboardVisible ? <Image source={mascots[step]} contentFit="contain" accessible={false} style={{ width: '100%', height: step === 4 ? 120 : 190 }} /> : null}
         <ThemedText accessibilityRole="header" style={{ textAlign: 'center', fontSize: 23, lineHeight: 30, fontWeight: '600' }}>{titles[step]}</ThemedText>
+        {!invalidField && step !== 1 ? <FieldError message={error} /> : null}
         {step === 0 ? <>
           <ThemedText type="small" style={{ textAlign: 'center' }}>Your everyday money, made clearer.</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Track spending, manage accounts, and work toward your goals. No sign-up needed.</ThemedText>
         </> : null}
         {step === 1 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Choose the name you want to see in your Home greeting.</ThemedText>
-          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={inputStyle} />
+          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!locked} onChangeText={(value) => { setName(value); setInvalidField(undefined); setError(''); }} placeholder="Your name" placeholderTextColor={theme.textSecondary} autoCapitalize="words" returnKeyType="next" onSubmitEditing={next} style={[inputStyle, { borderColor: invalidField === 'name' ? theme.error : theme.border }]} />
         </> : null}
+        {step === 1 ? <FieldError message={error} /> : null}
         {step === 2 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Use the + button to record money activity.</ThemedText>
           {[
@@ -107,17 +112,19 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
         {step === 3 ? <>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Find budgets, savings, and goals in Plans.</ThemedText>
           <View style={{ padding: 16, borderRadius: 16, backgroundColor: theme.backgroundElement, gap: 10 }}>
-            <ThemedText type="small">Budgets help you follow monthly spending limits.</ThemedText>
+            <ThemedText type="small">Set daily, weekly, or monthly spending limits.</ThemedText>
             <ThemedText type="small">Savings accounts and goals show your progress.</ThemedText>
           </View>
         </> : null}
         {step === 4 ? <>
           <ThemedText type="smallBold">Currency: Philippine Peso (PHP)</ThemedText>
           <ThemedText type="smallBold">First account name</ThemedText>
-          <TextInput ref={accountInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="First account name" value={accountName} maxLength={50} editable={!locked} onChangeText={(value) => { setAccountName(value); setError(''); }} placeholder="Cash" placeholderTextColor={theme.textSecondary} autoCapitalize="words" style={inputStyle} />
+          <TextInput ref={accountInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="First account name" value={accountName} maxLength={50} editable={!locked} onChangeText={(value) => { setAccountName(value); setInvalidField(undefined); setError(''); }} placeholder="Cash" placeholderTextColor={theme.textSecondary} autoCapitalize="words" style={[inputStyle, { borderColor: invalidField === 'account' ? theme.error : theme.border }]} />
+          <FieldError message={invalidField === 'account' ? error : undefined} />
           <ThemedText type="smallBold">Starting balance</ThemedText>
-          <MoneyField ref={amountInput} accessibilityLabel="Starting balance in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={{ ...inputStyle, fontSize: 22 }}
-            onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} />
+          <MoneyField ref={amountInput} accessibilityLabel="Starting balance in pesos" value={amount} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={{ ...inputStyle, borderColor: invalidField === 'amount' ? theme.error : theme.border, fontSize: 22 }}
+            onValueChange={(value) => { setAmount(value); setRejected(false); setInvalidField(undefined); setError(''); }} onRejected={() => { setRejected(true); setInvalidField('amount'); setError('Use digits and up to two decimal places.'); }} />
+          <FieldError message={invalidField === 'amount' ? error : undefined} />
           <ThemedText type="small" themeColor="textSecondary">Your current money, not income. Leave blank to start with zero.</ThemedText>
         </> : null}
         {step === 5 ? <>

@@ -16,7 +16,7 @@ function reject(change) {
 test('backup round trip preserves money, Philippine time, notes, IDs and audit timestamps', () => {
   const rows = [
     record({ id: 'income', type: 'INCOME', category: 'Salary', amount: 50000 }),
-    record({ notes: 'Lunch ₱120', updatedAt: '2026-10-09T07:00:00.000Z' }),
+    record({ notes: 'Lunch Ã¢â€šÂ±120', updatedAt: '2026-10-09T07:00:00.000Z' }),
   ];
   const restored = parseBackup(serializeBackup(cash, rows, exportedAt));
   assert.deepEqual(restored.accounts, [cash]);
@@ -45,7 +45,7 @@ test('backdated records retain their reporting month after round trip', () => {
 
 test('malformed JSON, metadata, unknown versions and unsupported fields are rejected', () => {
   for (const value of ['{', 'null', '[]', '1']) assert.throws(() => parseBackup(value));
-  reject((v) => { v.version = 8; });
+  reject((v) => { v.version = 11; });
   reject((v) => { v.format = 'other'; });
   reject((v) => { v.currency = 'USD'; });
   reject((v) => { v.timezone = 'UTC'; });
@@ -140,4 +140,28 @@ test('version 3 adjustments round trip; legacy versions remain readable but cann
     const legacy = payload(); legacy.version = version; delete legacy.goals; delete legacy.budgets;
     assert.equal(parseBackup(JSON.stringify(legacy)).version, version);
   }
+});
+
+
+test('colored backups retain version 8 financial fields and older backups keep default colors', () => {
+  const saving = { ...cash, id: 'save', name: 'Savings', purpose: 'savings', includedInAvailable: false, openingBalance: 20000, color: 'green' };
+  const rows = [
+    record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', adjustmentDirection: 'increase', externalName: 'Friend', amount: 5000 }),
+    record({ id: 'transfer', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'save', sourcePurpose: 'spending', destinationPurpose: 'savings' }),
+  ];
+  const goals = [{ id: 'goal', name: 'Emergency', accountId: 'save', targetAmount: 50000, createdAt: record().createdAt, updatedAt: record().updatedAt }];
+  const budgets = [{ month: '2026-10', category: 'Food', limitAmount: 20000 }];
+  const backup = parseBackup(serializeBackup([cash, saving], rows, '2026-10-11T00:00:00.000Z', goals, budgets));
+  assert.equal(backup.version, 8);
+  assert.equal(backup.accounts[1].color, 'green');
+  assert.deepEqual(backup.transactions, rows);
+  assert.deepEqual(backup.goals, goals);
+  assert.deepEqual(backup.budgets, budgets);
+  for (const color of ['unknown', 'toString', '__proto__', null, 1]) {
+    assert.throws(() => parseBackup(JSON.stringify({ ...backup, accounts: [{ ...cash, color }, saving] })), /valid account color/);
+  }
+  assert.throws(() => parseBackup(JSON.stringify({ ...backup, version: 7 })), /version 8/);
+  const legacy = parseBackup(serializeBackup(cash, []));
+  assert.equal(legacy.version, 6);
+  assert.equal(legacy.accounts[0].color, undefined);
 });

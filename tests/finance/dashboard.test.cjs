@@ -79,3 +79,24 @@ test('recorded weekly balances include starting balances and dated records witho
   assert.equal(weeklyRecordedBalances([{...cash,openingBalance:-100}],[],new Date('2026-10-07T04:00:00Z'))[0].balance,-100);
   assert.throws(()=>weeklyRecordedBalances([cash],[record({accountId:'missing'})]));
 });
+
+
+test('category chart aggregates expenses only within the selected period', () => {
+  const { dashboardCategories } = require('../../.expo/finance-tests/dashboard.js');
+  const rows = [record({category:'Meals', amount:6000}), record({category:'Meals', amount:12000}), record({category:'Snacks', amount:3000}), record({type:'INCOME', amount:50000}), record({type:'TRANSFER', amount:10000}), record({type:'ADJUSTMENT', amount:1000}), record({transactionDate:'2026-10-11', amount:90000})];
+  assert.deepEqual(dashboardCategories(rows, '2026-10-09', '2026-10-09'), {total:21000,rows:[{category:'Meals',amount:18000},{category:'Snacks',amount:3000}]});
+  assert.deepEqual(dashboardCategories([], '2026-10-09', '2026-10-09'), {total:0, rows:[]});
+  assert.throws(() => dashboardCategories([record({amount:Number.MAX_SAFE_INTEGER}),record({amount:1})], '2026-10-09','2026-10-09'));
+});
+
+
+test('spending activity week browsing totals completed weeks and excludes partial comparisons',()=>{
+ const {activityWeek}=require('../../.expo/finance-tests/dashboard.js');
+ const now=new Date('2026-11-03T04:00:00Z');
+ const records=[record({id:'older',amount:2000,transactionDate:'2026-10-20'}),record({id:'monday',amount:3000,transactionDate:'2026-10-26'}),record({id:'sunday',amount:4000,transactionDate:'2026-11-01'}),record({id:'today',amount:5000,transactionDate:'2026-11-03'}),record({id:'future',amount:6000,transactionDate:'2026-11-05'}),record({id:'income',type:'INCOME',category:'Salary',amount:9000,transactionDate:'2026-11-01'})];
+ const current=activityWeek(records,now,0);assert.equal(current.total,5000);assert.equal(current.difference,null);
+ const last=activityWeek(records,now,-1);assert.equal(last.start,'2026-10-26');assert.equal(last.end,'2026-11-01');assert.equal(last.total,7000);assert.equal(last.difference,5000);
+ assert.equal(last.days.length,7);assert.ok(last.days.every(day=>!day.isToday));
+ assert.throws(()=>activityWeek(records,now,1));
+ assert.equal(activityWeek([],new Date('1900-01-01T04:00:00Z')).canGoBack,false);
+});

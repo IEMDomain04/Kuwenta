@@ -1,3 +1,4 @@
+import { exchangeLabel } from '../exchanges';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { router } from 'expo-router';
 import { CategoryIcon } from './category-visual';
@@ -23,10 +24,10 @@ export function FinanceScreen({ title, children, scroll = true, scrollEnabled = 
     {floatingAction && <View style={{ position: 'absolute', right: Math.max(insets.right, 16), bottom: tabScreen ? 16 : Math.max(insets.bottom, 16) }}>{floatingAction}</View>}
   </SafeAreaView>;
 }
-export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false, icon }: { icon?: ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
+export function ActionButton({ label, onPress, disabled = false, selected, primary = false, compact = false, soft = false, bordered = false, icon }: { bordered?: boolean; icon?: ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void; disabled?: boolean; selected?: boolean; primary?: boolean; compact?: boolean; soft?: boolean }) {
   const theme = useTheme();
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.accentPressed : theme.accent : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.background, borderWidth: 0 }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
+    style={({ pressed }) => [styles.button, { backgroundColor: disabled ? theme.disabledBackground : primary ? pressed ? theme.accentPressed : theme.accent : selected ? theme.backgroundSelected : soft ? theme.incomeSurface : theme.background, borderWidth: bordered ? 1 : 0, borderColor: theme.border }, compact && { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 }, pressed && !primary && { opacity: 0.7 }]}>
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' }}>
       {(selected || icon) ? <Ionicons accessible={false} name={selected ? 'checkmark' : icon!} size={16} color={disabled ? theme.disabledText : primary ? theme.onAccent : theme.text} /> : null}
       <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, textAlign: 'center', color: disabled ? theme.disabledText : primary ? theme.onAccent : theme.text }}>{label}</ThemedText>
@@ -50,7 +51,7 @@ export function TransactionRow({ transaction, accountName, destinationName, disa
       <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <CategoryIcon category={transaction.category} income={income} compact />
         <View style={{ flex: 1, minWidth: 90, gap: 1 }}>
-          <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18 }}>{transaction.notes || transaction.category}</ThemedText>
+          <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18 }}>{transaction.notes || (transaction.exchange ? exchangeLabel(transaction.exchange.kind) : transaction.category)}</ThemedText>
           {transaction.type === 'TRANSFER' ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1, fontSize: 11, lineHeight: 16 }}>{accountName}</ThemedText>
             <Ionicons accessible={false} name="arrow-forward" size={12} color={theme.textSecondary} />

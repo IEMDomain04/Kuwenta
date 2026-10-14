@@ -1,3 +1,4 @@
+import { ConfirmationProvider } from '@/features/finance/components/confirmation';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -19,7 +20,7 @@ function AppContent() {
 
   return <View style={{ flex: 1, backgroundColor: colors.background }} onLayout={() => { void SplashScreen.hideAsync(); }}><ThemeProvider value={{ ...(scheme === 'dark' ? DarkTheme : DefaultTheme), colors: { ...(scheme === 'dark' ? DarkTheme : DefaultTheme).colors, background: colors.background, card: colors.backgroundElement, text: colors.text, primary: colors.accent, border: colors.border } }}>
     <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-    <FinanceProvider><Stack screenOptions={{ headerShown: false }}>
+    <ConfirmationProvider><FinanceProvider><Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="transaction" options={{ gestureEnabled: false }} />
       <Stack.Screen name="transfer" options={{ gestureEnabled: false }} />
@@ -27,6 +28,6 @@ function AppContent() {
       <Stack.Screen name="budgets" options={{ gestureEnabled: false }} />
       <Stack.Screen name="goal" options={{ gestureEnabled: false }} />
       <Stack.Screen name="account" options={{ gestureEnabled: false }} />
-    </Stack></FinanceProvider>
+    </Stack></FinanceProvider></ConfirmationProvider>
   </ThemeProvider></View>;
 }

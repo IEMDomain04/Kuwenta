@@ -61,3 +61,12 @@ test('budget feedback covers near-limit, reached and overspent categories with e
   assert.match(budgetFeedback(over, 600000, 0, true).message, /0\.01 over/);
   assert.match(budgetFeedback(over, 600000, 0, true).details.join(' '), /does not change your balance/);
 });
+
+
+test('rearranging the Home budget preview preserves hidden categories and validates stale entries', () => {
+  const { mergeBudgetOrder } = require('../../.expo/finance-tests/budgets.js');
+  assert.deepEqual(mergeBudgetOrder(['Meals','Snacks','Groceries','Bills','Games'], ['Groceries','Meals','Snacks']), ['Groceries','Meals','Snacks','Bills','Games']);
+  assert.deepEqual(mergeBudgetOrder(['Meals','Snacks','Bills'], ['Bills','Meals']), ['Bills','Snacks','Meals']);
+  assert.throws(() => mergeBudgetOrder(['Meals','Snacks'], ['Meals','Meals']));
+  assert.throws(() => mergeBudgetOrder(['Meals','Snacks'], ['Bills']));
+});

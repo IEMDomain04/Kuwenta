@@ -1,5 +1,8 @@
+import { AccountIcon } from '../components/account-icon';
+import { FieldError } from '../components/field-error';
+import { useConfirmation } from '../components/confirmation';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { BackHandler, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -8,7 +11,7 @@ import { ActionButton, BackButton, FinanceScreen } from '../components/ui';
 import { SelectionSheet } from '../components/selection-sheet';
 import { MoneyField } from '../components/money-field';
 import { TransactionDateTime } from '../components/transaction-date-time';
-import { philippineDateTime } from '../dates';
+import { isValidDate, isValidTime, philippineDateTime } from '../dates';
 import { calculateAccountSummary, calculateFinanceSummary } from '../calculations';
 import { formatMoney, parseMoney } from '../money';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -18,6 +21,8 @@ export default function TransferScreen() {
   const params = useLocalSearchParams<{ accountId?: string; destinationAccountId?: string }>();
   const finance = useFinance();
   const theme = useTheme();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const confirmation = useConfirmation();
   const [external, setExternal] = useState<'increase' | 'decrease' | null>(null);
   const nameInput = useRef<TextInput>(null);
   const [name, setName] = useState('');
@@ -60,7 +65,14 @@ export default function TransferScreen() {
   } catch { /* Incomplete inputs are validated on Save. */ }
   function save() {
     if (locked || pending.current || rejected) return;
-    if (external && !name.trim()) { setError('Enter the external source or destination name.'); nameInput.current?.focus(); return; }
+    if (external && !name.trim()) { setFieldErrors({ name: 'Enter the external source or destination name.' }); setError('Enter the external source or destination name.'); nameInput.current?.focus(); return; }
+    const issues: Record<string, string> = {};
+    if (external !== 'increase' && !finance.accounts.some(row => row.id === accountId && !row.archived)) issues.from = 'Choose an active source account.';
+    if (external !== 'decrease' && !finance.accounts.some(row => row.id === destinationId && !row.archived)) issues.to = 'Choose an active destination account.';
+    if (!external && accountId && accountId === destinationId) issues.to = 'Choose a different destination account.';
+    if (!isValidDate(dateTime.transactionDate)) issues.date = 'Choose a valid date.';
+    if (!isValidTime(dateTime.transactionTime)) issues.time = 'Choose a valid time.';
+    if (Object.keys(issues).length) { setFieldErrors(issues); return; }
     let cents: number;
     try {
       cents = parseMoney(amount.replace(/,/g, ''));
@@ -72,9 +84,9 @@ export default function TransferScreen() {
         calculateFinanceSummary(finance.accounts, [...finance.transactions, { ...draft, id: 'preview', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }], dateTime.transactionDate.slice(0, 7));
       }
       if (external && after === undefined) throw new Error('Balance exceeds the supported range.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the inputs.'); amountInput.current?.focus(); return; }
+    } catch (cause) { setFieldErrors({ amount: cause instanceof Error ? cause.message : 'Check the amount.' }); setError(cause instanceof Error ? cause.message : 'Check the inputs.'); amountInput.current?.focus(); return; }
     pending.current = true;
-    Alert.alert('Save transfer?', (external === 'increase' ? name.trim() + ' to ' + account.name : account.name + ' to ' + (external ? name.trim() : finance.accounts.find((row) => row.id === destinationId)?.name)) + '\n' + formatMoney(cents) + (external ? '\nExcluded from History, income, and expenses. An internal record is kept for balances and backups.' : '\nIncome and expense totals stay unchanged.'), [
+    confirmation.alert('Save transfer?', external ? 'Excluded from History, income, and expenses. Kept for balances and backups.' : 'Moves money between accounts. Income and expense totals stay unchanged.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Save', onPress: () => {
         setSaving(true);
@@ -93,7 +105,7 @@ export default function TransferScreen() {
           // On success, keep the form disabled throughout the exit transition.
         })();
       } },
-    ], { cancelable: false });
+    ], { icon: 'swap-horizontal-outline', rows: [{ label: 'From', value: external === 'increase' ? name.trim() : account.name }, { label: 'To', value: external === 'decrease' ? name.trim() : finance.accounts.find(row => row.id === destinationId)?.name ?? '' }, { label: 'Amount', value: formatMoney(cents) }] });
   }
   const destination = finance.accounts.find((row) => row.id === destinationId);
   function endpoint(side: 'from' | 'to') {
@@ -101,12 +113,14 @@ export default function TransferScreen() {
     const selected = side === 'from' ? finance.accounts.find((row) => row.id === accountId) : destination;
     return <View style={{ gap: 6 }}>
       <ThemedText type="smallBold">{side === 'from' ? 'From' : 'To'}</ThemedText>
-      <Pressable accessibilityRole="button" accessibilityLabel={'Choose ' + side} disabled={locked} onPress={() => setPicker(side)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, padding: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}>
-        <Ionicons name={isExternal ? 'person-outline' : 'wallet-outline'} size={20} color={theme.textSecondary} />
-        <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{isExternal ? 'External' : selected?.name ?? 'Choose account'}</ThemedText>
+      <Pressable accessibilityRole="button" accessibilityLabel={'Choose ' + side} disabled={locked} onPress={() => setPicker(side)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, padding: 12, borderWidth: 1, borderColor: fieldErrors[side] ? theme.error : theme.border, borderRadius: 12 }}>
+        {isExternal || !selected ? <Ionicons name="person-outline" size={20} color={theme.textSecondary} /> : <AccountIcon account={selected} color={theme.textSecondary} />}
+        <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{isExternal ? side === 'from' ? 'External source' : 'External destination' : selected?.name ?? 'Choose account'}</ThemedText>
         <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
       </Pressable>
-      {isExternal ? <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel={side === 'from' ? 'External source name' : 'External destination name'} value={name} onChangeText={setName} editable={!locked} placeholder={side === 'from' ? 'External source name' : 'External destination name'} placeholderTextColor={theme.textSecondary} style={input} /> : null}
+      <FieldError message={fieldErrors[side]} />
+      {isExternal ? <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel={side === 'from' ? 'External source name' : 'External destination name'} value={name} onChangeText={value => { setName(value); setFieldErrors({}); }} editable={!locked} placeholder={side === 'from' ? 'External source name' : 'External destination name'} placeholderTextColor={theme.textSecondary} style={[input, { borderColor: fieldErrors.name ? theme.error : theme.border }]} /> : null}
+      {isExternal ? <FieldError message={fieldErrors.name} /> : null}
     </View>;
   }
   const input = { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, color: theme.text, fontSize: 12 };
@@ -117,8 +131,9 @@ export default function TransferScreen() {
       {endpoint('to')}
       <ThemedText type="small" themeColor="textSecondary">{external ? 'Moves money ' + (external === 'increase' ? 'into' : 'out of') + ' your account. Excluded from History, income, and expenses; kept in balances and backups. Use Income or Expense for salary or purchases.' : 'Moves money between your accounts without changing income or expense totals.'}</ThemedText>
       <ThemedText type="small">Amount (PHP)</ThemedText>
-      <MoneyField ref={amountInput} accessibilityLabel="Transfer amount" value={amount} editable={!locked} onValueChange={(value) => { setAmount(value); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setError('Use digits and up to two decimal places.'); }} style={{ ...input, fontSize: 22 }} />
-      <TransactionDateTime date={dateTime.transactionDate} time={dateTime.transactionTime} disabled={locked} onDateChange={(transactionDate) => setDateTime({ ...dateTime, transactionDate })} onTimeChange={(transactionTime) => setDateTime({ ...dateTime, transactionTime })} />
+      <MoneyField ref={amountInput} accessibilityLabel="Transfer amount" value={amount} editable={!locked} onValueChange={(value) => { setAmount(value); setFieldErrors({}); setRejected(false); setError(''); }} onRejected={() => { setRejected(true); setFieldErrors({ amount: 'Use digits and up to two decimal places.' }); setError('Use digits and up to two decimal places.'); }} style={{ ...input, borderColor: fieldErrors.amount ? theme.error : theme.border, fontSize: 22 }} />
+      <FieldError message={fieldErrors.amount} />
+      <TransactionDateTime dateError={fieldErrors.date} timeError={fieldErrors.time} date={dateTime.transactionDate} time={dateTime.transactionTime} disabled={locked} onDateChange={(transactionDate) => { setDateTime({ ...dateTime, transactionDate }); setFieldErrors({}); }} onTimeChange={(transactionTime) => { setDateTime({ ...dateTime, transactionTime }); setFieldErrors({}); }} />
       <TextInput selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Optional transfer note" value={notes} onChangeText={setNotes} editable={!locked} placeholder="Optional note" placeholderTextColor={theme.textSecondary} style={input} />
       {after !== undefined ? <View style={{ padding: 12, borderRadius: 12, backgroundColor: theme.infoSurface, gap: 4 }}>
         <ThemedText type="smallBold">After saving</ThemedText>
@@ -130,8 +145,8 @@ export default function TransferScreen() {
       <ActionButton primary label={saving ? 'Saving...' : 'Save transfer'} disabled={locked || rejected} onPress={save} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } }} />
       </View>
-      <SelectionSheet visible={Boolean(picker)} title={picker === 'from' ? 'From' : 'To'} selected={external === (picker === 'from' ? 'increase' : 'decrease') ? 'external' : picker === 'from' ? accountId : destinationId} disabled={locked} options={[...finance.accounts.filter((row) => !row.archived).map((row) => ({ value: row.id, label: row.name })), { value: 'external', label: 'External (outside Kuwenta)' }]} onClose={() => setPicker(null)} onSelect={(value) => {
-        setError('');
+      <SelectionSheet visible={Boolean(picker)} title={picker === 'from' ? 'From' : 'To'} selected={external === (picker === 'from' ? 'increase' : 'decrease') ? 'external' : picker === 'from' ? accountId : destinationId} disabled={locked} options={[...finance.accounts.filter((row) => !row.archived).map((row) => ({ value: row.id, label: row.name, leading: <AccountIcon account={row} color={theme.textSecondary} /> })), { value: 'external', label: picker === 'from' ? 'External source' : 'External destination' }]} onClose={() => setPicker(null)} onSelect={(value) => {
+        setFieldErrors({}); setError('');
         if (value === 'external') { setExternal(picker === 'from' ? 'increase' : 'decrease'); }
         else if (picker === 'from') { setAccountId(value); if (external === 'increase') setExternal(null); }
         else { setDestinationId(value); if (external === 'decrease') setExternal(null); }

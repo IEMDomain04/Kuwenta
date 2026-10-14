@@ -86,3 +86,11 @@ test('day headings follow Philippine midnight and handle previous-month and year
   assert.equal(transactionDayHeading('2026-10-10', new Date('2026-10-10T15:59:59Z')), 'Today · Oct 10, 2026');
   assert.throws(() => transactionDayHeading('2026-02-30', now));
 });
+
+test('time field labels explicitly distinguish midnight, noon and afternoon', () => {
+  const { formatTransactionTime } = require('../../.expo/finance-tests/dates.js');
+  assert.equal(formatTransactionTime('00:05:59'), '12:05 AM');
+  assert.equal(formatTransactionTime('12:00:00'), '12:00 PM');
+  assert.equal(formatTransactionTime('18:30:00'), '6:30 PM');
+  assert.throws(() => formatTransactionTime('25:00:00'));
+});

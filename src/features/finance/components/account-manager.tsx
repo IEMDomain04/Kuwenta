@@ -1,6 +1,13 @@
+import { SelectionSheet } from './selection-sheet';
+import { AccountIcon } from './account-icon';
+import { ACCOUNT_ICONS, type AccountIconName } from '../account-icons';
+import { FieldError } from './field-error';
+import { useConfirmation } from './confirmation';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ACCOUNT_CARD_COLORS, accountCardColor, type AccountCardColor } from '../account-colors';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Keyboard, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
@@ -16,11 +23,15 @@ import { MoneyField } from './money-field';
 export function AccountManager({ accountId, onClose, initialPurpose = 'spending', initialCorrectOpening = false }: { accountId?: string; onClose?: () => void; initialPurpose?: Account['purpose']; initialCorrectOpening?: boolean } = {}) {
   const { accounts, transactions, month, busy, saveAccount, newSubmissionId, showNotice } = useFinance();
   const theme = useTheme();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const confirmation = useConfirmation();
+  const dark = useColorScheme() === 'dark';
   const { height } = useWindowDimensions();
   const [purposeOpen, setPurposeOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState<'color' | 'icon' | null>(null);
   const initial = accountId ? accounts.find((account) => account.id === accountId) : undefined;
   const [editor, setEditor] = useState<Account | null>(() => onClose
-    ? initial ? initial.archived ? null : { ...initial } : { id: '', name: '', currency: 'PHP', openingBalance: 0, purpose: initialPurpose, includedInAvailable: initialPurpose === 'spending', archived: false }
+    ? initial ? initial.archived ? null : { ...initial } : { id: '', name: '', currency: 'PHP', openingBalance: 0, purpose: initialPurpose, icon: 'wallet', color: initialPurpose === 'savings' ? 'green' : 'blue', includedInAvailable: initialPurpose === 'spending', archived: false }
     : null);
   const [opening, setOpening] = useState(initial ? formatEditableMoney(moneyInput(initial.openingBalance), true)! : onClose ? '0' : '');
   const [correctOpening, setCorrectOpening] = useState(initialCorrectOpening);
@@ -39,11 +50,12 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
   }, [onClose, busy, working]);
   function edit(account?: Account) {
     setPurposeOpen(false);
+    setAppearanceOpen(null);
     newId.current = undefined;
     setCorrectOpening(false);
-    setEditor(account ? { ...account } : { id: '', name: '', currency: 'PHP', openingBalance: 0, purpose: initialPurpose, includedInAvailable: initialPurpose === 'spending', archived: false });
+    setEditor(account ? { ...account } : { id: '', name: '', currency: 'PHP', openingBalance: 0, purpose: initialPurpose, icon: 'wallet', color: initialPurpose === 'savings' ? 'green' : 'blue', includedInAvailable: initialPurpose === 'spending', archived: false });
     setOpening(account ? formatEditableMoney(moneyInput(account.openingBalance), true)! : '0');
-    setRejected(false); setError('');
+    setRejected(false); setFieldErrors({}); setError('');
   }
   async function commit(account: Account, creating: boolean) {
     setWorking(true);
@@ -56,27 +68,27 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
   }
   function review() {
     if (!editor || locked || pending.current || rejected) return;
-    if (!editor.name.trim()) { setError('Enter an account name.'); nameInput.current?.focus(); return; }
+    if (!editor.name.trim()) { setFieldErrors({ name: 'Enter an account name.' }); setError('Enter an account name.'); nameInput.current?.focus(); return; }
     let draft: Account;
     try {
       draft = { ...editor, id: editor.id || 'new-account', name: editor.name.trim(), includedInAvailable: editor.purpose === 'spending', openingBalance: editor.id && !correctOpening ? editor.openingBalance : parseMoney(opening.replace(/,/g, ''), { allowZero: true, allowNegative: true }) };
       validateAccount(draft);
       calculateAccountSummary(draft, transactions, month);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid account.'); amountInput.current?.focus(); return; }
+    } catch (cause) { setFieldErrors({ amount: cause instanceof Error ? cause.message : 'Invalid account.' }); setError(cause instanceof Error ? cause.message : 'Invalid account.'); amountInput.current?.focus(); return; }
     Keyboard.dismiss(); pending.current = true;
-    if (!editor.id) { void commit(draft, true); return; }
-    Alert.alert('Save account changes?', draft.name + (correctOpening ? '\nCorrect original opening balance: ' + formatMoney(editor.openingBalance) + ' to ' + formatMoney(draft.openingBalance) + '\nThis changes the historical starting balance and current balance, without counting as income.' : '\nAccount settings will be updated. The balance stays unchanged.'), [
+    if (!editor.id || !correctOpening || draft.openingBalance === editor.openingBalance) { void commit(draft, !editor.id); return; }
+    confirmation.alert('Correct opening balance?', 'This changes the historical starting balance and current balance, separate from income.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Confirm', onPress: () => { void commit(draft, false); } },
-    ], { cancelable: false });
+    ], { icon: 'wallet-outline', rows: [{ label: 'Account', value: draft.name }], change: { label: 'Opening balance', before: formatMoney(editor.openingBalance), after: formatMoney(draft.openingBalance) } });
   }
   function archive(account: Account) {
     if (locked || pending.current) return;
     pending.current = true;
-    Alert.alert(account.archived ? 'Unarchive account?' : 'Archive account?',
+    confirmation.alert(account.archived ? 'Unarchive account?' : 'Archive account?',
       account.archived ? 'This makes ' + account.name + ' available for new transactions again.' : 'Existing records and the balance are kept. New transactions and edits are blocked until you unarchive this account.',
       [{ text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
-        { text: account.archived ? 'Unarchive' : 'Archive', onPress: () => { void commit({ ...account, archived: !account.archived }, false); } }], { cancelable: false });
+        { text: account.archived ? 'Unarchive' : 'Archive', onPress: () => { void commit({ ...account, archived: !account.archived }, false); } }], { icon: 'archive-outline', rows: [{ label: 'Account', value: account.name }] });
   }
   const savedAccount = accounts.find((account) => account.id === editor?.id);
   let previewBalance: number | undefined;
@@ -84,29 +96,43 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     try { previewBalance = parseMoney(opening.replace(/,/g, '') || '0', { allowZero: true, allowNegative: true }); }
     catch { /* An incomplete or invalid draft has no displayable balance. */ }
   }
-  const previewColor = editor?.purpose === 'savings' ? theme.income : theme.secondary;
+  if (savedAccount) previewBalance = calculateAccountSummary(savedAccount, transactions, month).balance;
+  const previewText = dark ? '#082417' : '#FFFFFF';
+  const previewColor = accountCardColor(editor ?? { purpose: initialPurpose }, dark);
   const inputStyle = { color: theme.text, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 12, fontSize: 12 };
   return <View style={{ gap: 12 }}>
     <ThemedText type="smallBold" accessibilityRole="header">Accounts | PHP</ThemedText>
     {editor ? <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
       <ThemedText type="smallBold">{editor.id ? 'Edit account' : 'Add account'}</ThemedText>
-      {!editor.id ? <View accessibilityLabel="New account preview" style={{ padding: 16, minHeight: 150, borderRadius: 20, backgroundColor: previewColor, gap: 12, boxShadow: '0 3px 8px rgba(20, 36, 67, 0.08)' }}>
+      <View accessibilityLabel="Account card preview" style={{ padding: 16, minHeight: 150, borderRadius: 20, backgroundColor: previewColor, gap: 12, boxShadow: '0 3px 8px rgba(20, 36, 67, 0.08)' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={20} color={theme.onAccent} />
+          <AccountIcon account={editor} size={24} color={previewText} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: theme.onAccent }}>{editor.name.trim() || 'New account'}</ThemedText>
-            <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: theme.onAccent }}>{editor.purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
+            <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: previewText }}>{editor.name.trim() || 'New account'}</ThemedText>
+            <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: previewText }}>{editor.purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
           </View>
         </View>
         <View style={{ marginTop: 'auto', gap: 3 }}>
-          <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: theme.onAccent }}>STARTING BALANCE</ThemedText>
-          <ThemedText style={{ fontSize: 18, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: theme.onAccent }}>{previewBalance === undefined ? '—' : formatMoney(previewBalance)}</ThemedText>
-          {previewBalance !== undefined && previewBalance < 0 ? <ThemedText type="small" style={{ fontSize: 10, color: theme.onAccent }}>Negative starting balance</ThemedText> : null}
+          <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: previewText }}>{editor.id ? 'CURRENT BALANCE' : 'STARTING BALANCE'}</ThemedText>
+          <ThemedText style={{ fontSize: 18, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: previewText }}>{previewBalance === undefined ? 'â€”' : formatMoney(previewBalance)}</ThemedText>
+          {previewBalance !== undefined && previewBalance < 0 ? <ThemedText type="small" style={{ fontSize: 10, color: previewText }}>{editor.id ? 'Negative balance' : 'Negative starting balance'}</ThemedText> : null}
         </View>
-      </View> : null}
-      {savedAccount && <ThemedText type="smallBold">Current balance: {formatMoney(calculateAccountSummary(savedAccount, transactions, month).balance)}</ThemedText>}
+      </View>
+      <ThemedText type="small">Card color</ThemedText>
+      <Pressable accessibilityRole="button" accessibilityLabel="Select card color" accessibilityState={{ disabled: locked, expanded: appearanceOpen === 'color' }} disabled={locked} onPress={() => { Keyboard.dismiss(); setAppearanceOpen('color'); }} style={{ minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: previewColor }} />
+        <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{ACCOUNT_CARD_COLORS[editor.color ?? (editor.purpose === 'savings' ? 'green' : 'blue')].label}</ThemedText>
+        <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+      </Pressable>
+      <ThemedText type="small">Account icon</ThemedText>
+      <Pressable accessibilityRole="button" accessibilityLabel="Select account icon" accessibilityState={{ disabled: locked, expanded: appearanceOpen === 'icon' }} disabled={locked} onPress={() => { Keyboard.dismiss(); setAppearanceOpen('icon'); }} style={{ minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <AccountIcon account={editor} color={theme.accent} />
+        <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{editor.icon ? ACCOUNT_ICONS[editor.icon] : editor.purpose === 'savings' ? 'Savings' : 'Wallet'}</ThemedText>
+        <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
+      </Pressable>
       <ThemedText type="small">Account name</ThemedText>
-      <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => setEditor({ ...editor, name })} editable={!locked} placeholder="Bank, GCash, Savings..." placeholderTextColor={theme.textSecondary} style={inputStyle} />
+      <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Account name" value={editor.name} onChangeText={(name) => { setEditor({ ...editor, name }); setFieldErrors({}); }} editable={!locked} placeholder="Bank, GCash, Savings..." placeholderTextColor={theme.textSecondary} style={[inputStyle, { borderColor: fieldErrors.name ? theme.error : theme.border }]} />
+      <FieldError message={fieldErrors.name} />
       <ThemedText type="small">Purpose</ThemedText>
       <Pressable accessibilityRole="button" accessibilityLabel="Select account purpose" accessibilityState={{ disabled: locked, expanded: purposeOpen }} disabled={locked} onPress={() => { Keyboard.dismiss(); setPurposeOpen(true); }} style={{ minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Ionicons name={editor.purpose === 'savings' ? 'shield-checkmark-outline' : 'wallet-outline'} size={18} color={theme.accent} />
@@ -116,8 +142,9 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       {(!editor.id || correctOpening) ? <ThemedText type="small">{editor.id ? 'Correct original opening balance' : 'Starting balance'}</ThemedText> : null}
       {editor.id && correctOpening ? <ThemedText type="small" themeColor="textSecondary">This changes your historical starting balance. To correct today's balance, use Adjust balance instead.</ThemedText> : null}
       {(!editor.id || correctOpening) && <>
-      <MoneyField ref={amountInput} signed accessibilityLabel="Account opening balance in pesos" value={opening} onValueChange={(value) => { setOpening(value); setRejected(false); setError(''); }}
-        onRejected={() => { setRejected(true); setError('Use digits, up to two decimal places, and an optional minus sign.'); }} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={inputStyle} />
+      <MoneyField ref={amountInput} signed accessibilityLabel="Account opening balance in pesos" value={opening} onValueChange={(value) => { setOpening(value); setFieldErrors({}); setRejected(false); setError(''); }}
+        onRejected={() => { setRejected(true); setFieldErrors({ amount: 'Use digits, up to two decimal places, and an optional minus sign.' }); setError('Use digits, up to two decimal places, and an optional minus sign.'); }} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={[inputStyle, { borderColor: fieldErrors.amount ? theme.error : theme.border }]} />
+      <FieldError message={fieldErrors.amount} />
       <ThemedText type="small" themeColor="textSecondary">A starting balance adjustment, separate from income.</ThemedText>
       </>}
       <ActionButton primary label={working ? 'Saving...' : editor.id ? 'Save changes' : 'Save account'} disabled={locked || rejected} onPress={review} />
@@ -140,6 +167,18 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
       </View>;
     })}
     {onClose && !editor && <ActionButton label="Back" disabled={locked} onPress={() => { if (!pending.current) onClose(); }} />}
+    <SelectionSheet visible={appearanceOpen !== null && Boolean(editor)} title={appearanceOpen === 'color' ? 'Card color' : 'Account icon'} disabled={locked}
+      selected={appearanceOpen === 'color' ? editor?.color ?? (editor?.purpose === 'savings' ? 'green' : 'blue') : editor?.icon ?? (editor?.purpose === 'savings' ? 'savings' : 'wallet')}
+      options={appearanceOpen === 'color' ? [
+        ...(Object.keys(ACCOUNT_CARD_COLORS) as AccountCardColor[]).map(color => ({ value: color, label: ACCOUNT_CARD_COLORS[color].label, leading: <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: accountCardColor({ purpose: editor?.purpose ?? initialPurpose, color }, dark) }} /> })),
+      ] : [
+        ...(editor?.purpose === 'savings' ? [{ value: 'savings', label: 'Savings', leading: <AccountIcon account={{ purpose: 'savings' }} color={theme.accent} /> }] : []),
+        ...Object.entries(ACCOUNT_ICONS).map(([icon, label]) => ({ value: icon, label, leading: <AccountIcon account={{ purpose: editor?.purpose ?? initialPurpose, icon: icon as AccountIconName }} color={theme.accent} /> })),
+      ]}
+      onClose={() => setAppearanceOpen(null)} onSelect={value => {
+        if (!editor || locked) return;
+        setEditor(appearanceOpen === 'color' ? { ...editor, color: value as AccountCardColor } : { ...editor, icon: value === 'savings' ? undefined : value as AccountIconName });
+      }} />
     <Modal visible={purposeOpen && Boolean(editor)} transparent animationType="fade" onRequestClose={() => setPurposeOpen(false)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close purpose selection" onPress={() => setPurposeOpen(false)} style={{ flex: 1 }} />

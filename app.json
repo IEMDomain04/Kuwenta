@@ -14,7 +14,8 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.iemdomain04.Kuwenta",
       "icon": "./assets/images/kuwenta-app-icon.png",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "allowBackup": false
     },
     "web": {
       "output": "static",
@@ -33,7 +34,12 @@
           "imageWidth": 76
         }
       ],
-      "expo-sqlite",
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       "expo-sharing",
       "@react-native-community/datetimepicker",
       "@react-native-vector-icons/ionicons",
@@ -47,7 +53,15 @@
         }
       ],
       "expo-notifications",
-      "./plugins/kuwenta-widget/with-kuwenta-widget"
+      "./plugins/kuwenta-widget/with-kuwenta-widget",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false,
+          "faceIDPermission": false
+        }
+      ],
+      "./plugins/with-private-backup"
     ],
     "experiments": {
       "typedRoutes": true,

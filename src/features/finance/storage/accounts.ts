@@ -1,12 +1,13 @@
 import type { Account, Transaction } from '../types';
 import { validateAccount } from '../validation';
-import { calculateAccountSummary } from '../calculations';
+import { calculateAccountSummary, calculateCurrentMoney, calculateFinanceSummary, calculateSavings } from '../calculations';
 import type { FinanceDatabase } from './database';
 
-type AccountRow = Omit<Account, 'includedInAvailable' | 'archived'> & { includedInAvailable: number; archived: number };
+type AccountRow = Omit<Account, 'includedInAvailable' | 'archived' | 'color' | 'icon'> & { includedInAvailable: number; archived: number; color?: Account['color'] | null; icon?: Account['icon'] | null };
 function fromRow(row: AccountRow): Account {
   if (![0, 1].includes(row.includedInAvailable) || ![0, 1].includes(row.archived)) throw new Error('Invalid stored account flags.');
-  const account = { ...row, includedInAvailable: row.includedInAvailable === 1, archived: row.archived === 1 };
+  const { color, icon, ...fields } = row;
+  const account: Account = { ...fields, includedInAvailable: row.includedInAvailable === 1, archived: row.archived === 1, ...(color == null ? {} : { color }), ...(icon == null ? {} : { icon }) };
   validateAccount(account);
   return account;
 }
@@ -34,16 +35,16 @@ export async function saveAccount(db: FinanceDatabase, account: Account, creatin
     if (creating) {
       const existing = await transaction.getFirstAsync<{ id: string }>('SELECT id FROM accounts WHERE id = ?', account.id);
       if (existing) return; // Retrying a submission cannot duplicate or overwrite its account.
-      await transaction.runAsync('INSERT INTO accounts (id, name, currency, openingBalance, purpose, includedInAvailable, archived) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        account.id, account.name.trim(), account.currency, account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0);
+      await transaction.runAsync('INSERT INTO accounts (id, name, currency, openingBalance, purpose, includedInAvailable, archived, color, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        account.id, account.name.trim(), account.currency, account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.color ?? null, account.icon ?? null);
     } else {
       if (account.purpose !== 'savings' && await transaction.getFirstAsync('SELECT id FROM goals WHERE accountId = ?', account.id)) throw new Error('Delete or relink the goal before changing this savings account to spending.');
       const original = await getAccount(transaction, account.id);
       if (original.archived && account.archived) throw new Error('Unarchive the account before editing its details.');
       const rows = await transaction.getAllAsync<Transaction>('SELECT * FROM transactions WHERE accountId = ? OR destinationAccountId = ?', account.id, account.id);
-      calculateAccountSummary(account, rows.map((row) => ({ ...row, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined })), '1900-01');
-      await transaction.runAsync('UPDATE accounts SET name = ?, openingBalance = ?, purpose = ?, includedInAvailable = ?, archived = ? WHERE id = ?',
-        account.name.trim(), account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.id);
+      calculateAccountSummary(account, rows.map((row) => ({ ...row, exchange: typeof row.exchange === 'string' ? JSON.parse(row.exchange) : row.exchange ?? undefined, exchangeParentId: row.exchangeParentId ?? undefined, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined })), '1900-01');
+      await transaction.runAsync('UPDATE accounts SET name = ?, openingBalance = ?, purpose = ?, includedInAvailable = ?, archived = ?, color = ?, icon = ? WHERE id = ?',
+        account.name.trim(), account.openingBalance, account.purpose, account.includedInAvailable ? 1 : 0, account.archived ? 1 : 0, account.color ?? null, account.icon ?? null, account.id);
     }
   });
 }
@@ -67,17 +68,41 @@ export async function completeCashSetup(db: FinanceDatabase, cents: number, disp
   });
 }
 
-/** Delete only an unused, empty account; never remove financial history. */
+/** Permanent deletion after UI confirmation; archive remains the option that keeps records. */
 export async function deleteAccount(db: FinanceDatabase, id: string): Promise<void> {
   if (id === 'cash') throw new Error('The default Cash account cannot be deleted. Use Reset all data to start over.');
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const account = await transaction.getFirstAsync<AccountRow>('SELECT * FROM accounts WHERE id = ?', id);
-    if (!account) return; // A repeated deletion cannot affect another account.
-    if (await transaction.getFirstAsync('SELECT id FROM transactions WHERE accountId = ? OR destinationAccountId = ? LIMIT 1', id, id)) throw new Error('This account has transaction history. Archive it instead to preserve your records.');
-    if (await transaction.getFirstAsync('SELECT id FROM goals WHERE accountId = ? LIMIT 1', id)) throw new Error('Delete or relink the savings goal before deleting this account.');
-    if (account.openingBalance !== 0) throw new Error('This account still has a balance. Resolve it before deleting the account.');
+    if (!account) return; // Repeated deletion cannot affect another account.
+    const removed = await transaction.getAllAsync<{ transactionDate: string }>('SELECT transactionDate FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
+    const linked = await transaction.getAllAsync<{ id: string; exchangeParentId?: string }>('SELECT id, exchangeParentId FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
+    for (const row of linked) if (row.exchangeParentId) await transaction.runAsync('DELETE FROM transactions WHERE id = ?', row.exchangeParentId);
+    await transaction.runAsync('DELETE FROM goals WHERE accountId = ?', id);
+    await transaction.runAsync('DELETE FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);
     await transaction.runAsync("DELETE FROM preferences WHERE key = 'lastEntryAccount' AND value = ?", id);
+    const order = await transaction.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'accountOrder'");
+    if (order) {
+      let ids: unknown;
+      try { ids = JSON.parse(order.value); } catch { /* Discard malformed display preferences. */ }
+      if (Array.isArray(ids) && ids.every(value => typeof value === 'string')) {
+        await transaction.runAsync("UPDATE preferences SET value = ? WHERE key = 'accountOrder'", JSON.stringify(ids.filter(value => value !== id)));
+      } else {
+        await transaction.runAsync("DELETE FROM preferences WHERE key = 'accountOrder'");
+      }
+    }
     await transaction.runAsync('DELETE FROM accounts WHERE id = ?', id);
+    const remainingAccounts = await listAccounts(transaction);
+    const remainingRows = (await transaction.getAllAsync<Transaction>('SELECT * FROM transactions')).map(row => ({
+      ...row, exchange: typeof row.exchange === 'string' ? JSON.parse(row.exchange) : row.exchange ?? undefined, exchangeParentId: row.exchangeParentId ?? undefined, notes: row.notes ?? undefined, externalName: row.externalName ?? undefined,
+      sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined,
+      destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined,
+    }));
+    // Removing transfers or offsetting balances must not leave unsupported totals.
+    calculateCurrentMoney(remainingAccounts, remainingRows);
+    calculateSavings(remainingAccounts, remainingRows, '1900-01');
+    for (const month of new Set(removed.map(row => row.transactionDate.slice(0, 7)))) {
+      calculateFinanceSummary(remainingAccounts, remainingRows, month);
+    }
   });
 }
 

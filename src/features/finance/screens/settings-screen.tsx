@@ -1,8 +1,10 @@
+import { HOME_VISUALIZATIONS, type HomeVisualization } from '../home-visualizations';
+import { useConfirmation } from '../components/confirmation';
 import { NotificationSettingsPanel } from '../components/notification-settings';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useAppearance } from '@/hooks/appearance-provider';
 import { useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { FinanceScreen, ActionButton } from '../components/ui';
@@ -11,10 +13,13 @@ import { BackupImportPreview } from '../components/backup-import-preview';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
-  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice } = useFinance();
+  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup, homeVisualizations, saveHomeVisualizations } = useFinance();
   const theme = useTheme();
+  const confirmation = useConfirmation();
   const { mode, setMode } = useAppearance();
   function setAppearanceError(message: string) { if (message) showNotice(message, true); }
+  const [visualizationsOpen, setVisualizationsOpen] = useState(false);
+  const visualizationPending = useRef(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearanceOptions = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Use device setting']] as const;
   const [nameOpen, setNameOpen] = useState(false);
@@ -31,6 +36,13 @@ export default function SettingsScreen() {
     catch (cause) { setNameError(cause instanceof Error ? cause.message : 'Could not save your name.'); }
     finally { namePending.current = false; setSavingName(false); }
   }
+  async function saveVisualizations(selected: HomeVisualization[]) {
+    if (busy || visualizationPending.current) return;
+    visualizationPending.current = true;
+    try { await saveHomeVisualizations(selected); }
+    catch (cause) { showNotice(cause instanceof Error ? cause.message : 'Could not save Home visualizations.', true); }
+    finally { visualizationPending.current = false; }
+  }
   const section = { padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 };
   const pending = useRef(false);
   const [resetting, setResetting] = useState(false);
@@ -38,13 +50,13 @@ export default function SettingsScreen() {
   function confirmReset() {
     if (pending.current || busy) return;
     pending.current = true;
-    Alert.alert('Reset all Kuwenta data?', 'Permanently remove all accounts, opening balances, transactions, transfers, adjustments, savings goals, budgets, and saved account preferences on this device. A fresh Cash account will start at zero. This cannot be undone. Export a backup first if you want to keep your records. Exported backup files are not deleted.', [
+    confirmation.alert('Reset all Kuwenta data?', 'Permanently remove all accounts, opening balances, transactions, transfers, adjustments, savings goals, budgets, and saved account preferences on this device. A fresh Cash account will start at zero. This cannot be undone. Export a backup first if you want to keep your records. Exported backup files are not deleted.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
       { text: 'Reset all data', style: 'destructive', onPress: () => {
         setResetting(true); setError('');
         void resetData().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not reset data.')).finally(() => { pending.current = false; setResetting(false); });
       } },
-    ], { cancelable: false });
+    ], { icon: 'warning-outline', rows: [{ label: 'Removed', value: 'All records on this device' }, { label: 'Kept', value: 'Exported backup files' }] });
   }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><FinanceScreen title="Settings">
     <View style={section}>
@@ -69,13 +81,32 @@ export default function SettingsScreen() {
       </Pressable>)}
     </View> : null}
 
+    <ThemedText type="smallBold">Home visualizations</ThemedText>
+    <Pressable accessibilityRole="button" accessibilityLabel="Home visualizations" accessibilityState={{ expanded: visualizationsOpen }} onPress={() => setVisualizationsOpen(value => !value)}
+      style={{ minHeight: 48, paddingHorizontal: 12, borderRadius: 12, backgroundColor: theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <ThemedText type="small" style={{ flex: 1 }}>{homeVisualizations.length ? homeVisualizations.length + ' selected' : 'None selected'}</ThemedText>
+      <Ionicons name={visualizationsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textSecondary} />
+    </Pressable>
+    {visualizationsOpen ? <View style={{ borderRadius: 12, padding: 4, backgroundColor: theme.background }}>
+      {HOME_VISUALIZATIONS.map(option => {
+        const checked = homeVisualizations.includes(option.id);
+        return <Pressable key={option.id} accessibilityRole="checkbox" accessibilityLabel={option.label} accessibilityState={{ checked, disabled: busy }} disabled={busy}
+          onPress={() => { void saveVisualizations(checked ? homeVisualizations.filter(value => value !== option.id) : [...homeVisualizations, option.id]); }}
+          style={{ minHeight: 48, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10, opacity: busy ? 0.5 : 1 }}>
+          <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={20} color={checked ? theme.accent : theme.textSecondary} />
+          <ThemedText type="small" style={{ flex: 1 }}>{option.label}</ThemedText>
+        </Pressable>;
+      })}
+      <ActionButton compact label="Select none" disabled={busy || homeVisualizations.length === 0} onPress={() => { void saveVisualizations([]); }} />
+    </View> : null}
+
     <Modal visible={nameOpen} transparent animationType="fade" onRequestClose={() => { if (!namePending.current) setNameOpen(false); }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', padding: 24 }}>
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flexShrink: 1, width: '100%', maxWidth: 420, alignSelf: 'center' }} contentContainerStyle={{ paddingVertical: 12 }}>
         <View accessibilityViewIsModal style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 20, gap: 12, width: '100%', maxWidth: 420, alignSelf: 'center' }}>
           <ThemedText type="smallBold" accessibilityRole="header">Your name</ThemedText>
           {nameError ? <ThemedText type="small" accessibilityRole="alert" themeColor="error">{nameError}</ThemedText> : null}
-          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14 }} />
+          <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Your name" value={name} maxLength={50} editable={!savingName && !busy} onChangeText={(value) => { setName(value); setNameError(''); }} autoCapitalize="words" placeholder="Your name" placeholderTextColor={theme.textSecondary} style={{ color: theme.text, fontSize: 12, borderWidth: 1, borderColor: nameError ? theme.error : theme.border, borderRadius: 12, padding: 14 }} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}><ActionButton label="Cancel" disabled={savingName || busy} onPress={() => setNameOpen(false)} /></View>
             <View style={{ flex: 1 }}><ActionButton primary label={savingName ? 'Saving...' : 'Save'} disabled={savingName || busy} onPress={() => { void saveName(); }} /></View>
@@ -90,10 +121,9 @@ export default function SettingsScreen() {
     <NotificationSettingsPanel onChanged={async () => { await refresh(); showNotice('Notifications updated.'); }} />
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Backup & Restore</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Records stay on this device. Password-protected backups include accounts, transactions, savings goals, and budgets.</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Back up or replace your financial records.</ThemedText>
     <BackupExport disabled={busy} />
-    <BackupImportPreview disabled={busy} />
-    <ThemedText type="small" themeColor="textSecondary">Restoring replaces current financial records. Export a backup first to keep them.</ThemedText>
+    <BackupImportPreview busy={busy} onRestore={restoreBackup} onNotice={showNotice} />
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Reset App</ThemedText>
     <ThemedText type="small" themeColor="textSecondary">Permanently clear Kuwenta records on this device and restart with Cash at zero. Export a backup above before resetting. There is no Undo.</ThemedText>
