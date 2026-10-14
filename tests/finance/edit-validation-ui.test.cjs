@@ -5,9 +5,10 @@ const ts = require('typescript');
 const vm = require('node:vm');
 const { cash, record } = require('./fixtures.cjs');
 const settle = () => new Promise(resolve => setImmediate(resolve));
-function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], onSubmit = () => {} } = {}) {
-  const hooks = []; let cursor = 0; const saved = [], prompts = [], notices = [];
-  const finance = { accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
+function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], onSubmit = () => {}, deleteFailure = false, refreshRecords } = {}) {
+  const hooks = []; let cursor = 0; const saved = [], prompts = [], notices = [], removed = [], navigation = [], effects = [], refreshed = [];
+  const finance = { removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
+  finance.refresh = async () => { refreshed.push(true); refreshRecords?.(finance); };
   const state = initial => { const index = cursor++; if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial; return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }]; };
   const jsx = (type, props) => ({ type, props });
   const theme = { text: '#0A1129', border: '#73877A', accent: '#06633E', error: '#B4233C' };
@@ -15,11 +16,11 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
     if (name.endsWith('/peso-icon')) return { PesoIcon: 'PesoIcon' };
     if (name.endsWith('/account-icon')) return { AccountIcon: 'AccountIcon' };
     if (name.endsWith('/budget-period-picker')) return { BudgetPeriodPicker: 'BudgetPeriodPicker' };
-    if (name === 'react') return { useMemo: fn => fn(), useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect() {} };
+    if (name === 'react') return { useMemo: fn => fn(), useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect(callback, dependencies) { if (refreshRecords && dependencies?.includes(finance.refresh)) effects.push(callback); } };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
     if (name === 'react-native') return { View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable', Modal: 'Modal', TextInput: 'Input', KeyboardAvoidingView: 'AvoidingView', Platform: { OS: 'android' }, Keyboard: { dismiss() {} }, useWindowDimensions: () => ({ height: 800, fontScale: 1 }) };
     if (name === 'react-native-safe-area-context') return { SafeAreaView: 'SafeAreaView' };
-    if (name === 'expo-router') return { useLocalSearchParams: () => params, router: { canGoBack: () => true, back() {}, replace() {} } };
+    if (name === 'expo-router') return { useLocalSearchParams: () => params, router: { canGoBack: () => true, back() { navigation.push('back'); }, replace() { navigation.push('replace'); } } };
     if (name === '@react-native-vector-icons/ionicons') return { Ionicons: 'Icon' };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-theme') return { useTheme: () => theme };
@@ -44,9 +45,10 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
     const component = sandbox.exports.default ?? sandbox.exports.AccountManager ?? sandbox.exports.TransactionForm;
     const props = file.includes('account-manager') ? { accountId: params.id, onClose() {} } : file.includes('transaction-form') ? { disabled: false, onSubmit, onCancel() {}, onTypeChange() {}, original: params.original, initialType: params.type, initialAccountId: params.accountId } : {};
     walk(component(props));
+    effects.splice(0).forEach(callback => callback());
     return { nodes, find: type => nodes.find(node => node.type === type), button: label => nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label), input: label => nodes.find(node => node.props.accessibilityLabel === label) };
   }
-  return { render, saved, prompts, notices, theme };
+  return { render, saved, prompts, notices, theme, removed, navigation, refreshed };
 }
 test('editing a transaction saves directly and repeated taps submit once', async () => {
   const original = record();
@@ -183,7 +185,7 @@ test('service sale form submits both amounts and receipt clicks edit the linked 
  const bank={...cash,id:'bank',name:'MariBank',openingBalance:500000};const accounts=[{...cash,openingBalance:500000},bank];let draft;
  const form=harness('components/transaction-form.tsx',{accounts,onSubmit:value=>{draft=value;}});
  form.render().button('Category: Meals. Change category.').props.onPress();
- form.render().button('Service sale').props.onPress();
+ form.render().button('Service exchange').props.onPress();
  form.render().input('Amount paid in pesos').props.onValueChange('95');
  form.render().input('Amount received in pesos').props.onValueChange('100');
  form.render().button('Save').props.onPress();
@@ -260,4 +262,71 @@ test('cash-out edits derive the fee and retain older earnings records',()=>{
   else {assert.equal(h.render().input('Fee in pesos'),undefined);assert.equal(h.render().input('Amount received in pesos').props.value,'2010.00');}
   h.render().button('Save changes').props.onPress();assert.equal(saved.exchange.received,received);assert.equal(saved.exchange.paid,200000);
  }
+});
+
+
+test('transaction editor confirms deletion, cancels safely and deletes only once', async () => {
+ const original=record();
+ const h=harness('screens/transaction-screen.tsx',{params:{id:original.id},transactions:[original]});
+ h.render().button('Delete transaction').props.onPress();h.render().button('Delete transaction').props.onPress();
+ assert.equal(h.prompts.length,1);assert.equal(h.removed.length,0);
+ assert.ok(h.prompts[0][3].rows.some(row=>row.label==='Amount' && row.value.includes('120')));
+ h.prompts[0][2].find(button=>button.style==='cancel').onPress();assert.equal(h.removed.length,0);
+ h.render().button('Delete transaction').props.onPress();
+ const confirm=h.prompts[1][2].find(button=>button.style==='destructive');confirm.onPress();confirm.onPress();await settle();
+ assert.deepEqual(h.removed,[original.id]);assert.deepEqual(h.navigation,['back']);
+ assert.equal(harness('screens/transaction-screen.tsx').render().button('Delete transaction'),undefined);
+});
+
+test('transaction deletion failure keeps the editor available for retry',async()=>{
+ const original=record();const h=harness('screens/transaction-screen.tsx',{params:{id:original.id},transactions:[original],deleteFailure:true});
+ h.render().button('Delete transaction').props.onPress();h.prompts[0][2].find(button=>button.style==='destructive').onPress();await settle();
+ assert.equal(h.removed.length,0);assert.equal(h.navigation.length,0);assert.ok(h.notices.includes('Could not delete.'));
+ assert.equal(h.render().button('Delete transaction').props.disabled,false);
+ h.render().button('Delete transaction').props.onPress();assert.equal(h.prompts.length,2);
+});
+
+test('opening a linked receipt deletes its exchange parent with both sides in the confirmation',async()=>{
+ const bank={...cash,id:'bank',name:'MariBank'};const api=require('../../.expo/finance-tests/exchanges.js');
+ const draft=api.exchangeDraft('bank',{kind:'Service sale',paid:9500,received:10000,receivedAccountId:'cash',extraAccountId:'cash',earningsConfirmed:true},'2026-10-13','12:00:00');
+ const records=api.exchangeRecords('sale',draft,'2026-10-13T04:00:00.000Z');
+ const h=harness('screens/transaction-screen.tsx',{params:{id:records[1].id},accounts:[cash,bank],transactions:records});
+ h.render().button('Delete transaction').props.onPress();assert.equal(h.prompts[0][0],'Delete linked exchange?');
+ assert.ok(h.prompts[0][3].rows.some(row=>row.label==='Paid from' && row.value.includes('MariBank')));
+ assert.ok(h.prompts[0][3].rows.some(row=>row.label==='Received into' && row.value.includes('Cash')));
+ h.prompts[0][2].find(button=>button.style==='destructive').onPress();await settle();assert.deepEqual(h.removed,['sale']);
+});
+
+
+test('editing account balance confirms old and new values and saves details with one correction',async()=>{
+ const h=harness('components/account-manager.tsx',{params:{id:'cash'},transactions:[record()]});
+ assert.equal(h.render().input('Account current balance in pesos').props.value,'880.00');
+ assert.equal(h.render().input('Account opening balance in pesos'),undefined);
+ h.render().input('Account name').props.onChangeText('My cash');
+ h.render().input('Account current balance in pesos').props.onValueChange('500');
+ h.render().button('Save changes').props.onPress();assert.equal(h.saved.length,0);
+ assert.ok(h.prompts[0][3].change.before.includes('880.00'));assert.ok(h.prompts[0][3].change.after.includes('500.00'));
+ h.prompts[0][2].find(button=>button.style==='cancel').onPress();assert.equal(h.saved.length,0);
+ h.render().button('Save changes').props.onPress();h.prompts[1][2].find(button=>button.text==='Confirm').onPress();await settle();
+ assert.equal(h.saved.length,1);assert.equal(h.saved[0][0].openingBalance,100000);assert.equal(h.saved[0][0].name,'My cash');
+ assert.equal(h.saved[0][2].target,50000);assert.equal(h.saved[0][2].expected,88000);
+});
+
+
+test('transaction editing reloads a stale snapshot before showing unavailable and retries genuinely missing records',()=>{
+ const original=record();
+ const h=harness('screens/transaction-screen.tsx',{params:{id:original.id},refreshRecords:finance=>finance.transactions.push(original)});
+ assert.equal(h.render().find('Screen').props.title,'Opening transaction');
+ assert.equal(h.render().find('TransactionForm').props.original.id,original.id);assert.equal(h.refreshed.length,1);
+ const missing=harness('screens/transaction-screen.tsx',{params:{id:'missing'},refreshRecords:()=>{}});
+ missing.render();assert.equal(missing.render().find('Screen').props.title,'Transaction unavailable');
+ missing.render().button('Retry').props.onPress();missing.render();assert.equal(missing.refreshed.length,2);
+});
+
+test('a removed equal-exchange child ID opens its surviving parent after an update',()=>{
+ const bank={...cash,id:'bank',name:'MariBank'};const api=require('../../.expo/finance-tests/exchanges.js');
+ const draft=api.exchangeDraft('bank',{kind:'Service sale',paid:10000,received:10000,receivedAccountId:'cash',extraAccountId:'cash',earningsConfirmed:true},'2026-10-13','12:00:00');
+ const records=api.exchangeRecords('equal',draft,'2026-10-13T04:00:00.000Z');
+ const h=harness('screens/transaction-screen.tsx',{params:{id:['equal:extra']},accounts:[cash,bank],transactions:records});
+ assert.equal(h.render().find('TransactionForm').props.original.id,'equal');
 });

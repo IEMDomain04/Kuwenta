@@ -1,3 +1,4 @@
+import { groupExchangeTransactions } from '../exchanges';
 import { useConfirmation } from '../components/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
@@ -24,7 +25,7 @@ export default function TransactionsScreen() {
   useEffect(() => {
     if (typeof params.accountId === 'string') { setAccountFilter(params.accountId); setFilter('ALL'); router.setParams({ accountId: undefined }); }
   }, [params.accountId]);
-  const visible = filterTransactions(transactions, month, filter).filter((row) => accountFilter === null || (row.accountId === accountFilter || row.destinationAccountId === accountFilter));
+  const visible = groupExchangeTransactions(filterTransactions(transactions, month, filter).filter((row) => accountFilter === null || (row.accountId === accountFilter || row.destinationAccountId === accountFilter)), transactions);
   const groups = new Map<string, Transaction[]>();
   for (const transaction of visible) {
     const group = groups.get(transaction.transactionDate);

@@ -204,7 +204,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
         {selectedDestination ? <AccountIcon account={selectedDestination} color={theme.textSecondary}/> : null}<ThemedText type="small" style={{flex:1}}>{selectedDestination?.name ?? 'Choose receiving account'}</ThemedText><Ionicons name="chevron-down" size={16} color={theme.textSecondary}/>
       </Pressable>
       <FieldError message={errors.destination}/>
-      {!usesFee && difference !== undefined && difference !== 0 ? <ThemedText type="smallBold">{kind==='Service sale' ? difference>0?'Profit: ':'Loss: ' : difference>0?'Earnings: ':'Fee: '}{formatMoney(Math.abs(difference))}</ThemedText> : null}
+      {!usesFee && difference !== undefined && difference !== 0 ? <ThemedText type="smallBold">{kind==='Service sale' ? difference>0?'Earnings: ':'Loss: ' : difference>0?'Earnings: ':'Fee: '}{formatMoney(Math.abs(difference))}</ThemedText> : null}
       {allocationNotice ? <ThemedText type="small" themeColor="textSecondary">{allocationNotice}</ThemedText> : null}
       {exchangePreview.length ? <View style={{padding:12,borderRadius:12,backgroundColor:theme.infoSurface,gap:4}}><ThemedText type="smallBold">Balances after saving</ThemedText>{exchangePreview.map(row=><ThemedText key={row.name} type="small">{row.name}: {formatMoney(row.balance)}</ThemedText>)}{exchangePreview.some(row=>row.balance<0)?<ThemedText type="small" themeColor="warning">An account will have a negative balance.</ThemedText>:null}</View>:null}
     </> : null}

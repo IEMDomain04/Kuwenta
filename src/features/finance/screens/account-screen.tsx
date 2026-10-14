@@ -1,18 +1,15 @@
-import { FieldError } from '../components/field-error';
 import { useConfirmation } from '../components/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, TextInput, View } from 'react-native';
+import { BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { AccountManager } from '../components/account-manager';
-import { MoneyField } from '../components/money-field';
 import { ActionButton, FinanceScreen, BackButton, TransactionRow } from '../components/ui';
 import { calculateAccountSummary } from '../calculations';
 import { formatTransactionDateTime } from '../dates';
-import { formatEditableMoney } from '../inputs';
-import { formatMoney, moneyInput, parseMoney } from '../money';
+import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 
 export default function AccountScreen() {
@@ -20,20 +17,15 @@ export default function AccountScreen() {
   const accountId = typeof id === 'string' ? id : undefined;
   const finance = useFinance();
   const theme = useTheme();
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const confirmation = useConfirmation();
   const account = finance.accounts.find((row) => row.id === accountId);
   const history = finance.transactions.filter((row) => row.accountId === accountId || row.destinationAccountId === accountId).sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime) || b.createdAt.localeCompare(a.createdAt));
   const balance = account ? calculateAccountSummary(account, finance.transactions, finance.month).balance : 0;
-  const [mode, setMode] = useState<'details' | 'edit' | 'adjust'>('details');
+  const [mode, setMode] = useState<'details' | 'edit'>('details');
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [amount, setAmount] = useState('');
   function setError(message: string) { if (message) finance.showNotice(message, true); }
-  const [rejected, setRejected] = useState(false);
   const [working, setWorking] = useState(false);
-  const amountInput = useRef<TextInput>(null);
   const pending = useRef(false);
-  const submission = useRef<string | undefined>(undefined);
   const locked = finance.busy || working;
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -44,15 +36,6 @@ export default function AccountScreen() {
     return () => subscription.remove();
   }, [mode, locked]);
   function leave() { if (router.canGoBack()) router.back(); else router.replace('/'); }
-  async function commit(target: number, expected: number) {
-    setWorking(true);
-    try {
-      const saveId = submission.current ??= await finance.newSubmissionId();
-      await finance.adjustBalance(saveId, account!.id, target, expected);
-      submission.current = undefined; setMode('details'); setError('');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not adjust the balance.'); }
-    finally { pending.current = false; setWorking(false); }
-  }
   const deletionReason = account?.id === 'cash' ? 'The default Cash account cannot be deleted. Use Reset all data to start over.' : '';
 
   function remove() {
@@ -85,23 +68,8 @@ export default function AccountScreen() {
       } },
     ], { icon: 'archive-outline', rows: [{ label: 'Account', value: account.name }] });
   }
-  function review() {
-    if (!account || locked || pending.current || rejected) return;
-    let target: number;
-    try {
-      target = parseMoney(amount.replace(/,/g, ''), { allowZero: true, allowNegative: true });
-      const delta = BigInt(target) - BigInt(balance);
-      if (delta > BigInt(Number.MAX_SAFE_INTEGER) || delta < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Adjustment exceeds the supported range.');
-    } catch (cause) { setFieldErrors({ amount: cause instanceof Error ? cause.message : 'Invalid balance.' }); setError(cause instanceof Error ? cause.message : 'Invalid balance.'); amountInput.current?.focus(); return; }
-    if (target === balance) { setMode('details'); return; }
-    pending.current = true;
-    confirmation.alert('Adjust balance?', 'Records a balance correction, separate from income and expenses. The opening balance stays unchanged.', [
-      { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
-      { text: 'Confirm', onPress: () => { void commit(target, balance); } },
-    ], { icon: 'wallet-outline', rows: [{ label: 'Account', value: account.name }], change: { label: 'Balance', before: formatMoney(balance), after: formatMoney(target) } });
-  }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <FinanceScreen title={!accountId ? 'Add account' : mode === 'adjust' ? 'Adjust balance' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (pending.current) return; if (mode !== 'details') setMode('details'); else leave(); }} />}>
+    <FinanceScreen title={!accountId ? 'Add account' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (pending.current) return; if (mode !== 'details') setMode('details'); else leave(); }} />}>
       {!accountId ? <AccountManager initialPurpose={purpose === "savings" ? "savings" : "spending"} onClose={leave} />
         : !account ? <><ThemedText>This account is no longer available.</ThemedText><ActionButton label="Back" onPress={leave} /></>
         : mode === 'edit' ? <AccountManager accountId={accountId} onClose={() => setMode('details')} />
@@ -109,7 +77,7 @@ export default function AccountScreen() {
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <ThemedText type="smallBold" numberOfLines={1} style={{ flex: 1 }}>{account.name}{account.archived ? ' | Archived' : ''}</ThemedText>
-            {mode !== 'adjust' ? <Pressable accessibilityRole="button" accessibilityLabel="Account options" disabled={locked} onPress={() => setOptionsOpen(true)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="ellipsis-horizontal" size={20} color={theme.accent} /></Pressable> : null}
+            <Pressable accessibilityRole="button" accessibilityLabel="Account options" disabled={locked} onPress={() => setOptionsOpen(true)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="ellipsis-horizontal" size={20} color={theme.accent} /></Pressable>
             </View>
             <ThemedText type="small" themeColor="textSecondary">Current balance</ThemedText>
             <ThemedText style={{ fontSize: 24, lineHeight: 32, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatMoney(balance)}</ThemedText>
@@ -118,20 +86,13 @@ export default function AccountScreen() {
             <ThemedText type="small" themeColor="textSecondary">{account.includedInAvailable ? 'Included in' : 'Excluded from'} Available Money</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">Original opening balance: {formatMoney(account.openingBalance)}</ThemedText>
           </View>
-          {mode === 'adjust' ? <>
-            <ThemedText type="smallBold">Actual balance now</ThemedText>
-            <MoneyField ref={amountInput} signed accessibilityLabel="Actual account balance in pesos" value={amount} editable={!locked}
-              onValueChange={(value) => { setAmount(value); setFieldErrors({}); setRejected(false); setError(''); }}
-              onRejected={() => { setRejected(true); setFieldErrors({ amount: 'Use digits and up to two decimal places.' }); setError('Use digits and up to two decimal places.'); }}
-              style={{ color: theme.text, fontSize: 24, borderWidth: 1, borderColor: fieldErrors.amount ? theme.error : theme.border, padding: 14, borderRadius: 12 }} />
-            <FieldError message={fieldErrors.amount} />
-            <ActionButton primary label={working ? 'Saving...' : 'Review adjustment'} disabled={locked || rejected} onPress={review} />
-            <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { setMode('details'); setError(''); } }} />
-          </> : <>
+          <>
             {!account.archived && <>
-              <ActionButton compact soft bordered label="Adjust balance" disabled={locked} onPress={() => { submission.current = undefined; setAmount(formatEditableMoney(moneyInput(balance), true)!); setRejected(false); setError(''); setFieldErrors({}); setMode('adjust'); }} />
-              <ActionButton primary label="Transfer money" disabled={locked || finance.accounts.filter((row) => !row.archived).length < 2}
-                onPress={() => router.push({ pathname: '/transfer', params: { type: 'TRANSFER', accountId: account.id } })} />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}><ActionButton compact primary label="Transfer money" disabled={locked || finance.accounts.filter(row => !row.archived).length < 2}
+                  onPress={() => router.push({ pathname: '/transfer', params: { type: 'TRANSFER', accountId: account.id } })} /></View>
+                <View style={{ flex: 1 }}><ActionButton compact bordered label="Edit account" disabled={locked} onPress={() => setMode('edit')} /></View>
+              </View>
               {finance.accounts.filter((row) => !row.archived).length < 2 && <ThemedText type="small">Add another active account to transfer money.</ThemedText>}
 
             </>}
@@ -141,7 +102,7 @@ export default function AccountScreen() {
                 <ThemedText type="smallBold">Account transactions</ThemedText>
                 <ActionButton compact label="See all" disabled={locked} onPress={() => router.push({ pathname: '/transactions', params: { accountId: account.id } })} />
               </View>
-              {history.some((row) => row.type !== 'EXTERNAL') ? history.filter((row) => row.type !== 'EXTERNAL').slice(0, 5).map((row) => <TransactionRow key={row.id} transaction={row} showDate accountName={finance.accounts.find((item) => item.id === row.accountId)?.name ?? 'Unknown account'} destinationName={finance.accounts.find((item) => item.id === row.destinationAccountId)?.name} disabled={locked || (row.type === 'ADJUSTMENT' || row.type === 'EXTERNAL')} onEdit={() => router.push({ pathname: '/transaction', params: { id: row.id } })} />) : <ThemedText type="small" themeColor="textSecondary">No transactions for this account yet.</ThemedText>}
+              {history.some((row) => row.type !== 'EXTERNAL') ? history.filter((row) => row.type !== 'EXTERNAL' && !row.exchangeParentId).slice(0, 5).map((row) => <TransactionRow key={row.id} transaction={row} showDate accountName={finance.accounts.find((item) => item.id === row.accountId)?.name ?? 'Unknown account'} destinationName={finance.accounts.find((item) => item.id === row.destinationAccountId)?.name} disabled={locked || (row.type === 'ADJUSTMENT' || row.type === 'EXTERNAL')} onEdit={() => router.push({ pathname: '/transaction', params: { id: row.id } })} />) : <ThemedText type="small" themeColor="textSecondary">No transactions for this account yet.</ThemedText>}
             </View>
             {history.some((row) => row.type === 'EXTERNAL') ? <View style={{ padding: 12, gap: 10, borderRadius: 18, backgroundColor: theme.backgroundElement }}>
               <ThemedText type="smallBold">External movements</ThemedText>
@@ -161,7 +122,6 @@ export default function AccountScreen() {
                     <Pressable accessibilityRole="button" accessibilityLabel="Close account options" onPress={() => setOptionsOpen(false)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={20} color={theme.text} /></Pressable>
                   </View>
                   {[
-                    ...(!account.archived ? [{ disabled: false, label: 'Edit account', icon: 'create-outline' as const, action: () => { setOptionsOpen(false); setMode('edit'); } }] : []),
                     { disabled: false, label: account.archived ? 'Unarchive account' : 'Archive account', icon: 'archive-outline' as const, action: () => { setOptionsOpen(false); archive(); } },
                     { label: 'Delete account', disabled: Boolean(deletionReason), icon: 'trash-outline' as const, action: () => { setOptionsOpen(false); remove(); } },
                   ].map((option) => <Pressable key={option.label} accessibilityRole="button" accessibilityState={{ disabled: locked || option.disabled }} disabled={locked || option.disabled} onPress={option.action} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, opacity: locked || option.disabled ? 0.45 : 1 }}>
@@ -173,7 +133,7 @@ export default function AccountScreen() {
               </View>
             </Modal>
 
-          </>}
+          </>
 
         </>}
     </FinanceScreen>

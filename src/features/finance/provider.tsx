@@ -1,3 +1,4 @@
+import type { AccountBalanceChange } from './storage/accounts';
 import { loadHomeVisualizations, saveHomeVisualizations as saveHomeVisualizationsRecord, type HomeVisualization } from './home-visualizations';
 import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -23,7 +24,7 @@ import { listGoals, saveGoal as saveGoalRecord, deleteGoal } from './storage/goa
 import { saveAccountOrder as saveAccountOrderRecord, deleteAccount, saveDisplayName as saveDisplayNameRecord, completeCashSetup, listAccounts, saveAccount as saveAccountRecords, updateOpeningBalance } from './storage/accounts';
 import { resetFinancialData, restoreBackup as restoreBackupRecords } from './storage/backup';
 import { serializeBackup, type FinanceBackup } from './backup';
-import { createExternalTransfer, adjustAccountBalance, createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
+import { saveAccountWithBalance, createExternalTransfer, adjustAccountBalance, createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
 import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
@@ -47,7 +48,7 @@ type Actions = {
   restoreBackup: (backup: FinanceBackup) => Promise<void>;
   getBackupJson: () => Promise<string>;
   refresh: () => Promise<void>;
-  saveAccount: (account: Account, creating: boolean) => Promise<void>;
+  saveAccount: (account: Account, creating: boolean, balanceChange?: AccountBalanceChange) => Promise<void>;
   saveOpeningBalance: (amount: number) => Promise<void>;
   newSubmissionId: () => Promise<string>;
   saveTransaction: (id: string, draft: TransactionDraft, editing: boolean) => Promise<void>;
@@ -179,7 +180,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (!data) throw new Error('Please wait for records to finish loading.');
         return serializeBackup(data.accounts, data.transactions, new Date().toISOString(), data.goals, data.budgets);
       },
-      saveAccount: (account, creating) => write((db) => saveAccountRecords(db, account, creating), creating ? 'Account added.' : 'Account updated.'),
+      saveAccount: (account, creating, balanceChange) => write((db) => balanceChange && !creating ? saveAccountWithBalance(db, account, balanceChange) : saveAccountRecords(db, account, creating), creating ? 'Account added.' : 'Account updated.'),
       saveOpeningBalance: (amount) => write((db) => updateOpeningBalance(db, amount), 'Opening balance saved.'),
       newSubmissionId: async () => {
         if (locked || !active || !connection) throw new Error('Please wait for records to finish loading.');
@@ -238,7 +239,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     resetData: () => actions.current?.resetData() ?? unavailable(),
     restoreBackup: (backup) => actions.current?.restoreBackup(backup) ?? unavailable(),
     getBackupJson: () => actions.current?.getBackupJson() ?? unavailable(),
-    saveAccount: (account, creating) => actions.current?.saveAccount(account, creating) ?? unavailable(),
+    saveAccount: (account, creating, balanceChange) => actions.current?.saveAccount(account, creating, balanceChange) ?? unavailable(),
     saveOpeningBalance: (amount) => actions.current?.saveOpeningBalance(amount) ?? unavailable(),
     newSubmissionId: () => actions.current?.newSubmissionId() ?? unavailable(),
     saveTransaction: (id, draft, editing) => actions.current?.saveTransaction(id, draft, editing) ?? unavailable(),

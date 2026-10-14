@@ -1,4 +1,4 @@
-import { exchangeLabel } from '../exchanges';
+import { exchangeLabel, exchangeSummary } from '../exchanges';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { router } from 'expo-router';
 import { CategoryIcon } from './category-visual';
@@ -49,7 +49,7 @@ export function TransactionRow({ transaction, accountName, destinationName, disa
       accessibilityState={{ disabled }} disabled={disabled} onPress={onEdit}
       style={({ pressed }) => ({ flex: 1, minWidth: 0, paddingHorizontal: 12, paddingVertical: 10, opacity: pressed || disabled ? 0.5 : 1 })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <CategoryIcon category={transaction.category} income={income} compact />
+        <CategoryIcon category={transaction.exchange ? exchangeLabel(transaction.exchange.kind) : transaction.category} income={income} compact />
         <View style={{ flex: 1, minWidth: 90, gap: 1 }}>
           <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18 }}>{transaction.notes || (transaction.exchange ? exchangeLabel(transaction.exchange.kind) : transaction.category)}</ThemedText>
           {transaction.type === 'TRANSFER' ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -57,10 +57,11 @@ export function TransactionRow({ transaction, accountName, destinationName, disa
             <Ionicons accessible={false} name="arrow-forward" size={12} color={theme.textSecondary} />
             <ThemedText type="small" numberOfLines={1} themeColor="textSecondary" style={{ flexShrink: 1, fontSize: 11, lineHeight: 16 }}>{destinationName}</ThemedText>
           </View> : <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{transaction.category + " | " + accountName}</ThemedText>}
+          {transaction.exchange ? <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{formatMoney(transaction.exchange.paid, true)} paid / {formatMoney(transaction.exchange.received, true)} received</ThemedText> : null}
           <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{showDate ? formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime) : formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime).split(' · ')[1]}</ThemedText>
         </View>
-        <ThemedText type="smallBold" style={{ color: income ? theme.income : theme.text, fontVariant: ['tabular-nums'], flexShrink: 1, fontSize: 14, lineHeight: 20 }}>
-          {transaction.type === 'TRANSFER' ? '' : (income || transaction.type === 'ADJUSTMENT' && transaction.adjustmentDirection === 'increase') ? '+' : '−'}{formatMoney(transaction.amount)}
+        <ThemedText type="smallBold" style={{ color: transaction.exchange ? transaction.exchange.received > transaction.exchange.paid ? theme.income : transaction.exchange.received < transaction.exchange.paid ? theme.expense : theme.text : income ? theme.income : theme.text, fontVariant: ['tabular-nums'], flexShrink: 1, fontSize: 14, lineHeight: 20 }}>
+          {transaction.exchange ? exchangeSummary(transaction.exchange) : <>{transaction.type === 'TRANSFER' ? '' : (income || transaction.type === 'ADJUSTMENT' && transaction.adjustmentDirection === 'increase') ? '+' : '-'}{formatMoney(transaction.amount)}</>}
         </ThemedText>
       </View>
     </Pressable>

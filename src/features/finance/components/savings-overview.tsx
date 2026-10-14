@@ -25,10 +25,10 @@ export function SavingsOverview({ compact = false, goalsOnly = false, reportingM
         <ThemedText style={{ fontSize: 22, fontWeight: '700' }}>{formatMoney(savings.balance)}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">{readableReportingMonth(month)}</ThemedText>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-          <ThemedText type="small">Saved this month</ThemedText><ThemedText type="smallBold">{formatMoney(savings.savedThisMonth)}</ThemedText>
+          <ThemedText type="small">Moved into savings</ThemedText><ThemedText type="smallBold">{formatMoney(savings.movedIntoSavings)}</ThemedText>
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-          <ThemedText type="small">Savings rate</ThemedText><ThemedText type="smallBold">{savings.savingsRate === null ? '—' : savings.savingsRate.toFixed(1) + '%'}</ThemedText>
+          <ThemedText type="small">Moved out of savings</ThemedText><ThemedText type="smallBold">{formatMoney(savings.movedOutOfSavings)}</ThemedText>
         </View>
         {savings.balance < 0 && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: the savings balance is negative.</ThemedText>}
         {savings.usesLegacyPurposes && <ThemedText type="small" themeColor="textSecondary">Older transfers use current account purposes for this report.</ThemedText>}

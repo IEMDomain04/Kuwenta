@@ -48,7 +48,7 @@ function harness() {
       card.props.ref({ measureInWindow: callback => callback(index === 1 ? 110 : 0, index === 2 ? 110 : 0, 100, 100) });
       return card.props;
     });
-    return { cards, positions: nodes.filter(node => typeof node.type === 'function' && node.type.name === 'MovingCard').map(node => ({ x: node.props.x, y: node.props.y })), pan: nodes.find(node => node.props.onPanResponderMove).props };
+    return { nodes, cards, positions: nodes.filter(node => typeof node.type === 'function' && node.type.name === 'MovingCard').map(node => ({ x: node.props.x, y: node.props.y })), pan: nodes.find(node => node.props.onPanResponderMove).props };
   }
   return { render, saved, navigation, scrolling };
 }
@@ -90,4 +90,15 @@ test('neighboring cards preview their new slots while dragging and return on can
   pan.onPanResponderTerminate();
   assert.deepEqual(h.render().positions, [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }]);
   assert.deepEqual(h.saved, []);
+});
+
+
+test('switching account list and cards repeatedly restores explicit card widths',()=>{
+ const h=harness();
+ for(let i=0;i<3;i++){
+  h.render().nodes.find(node=>node.props.accessibilityLabel==='Account list').props.onPress();
+  assert.ok(h.render().nodes.filter(node=>typeof node.type==='function'&&node.type.name==='MovingCard').every(node=>node.props.style.width==='100%'));
+  h.render().nodes.find(node=>node.props.accessibilityLabel==='Account cards').props.onPress();
+  assert.ok(h.render().nodes.filter(node=>typeof node.type==='function'&&node.type.name==='MovingCard').every(node=>node.props.style.width==='47%' && node.props.style.flexShrink===0));
+ }
 });

@@ -45,7 +45,7 @@ test('backdated records retain their reporting month after round trip', () => {
 
 test('malformed JSON, metadata, unknown versions and unsupported fields are rejected', () => {
   for (const value of ['{', 'null', '[]', '1']) assert.throws(() => parseBackup(value));
-  reject((v) => { v.version = 11; });
+  reject((v) => { v.version = 12; });
   reject((v) => { v.format = 'other'; });
   reject((v) => { v.currency = 'USD'; });
   reject((v) => { v.timezone = 'UTC'; });

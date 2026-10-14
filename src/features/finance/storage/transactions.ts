@@ -1,8 +1,8 @@
 import { exchangeRecords, validateExchangeLinks } from '../exchanges';
 import { philippineDateTime } from '../dates';
-import type { Transaction, TransactionDraft } from '../types';
+import type { Account, Transaction, TransactionDraft } from '../types';
 import { validateDraft, validateManualRecord } from '../validation';
-import { getAccount, listAccounts } from './accounts';
+import { getAccount, listAccounts, saveAccountDetails, type AccountBalanceChange } from './accounts';
 import { calculateFinanceSummary, calculateAccountSummary } from '../calculations';
 import type { FinanceDatabase } from './database';
 
@@ -65,7 +65,7 @@ export async function updateTransaction(db: FinanceDatabase, id: string, draft: 
     const original = await getTransaction(transaction, id);
     if (!original) throw new Error('Transaction no longer exists.');
     if (original.exchange || original.exchangeParentId) throw new Error('Edit this through its linked exchange.');
-    if (original.type === 'ADJUSTMENT') throw new Error('Use Adjust balance on the account to make another correction.');
+    if (original.type === 'ADJUSTMENT') throw new Error('Use Edit account to make another balance correction.');
     if ((await getAccount(transaction, original.accountId)).archived) throw new Error('Unarchive the original account before editing its transactions.');
     if (original.type === 'TRANSFER' && (await getAccount(transaction, original.destinationAccountId!)).archived) throw new Error('Unarchive the original destination before editing this transfer.');
     const unchangedEndpoints = original.type === 'TRANSFER' && draft.type === 'TRANSFER' && original.accountId === draft.accountId && original.destinationAccountId === draft.destinationAccountId;
@@ -92,34 +92,45 @@ export async function deleteTransaction(db: FinanceDatabase, id: string): Promis
     calculateFinanceSummary(await listAccounts(transaction), await listTransactions(transaction), original.transactionDate.slice(0, 7));
   });
 }
+/** Account details and current-balance correction commit or roll back together. */
+export async function saveAccountWithBalance(db: FinanceDatabase, account: Account, change: AccountBalanceChange): Promise<void> {
+  await db.withExclusiveTransactionAsync(async transaction => {
+    const original = await getAccount(transaction, account.id);
+    if (account.openingBalance !== original.openingBalance || account.archived) throw new Error('Current balance edits must keep the starting balance and account active.');
+    await saveAccountDetails(transaction, account, false);
+    await applyBalanceAdjustment(transaction, change.id, account.id, change.target, change.expected);
+  });
+}
 /** Confirmed target balance correction, with a stable submission ID and stale-balance protection. */
 export async function adjustAccountBalance(db: FinanceDatabase, id: string, accountId: string, target: number, expected: number): Promise<void> {
+  await db.withExclusiveTransactionAsync(transaction => applyBalanceAdjustment(transaction, id, accountId, target, expected));
+}
+/** Reuses the balance-correction logic inside an existing account-edit transaction. */
+export async function applyBalanceAdjustment(transaction: FinanceDatabase, id: string, accountId: string, target: number, expected: number): Promise<void> {
   validateId(id);
   if (!Number.isSafeInteger(target) || !Number.isSafeInteger(expected)) throw new Error('Balance must be safe integer centavos.');
-  await db.withExclusiveTransactionAsync(async (transaction) => {
-    const existing = await getTransaction(transaction, id);
-    if (existing) {
-      if (existing.type !== 'ADJUSTMENT' || existing.accountId !== accountId) throw new Error('Submission ID is already in use.');
-      return;
-    }
-    const account = await getAccount(transaction, accountId);
-    if (account.archived) throw new Error('Unarchive the account before adjusting its balance.');
-    const rows = await listTransactions(transaction);
-    const current = calculateAccountSummary(account, rows, '1900-01').balance;
-    if (current !== expected) throw new Error('The account balance changed. Review the new balance and try again.');
-    const difference = BigInt(target) - BigInt(current);
-    if (difference === 0n) return;
-    const absolute = difference < 0n ? -difference : difference;
-    if (absolute > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Adjustment exceeds the supported range.');
-    const now = new Date();
-    const dateTime = philippineDateTime(now);
-    const audit = now.toISOString();
-    await transaction.runAsync('INSERT INTO transactions (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, adjustmentDirection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      id, accountId, 'ADJUSTMENT', Number(absolute), 'Balance adjustment', dateTime.transactionDate, dateTime.transactionTime, 'Account balance corrected', audit, audit, difference > 0n ? 'increase' : 'decrease');
-    const updatedRows = await listTransactions(transaction);
-    calculateFinanceSummary(await listAccounts(transaction), updatedRows, dateTime.transactionDate.slice(0, 7));
-    if (calculateAccountSummary(account, updatedRows, '1900-01').balance !== target) throw new Error('Could not apply the balance correction.');
-  });
+  const existing = await getTransaction(transaction, id);
+  if (existing) {
+    if (existing.type !== 'ADJUSTMENT' || existing.accountId !== accountId) throw new Error('Submission ID is already in use.');
+    return;
+  }
+  const account = await getAccount(transaction, accountId);
+  if (account.archived) throw new Error('Unarchive the account before adjusting its balance.');
+  const rows = await listTransactions(transaction);
+  const current = calculateAccountSummary(account, rows, '1900-01').balance;
+  if (current !== expected) throw new Error('The account balance changed. Review the new balance and try again.');
+  const difference = BigInt(target) - BigInt(current);
+  if (difference === 0n) return;
+  const absolute = difference < 0n ? -difference : difference;
+  if (absolute > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Adjustment exceeds the supported range.');
+  const now = new Date();
+  const dateTime = philippineDateTime(now);
+  const audit = now.toISOString();
+  await transaction.runAsync('INSERT INTO transactions (id, accountId, type, amount, category, transactionDate, transactionTime, notes, createdAt, updatedAt, adjustmentDirection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    id, accountId, 'ADJUSTMENT', Number(absolute), 'Balance adjustment', dateTime.transactionDate, dateTime.transactionTime, 'Account balance corrected', audit, audit, difference > 0n ? 'increase' : 'decrease');
+  const updatedRows = await listTransactions(transaction);
+  calculateFinanceSummary(await listAccounts(transaction), updatedRows, dateTime.transactionDate.slice(0, 7));
+  if (calculateAccountSummary(account, updatedRows, '1900-01').balance !== target) throw new Error('Could not apply the balance correction.');
 }
 
 export async function createExternalTransfer(db: FinanceDatabase, id: string, record: Transaction): Promise<void> {
