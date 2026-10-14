@@ -56,7 +56,7 @@ test('initialization creates Cash exactly once and preserves records/opening bal
   await createTransaction(db, 'expense', expense());
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync('SELECT count(*) AS total FROM accounts')).total, 1);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
   assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
@@ -176,9 +176,9 @@ test('migration failure rolls back schema and version; newer schema is rejected'
   assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'accounts'"), null);
   fail = false;
   await initializeDatabase(db);
-  await db.execAsync('PRAGMA user_version = 14');
+  await db.execAsync('PRAGMA user_version = 15');
   await assert.rejects(initializeDatabase(db), /newer version/);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 15);
 });
 
 test('a failure after an edit write rolls back the original transaction', async (t) => {
@@ -278,7 +278,7 @@ test('invalid restore payloads fail before opening a write transaction and prese
     (v) => { v.transactions[0].amount = -1; },
     (v) => { v.transactions.push({ ...v.transactions[0] }); },
     (v) => { v.transactions[0].accountId = 'missing'; },
-    (v) => { v.version = 11; },
+    (v) => { v.version = 12; },
   ]) {
     const backup = backupFixture();
     mutate(backup);
@@ -382,7 +382,7 @@ test('version 1 migration preserves Cash amounts, IDs and timestamps and is repe
   await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.deepEqual(await listTransactions(db), before);
   assert.ok(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"));
@@ -492,7 +492,7 @@ test('balance corrections preserve openings, exclude reports, are idempotent and
   await adjustAccountBalance(db, 'adjust-down', 'cash', -100, 80000);
   assert.equal((await getTransaction(db, 'adjust-down')).amount, 80100);
   assert.equal((await getTransaction(db, 'adjust-down')).adjustmentDirection, 'decrease');
-  await assert.rejects(updateTransaction(db, 'adjust-down', expense()), /Adjust balance/);
+  await assert.rejects(updateTransaction(db, 'adjust-down', expense()), /Edit account/);
   await deleteTransaction(db, 'adjust-down');
   assert.equal(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10').balance, 80000);
 });
@@ -521,7 +521,7 @@ test('version 3 table migration preserves records and rolls back failures', asyn
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
   db.execAsync = exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
 });
 
@@ -609,7 +609,7 @@ test('version 4 migration preserves existing adjustment and expense records', as
   await adjustAccountBalance(db, 'adjustment-kept', 'cash', 100, -12000);
   await db.execAsync('PRAGMA user_version = 3');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
   assert.equal((await getTransaction(db, 'adjustment-kept')).adjustmentDirection, 'increase');
   assert.equal((await getTransaction(db, 'expense-kept')).amount, 12000);
 });
@@ -806,7 +806,7 @@ test('preferences migration preserves financial records and is repeatable', asyn
   await db.execAsync('DROP TABLE preferences; PRAGMA user_version = 5');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
   assert.equal((await getTransaction(db, 'keep-six')).amount, 12000);
 });
 
@@ -1033,7 +1033,7 @@ test('budget schema migration preserves records and rolls back errors', async (t
   assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
   assert.equal((await listTransactions(db)).length, 1);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
 });
 
 
@@ -1213,7 +1213,7 @@ test('version 9 account color migration preserves existing records and rolls bac
   db.execAsync = exec;
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 14);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.equal((await getCashAccount(db)).color, undefined);
 });
@@ -1328,7 +1328,7 @@ test('version 10 palette upgrade preserves foreign keys and rolls back an interr
   assert.ok(!(await db.getAllAsync('PRAGMA table_info(accounts)')).some(row=>row.name==='previousColor'));
   db.execAsync=exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,13);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,14);
   const bank=(await listAccounts(db)).find(row=>row.id==='bank');
   assert.equal(bank.color,'teal');
   assert.equal(calculateAccountSummary(bank,await listTransactions(db),'2026-10').balance,38000);
@@ -1356,7 +1356,7 @@ test('icon migration preserves monthly records and rolls back on failure; all pe
  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,11);
  assert.deepEqual(await listBudgets(db),[monthly]);
  db.execAsync=exec;await migrateDatabase(db);
- assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,13);
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,14);
  const cash=await getCashAccount(db);await saveAccount(db,{...cash,icon:'gcash'},false);
  for(const month of ['daily:2026-10-13','weekly:2026-10-12']){
   await saveBudget(db,{...monthly,month},true);
@@ -1406,11 +1406,11 @@ test('exchanges save, edit, export, restore and delete their linked records atom
  assert.equal((await getTransaction(db,'sale')).amount,9500);db.runAsync=run;
  await updateTransaction(db,'sale',draft(9000,10000));
  assert.equal((await getTransaction(db,'sale')).amount,9000);
- const backup=parseBackup(await readBackupJson(db));assert.equal(backup.version,10);
+ const backup=parseBackup(await readBackupJson(db));assert.equal(backup.version,11);
  const excel=parseExcelBackup(createExcelBackup(backup));assert.deepEqual(excel,backup);
  await restoreBackup(db,excel);assert.equal((await listTransactions(db)).length,2);
  const accounts=await require('../../.expo/finance-tests/storage/accounts.js').listAccounts(db);
- const report=calculateFinanceSummary(accounts,await listTransactions(db),'2026-10');assert.equal(report.monthlyIncome,10000);assert.equal(report.monthlyExpenses,9000);
+ const report=calculateFinanceSummary(accounts,await listTransactions(db),'2026-10');assert.equal(report.monthlyIncome,1000);assert.equal(report.monthlyExpenses,0);
  await deleteTransaction(db,'sale:extra');assert.equal((await listTransactions(db)).length,0);
  assert.deepEqual(await db.getAllAsync('PRAGMA foreign_key_check'),[]);
 });
@@ -1427,4 +1427,60 @@ test('exchange migration rolls back and receiver account deletion removes the wh
  const draft=require('../../.expo/finance-tests/exchanges.js').exchangeDraft('cash',{kind:'Service sale',paid:9500,received:10000,receivedAccountId:'receiver',extraAccountId:'cash',earningsConfirmed:false},'2026-10-13','12:00:00');
  await createTransaction(db,'sale',draft);await deleteAccount(db,'receiver');
  assert.equal(await getTransaction(db,'sale'),null);assert.equal((await listTransactions(db)).length,1);
+});
+
+
+test('account details and current balance edits are atomic, preserve opening history and restore from backups',async()=>{
+ const {saveAccountWithBalance}=require('../../.expo/finance-tests/storage/transactions.js');
+ const {listAccounts}=require('../../.expo/finance-tests/storage/accounts.js');
+ const {readBackupJson,restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');
+ const {parseBackup}=require('../../.expo/finance-tests/backup.js');
+ const db=connect();await initializeDatabase(db);await updateOpeningBalance(db,100000);
+ await createTransaction(db,'before',expense());const original=await getCashAccount(db);
+ const expected=calculateAccountSummary(original,await listTransactions(db),'1900-01').balance;
+ await assert.rejects(saveAccountWithBalance(db,{...original,name:'Wrong'},{id:'stale',target:50000,expected:expected+1}),/balance changed/);
+ assert.equal((await getCashAccount(db)).name,original.name);assert.equal((await listTransactions(db)).length,1);
+ await assert.rejects(saveAccountWithBalance(db,{...original,name:'Wrong',openingBalance:200000},{id:'wrong',target:50000,expected}),/starting balance/);
+ const update={...original,name:'My cash',color:'teal'};
+ await saveAccountWithBalance(db,update,{id:'edit-balance',target:50000,expected});
+ await saveAccountWithBalance(db,update,{id:'edit-balance',target:50000,expected});
+ assert.equal((await getCashAccount(db)).openingBalance,100000);assert.equal((await getCashAccount(db)).name,'My cash');
+ assert.equal((await listTransactions(db)).length,2);assert.equal(calculateAccountSummary(await getCashAccount(db),await listTransactions(db),'1900-01').balance,50000);
+ const backup=parseBackup(await readBackupJson(db));await restoreBackup(db,backup);
+ assert.equal(calculateAccountSummary((await listAccounts(db))[0],await listTransactions(db),'1900-01').balance,50000);
+ db.close();
+});
+
+
+test('version 14 converts old service pairs atomically, preserves balances and supports old JSON and Excel backups',async t=>{
+ const db=await setup(t);
+ const {saveAccount,listAccounts}=require('../../.expo/finance-tests/storage/accounts.js');
+ const {calculateFinanceSummary}=require('../../.expo/finance-tests/calculations.js');
+ const {parseBackup}=require('../../.expo/finance-tests/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');
+ await updateOpeningBalance(db,500000);const cash=await getCashAccount(db);
+ await saveAccount(db,{...cash,id:'bank',name:'MariBank',purpose:'savings',includedInAvailable:false},true);
+ const old={type:'EXPENSE',category:'Service sale',accountId:'bank',amount:9500,transactionDate:'2026-10-13',transactionTime:'12:00:00',exchange:{kind:'Service sale',paid:9500,received:10000,receivedAccountId:'cash',extraAccountId:'bank',earningsConfirmed:false}};
+ await createTransaction(db,'legacy-sale',old);
+ const original=await listTransactions(db);const accounts=await listAccounts(db);
+ const legacyJson=JSON.stringify({format:'kuwenta-finance',version:10,currency:'PHP',timezone:'Asia/Manila',exportedAt:'2026-10-13T04:00:00.000Z',accounts,transactions:original,goals:[],budgets:[]});
+ const before=accounts.map(account=>calculateAccountSummary(account,original,'1900-01').balance);
+ await db.execAsync('PRAGMA user_version = 13');
+ const run=db.runAsync;db.runAsync=async(...args)=>{const value=await run(...args);if(args[0].startsWith('UPDATE transactions SET type'))throw new Error('migration interrupted');return value;};
+ await assert.rejects(initializeDatabase(db),/interrupted/);db.runAsync=run;
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,13);assert.equal((await getTransaction(db,'legacy-sale')).type,'EXPENSE');
+ await initializeDatabase(db);await initializeDatabase(db);
+ const converted=await listTransactions(db);assert.equal((await getTransaction(db,'legacy-sale')).type,'TRANSFER');
+ assert.deepEqual(accounts.map(account=>calculateAccountSummary(account,converted,'1900-01').balance),before);
+ assert.equal(calculateFinanceSummary(accounts,converted,'2026-10').monthlyIncome,500);
+ assert.equal(calculateFinanceSummary(accounts,converted,'2026-10').monthlyExpenses,0);
+ for(const backup of [parseBackup(legacyJson),parseExcelBackup(createExcelBackup(parseBackup(legacyJson)))]){
+  await restoreBackup(db,backup);const restored=await listTransactions(db);
+  assert.deepEqual(accounts.map(account=>calculateAccountSummary(account,restored,'1900-01').balance),before);
+  assert.equal(calculateFinanceSummary(accounts,restored,'2026-10').monthlyIncome,500);
+ }
+ await updateTransaction(db,'legacy-sale',require('../../.expo/finance-tests/exchanges.js').exchangeDraft('bank',{...old.exchange,paid:9000},old.transactionDate,old.transactionTime));
+ assert.equal(calculateFinanceSummary(accounts,await listTransactions(db),'2026-10').monthlyIncome,1000);
+ await deleteTransaction(db,'legacy-sale:extra');assert.equal((await listTransactions(db)).length,0);
 });

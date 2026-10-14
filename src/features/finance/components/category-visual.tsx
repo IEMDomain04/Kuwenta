@@ -49,6 +49,7 @@ visuals['Cash-in (E-bank)'] = visuals['E-bank Cash-in'];
 visuals['Cash-out (E-bank)'] = visuals['E-bank Cash-out'];
 const incomeVisual = { color: Colors.light.income, icon: 'cash' as const };
 export function categoryVisual(category: string, income = false, dark = false) {
+  if (category === 'Service exchange') category = 'Service sale';
   const visual = income ? incomeVisual : visuals[category] ?? visuals.Other;
   if (!dark) return visual;
   // Lift category colors against dark surfaces without changing their hue family.

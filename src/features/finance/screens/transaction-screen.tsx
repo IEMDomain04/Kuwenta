@@ -1,5 +1,6 @@
-import { exchangeRecords } from '../exchanges';
+import { exchangeLabel, exchangeRecords, resolveTransactionId } from '../exchanges';
 import { useConfirmation } from '../components/confirmation';
+import { formatTransactionDateTime } from '../dates';
 import { formatMoney } from '../money';
 import { QuickEntry } from '../components/quick-entry';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -10,7 +11,7 @@ import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable } from
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { TransactionForm } from '../components/transaction-form';
-import { FinanceScreen, ActionButton } from '../components/ui';
+import { FinanceScreen, ActionButton, IconButton } from '../components/ui';
 import { useFinance } from '../provider';
 import { validateDraft } from '../validation';
 import { calculateFinanceSummary } from '../calculations';
@@ -19,13 +20,17 @@ import type { TransactionDraft, ManualTransactionType } from '../types';
 export default function TransactionScreen({ transferOnly = false, transferChoices }: { transferOnly?: boolean; transferChoices?: ReactNode } = {}) {
   const params = useLocalSearchParams<{ quick?: string; id?: string; type?: string; accountId?: string; destinationAccountId?: string }>();
   const initialType = transferOnly || params.type === 'TRANSFER' ? 'TRANSFER' : params.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
-  const requestedId = typeof params.id === 'string' ? params.id : undefined;
+  const requestedId = Array.isArray(params.id) ? params.id[0] : typeof params.id === 'string' ? params.id : undefined;
   const finance = useFinance();
   const theme = useTheme();
   const confirmation = useConfirmation();
-  const id = finance.transactions.find(row=>row.id===requestedId)?.exchangeParentId ?? requestedId;
+  const id = resolveTransactionId(finance.transactions, requestedId);
   const [entryType, setEntryType] = useState<ManualTransactionType>(initialType);
   const original = id ? finance.transactions.find((row) => row.id === id) : undefined;
+  const [checkedId, setCheckedId] = useState<string>();
+  useEffect(() => {
+    if (id && !original && !finance.busy && checkedId !== id) { setCheckedId(id); void finance.refresh().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not reload records.')); }
+  }, [id, original, finance.busy, checkedId, finance.refresh]);
   const [quickOpen, setQuickOpen] = useState(!id && params.quick === '1');
   const [quickDraft, setQuickDraft] = useState<TransactionDraft>();
   const [quickWarnings, setQuickWarnings] = useState<string[]>([]);
@@ -53,6 +58,36 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
       if (!finished.current) { pending.current = false; setSaving(false); }
     }
   }
+  function confirmDelete() {
+    if (!original || pending.current || finished.current || finance.busy) return;
+    Keyboard.dismiss(); pending.current = true;
+    let confirmed = false;
+    const linked = Boolean(original.exchange);
+    const accountName = finance.accounts.find(account => account.id === original.accountId)?.name ?? '';
+    confirmation.alert(linked ? 'Delete linked exchange?' : 'Delete transaction?', linked
+      ? 'This deletes the exchange and all its linked fee, earnings, or payment records. Balances and reports will be recalculated. This cannot be undone.'
+      : 'This removes the record and recalculates account balances and reports. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        if (confirmed) return;
+        confirmed = true; setSaving(true);
+        void finance.removeTransaction(original.id).then(() => { finished.current = true; leave(); }).catch((cause: unknown) => {
+          setError(cause instanceof Error ? cause.message : 'Could not delete.');
+          pending.current = false; setSaving(false);
+        });
+      } },
+    ], { icon: 'trash-outline', rows: [
+      { label: 'Category', value: original.exchange ? exchangeLabel(original.exchange.kind) : original.category },
+      ...(original.exchange ? [
+        { label: 'Paid from', value: accountName + ' | ' + formatMoney(original.exchange.paid) },
+        { label: 'Received into', value: (finance.accounts.find(account => account.id === original.exchange!.receivedAccountId)?.name ?? '') + ' | ' + formatMoney(original.exchange.received) },
+      ] : [
+        { label: 'Amount', value: formatMoney(original.amount) },
+        { label: 'Account', value: accountName + (original.type === 'TRANSFER' ? ' to ' + (finance.accounts.find(account => account.id === original.destinationAccountId)?.name ?? '') : '') },
+      ]),
+      { label: 'Date', value: formatTransactionDateTime(original.transactionDate, original.transactionTime) },
+    ] });
+  }
   function submit(draft: TransactionDraft) {
     if (pending.current || finished.current || finance.busy) return;
     setError('');
@@ -69,13 +104,14 @@ export default function TransactionScreen({ transferOnly = false, transferChoice
     Keyboard.dismiss(); pending.current = true;
     if (draft.exchange) {
       const e=draft.exchange;
-      confirmation.alert('Save exchange?', 'The linked records will be saved together.', [{text:'Cancel',style:'cancel',onPress:()=>{pending.current=false;}},{text:'Save',onPress:()=>{void save(draft);}}], {icon:'swap-horizontal-outline',rows:[{label:'Paid from',value:(finance.accounts.find(account=>account.id===draft.accountId)?.name ?? '')+' | '+formatMoney(e.paid)},{label:'Received into',value:(finance.accounts.find(account=>account.id===e.receivedAccountId)?.name ?? '')+' | '+formatMoney(e.received)},...(e.kind!=='Service sale'&&e.paid!==e.received?[{label:e.paid>e.received?'Fee account':'Earnings account',value:finance.accounts.find(account=>account.id===e.extraAccountId)?.name ?? ''}]:[]),{label:e.kind==='Service sale'?'Profit / loss':e.received>=e.paid?'Earnings':'Fee',value:formatMoney(e.kind==='Service sale'?e.received-e.paid:Math.abs(e.received-e.paid))}]});
+      confirmation.alert('Save exchange?', 'The linked records will be saved together.', [{text:'Cancel',style:'cancel',onPress:()=>{pending.current=false;}},{text:'Save',onPress:()=>{void save(draft);}}], {icon:'swap-horizontal-outline',rows:[{label:'Paid from',value:(finance.accounts.find(account=>account.id===draft.accountId)?.name ?? '')+' | '+formatMoney(e.paid)},{label:'Received into',value:(finance.accounts.find(account=>account.id===e.receivedAccountId)?.name ?? '')+' | '+formatMoney(e.received)},...(e.kind!=='Service sale'&&e.paid!==e.received?[{label:e.paid>e.received?'Fee account':'Earnings account',value:finance.accounts.find(account=>account.id===e.extraAccountId)?.name ?? ''}]:[]),{label:e.kind==='Service sale'?'Earnings / loss':e.received>=e.paid?'Earnings':'Fee',value:formatMoney(e.kind==='Service sale'?e.received-e.paid:Math.abs(e.received-e.paid))}]});
     } else void save(draft);
   }
   if (original?.type === "ADJUSTMENT") return <FinanceScreen title="Balance adjustment" tabScreen={false}><ThemedText>Balance corrections are managed from the account.</ThemedText><ActionButton label="View account" onPress={() => router.replace({ pathname: "/account", params: { id: original.accountId } })} /><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
-  if (id && !original) return <FinanceScreen title="Transaction unavailable" tabScreen={false}><ThemedText>This transaction no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
+  if (id && !original && (finance.busy || checkedId !== id)) return <FinanceScreen title="Opening transaction" tabScreen={false}><ThemedText>Checking saved records...</ThemedText></FinanceScreen>;
+  if (id && !original) return <FinanceScreen title="Transaction unavailable" tabScreen={false}><ThemedText>This transaction could not be found in your current records.</ThemedText><ActionButton label="Retry" disabled={finance.busy} onPress={() => { setCheckedId(undefined); }} /><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <FinanceScreen scroll={quickOpen} tabScreen={false} title={quickOpen ? 'Quick Entry' : id ? 'Edit transaction' : entryType === 'TRANSFER' ? 'Add Transfer' : entryType === 'INCOME' ? 'Add Income' : 'Add Expense'} headerLeading={<Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving || finance.busy} onPress={() => { if (!pending.current) leave(); }} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="arrow-back" size={24} color={theme.text} /></Pressable>}>
+    <FinanceScreen headerAccessory={original ? <IconButton icon="trash-outline" label="Delete transaction" destructive disabled={saving || finance.busy} onPress={confirmDelete} /> : undefined} scroll={quickOpen} tabScreen={false} title={quickOpen ? 'Quick Entry' : id ? 'Edit transaction' : entryType === 'TRANSFER' ? 'Add Transfer' : entryType === 'INCOME' ? 'Add Income' : 'Add Expense'} headerLeading={<Pressable accessibilityRole="button" accessibilityLabel="Back" disabled={saving || finance.busy} onPress={() => { if (!pending.current) leave(); }} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="arrow-back" size={24} color={theme.text} /></Pressable>}>
       {quickOpen ? <QuickEntry disabled={saving || finance.busy} accountId={params.accountId} onCancel={() => setQuickOpen(false)} onReview={(draft, warnings) => { setQuickDraft(draft); setQuickWarnings(warnings); setEntryType(draft.type); setQuickOpen(false); }} /> : <>
 
       {quickDraft && quickWarnings.length > 0 ? <ThemedText type="small" accessibilityLiveRegion="polite">{quickWarnings.join(' ')}</ThemedText> : null}

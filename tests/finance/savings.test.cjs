@@ -18,7 +18,7 @@ test('savings separates current balances from selected-month net transfers and i
     transfer({ id: 'old', transactionDate: '2026-09-30', amount: 1000 }),
     record({ id: 'adjust', accountId: 'save', type: 'ADJUSTMENT', category: 'Balance adjustment', amount: 10, adjustmentDirection: 'increase' }),
   ];
-  assert.deepEqual(calculateSavings([cash, savings, second], rows, '2026-10'), { balance: 26010, savedThisMonth: 15000, savingsRate: 15, usesLegacyPurposes: false });
+  assert.deepEqual(calculateSavings([cash, savings, second], rows, '2026-10'), { balance: 26010, movedIntoSavings: 20000, movedOutOfSavings: 5000, savedThisMonth: 15000, savingsRate: 15, usesLegacyPurposes: false });
   assert.equal(calculateSavings([cash, savings, second], rows, '2026-09').savedThisMonth, 1000);
   assert.equal(calculateSavings([cash, savings, second], rows, '2026-09').balance, 26010);
   const changed = { ...cash, purpose: 'savings' };
@@ -54,4 +54,20 @@ test('goals and purpose snapshots round trip; malformed or duplicated goals reje
   assert.throws(() => parseBackup(JSON.stringify({ ...payload, version: 4 })));
   const legacy = { ...payload, version: 4, goals: undefined, budgets: undefined, transactions: [transfer({ sourcePurpose: undefined, destinationPurpose: undefined })] };
   assert.equal((parseBackup(JSON.stringify(legacy)).goals ?? []).length, 0);
+});
+
+
+test('cash exchanges show separate positive savings movements and keep fees and income separate',()=>{
+ const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/exchanges.js');
+ const bank={...savings,openingBalance:300000};
+ const out=exchangeRecords('out',exchangeDraft('save',{kind:'E-bank Cash-out',paid:104000,received:100000,receivedAccountId:'cash',extraAccountId:'save',earningsConfirmed:true},'2026-10-13','12:00:00'),'2026-10-13T04:00:00.000Z');
+ out[0].sourcePurpose='savings';out[0].destinationPurpose='spending';
+ const incoming=exchangeRecords('in',exchangeDraft('cash',{kind:'E-bank Cash-in',paid:100000,received:96000,receivedAccountId:'save',extraAccountId:'cash',earningsConfirmed:true},'2026-10-13','12:00:00'),'2026-10-13T04:00:00.000Z');
+ incoming[0].sourcePurpose='spending';incoming[0].destinationPurpose='savings';
+ const result=calculateSavings([cash,bank],[...out,...incoming],'2026-10');
+ assert.equal(result.movedIntoSavings,96000);assert.equal(result.movedOutOfSavings,100000);assert.equal(result.balance,292000);
+ const earned=exchangeRecords('earn',exchangeDraft('save',{kind:'E-bank Cash-out',paid:9500,received:10000,receivedAccountId:'cash',extraAccountId:'cash',earningsConfirmed:true},'2026-10-13','12:00:00'),'2026-10-13T04:00:00.000Z');
+ earned[0].sourcePurpose='savings';earned[0].destinationPurpose='spending';
+ assert.equal(calculateSavings([cash,bank],earned,'2026-10').movedOutOfSavings,9500);
+ assert.equal(calculateSavings([cash,bank],earned,'2026-09').movedOutOfSavings,0);
 });

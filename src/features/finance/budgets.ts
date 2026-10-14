@@ -4,7 +4,7 @@ import { budgetPeriodRange, isBudgetPeriodKey } from './budget-periods';
 
 
 /** Cash-in/out are entry modes; their actual expense category is Fees. */
-export const BUDGET_CATEGORIES = CATEGORIES.EXPENSE.filter(category => category !== 'Cash-in (E-bank)' && category !== 'Cash-out (E-bank)');
+export const BUDGET_CATEGORIES = CATEGORIES.EXPENSE.filter(category => category !== 'Cash-in (E-bank)' && category !== 'Cash-out (E-bank)' && category !== 'Service exchange');
 
 export function validateBudget(budget: Budget): void {
   if (!isBudgetPeriodKey(budget.month)) throw new Error('Choose a valid budget period.');

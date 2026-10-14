@@ -98,32 +98,12 @@ test('archive and unarchive remain available and never invoke permanent deletion
   assert.deepEqual(h.removed, []);
 });
 
-test('Adjust balance has a border and no icon, while the adjustment screen has no sign toggle or options icon', () => {
-  const h = harness();
-  const adjust = h.render().find(node => node.props.label === 'Adjust balance');
-  assert.equal(adjust.props.bordered, true);
-  assert.equal(adjust.props.icon, undefined);
-  adjust.props.onPress();
-  const nodes = h.render();
-  assert.ok(nodes.some(node => node.type === 'MoneyField'));
-  assert.ok(nodes.every(node => node.props.accessibilityLabel !== 'Account options'));
-  assert.ok(nodes.every(node => !['Make negative', 'Make positive'].includes(node.props.label)));
-});
-
-test('balance adjustment previews current and new amounts and only commits after confirmation', async () => {
-  const h = harness();
-  h.render().find(node => node.props.label === 'Adjust balance').props.onPress();
-  h.render().find(node => node.type === 'MoneyField').props.onValueChange('300.50');
-  const review = () => h.render().find(node => node.props.label === 'Review adjustment').props.onPress();
-  review();
-  assert.equal(h.adjusted.length, 0);
-  const prompt = h.confirmation();
-  assert.equal(prompt.options.rows[0].value, 'Bank');
-  assert.match(prompt.options.change.before, /480.00/);
-  assert.match(prompt.options.change.after, /300.50/);
-  prompt.buttons.find(button => button.text === 'Cancel').onPress();
-  assert.equal(h.adjusted.length, 0);
-  review(); h.confirmation().buttons.find(button => button.text === 'Confirm').onPress();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(h.adjusted, [['adjustment-id', 'bank', 30050, 48000]]);
+test('Edit account replaces Adjust balance beside Transfer money and is absent from the options menu',()=>{
+ const h=harness();const nodes=h.render();
+ assert.ok(nodes.some(node=>node.props.label==='Transfer money'));assert.ok(nodes.some(node=>node.props.label==='Edit account'));
+ assert.ok(!nodes.some(node=>node.props.label==='Adjust balance'));
+ assert.ok(!nodes.some(node=>node.type==='Text' && node.props.children==='Edit account'));
+ nodes.find(node=>node.props.label==='Edit account').props.onPress();
+ assert.ok(h.render().some(node=>node.type==='AccountManager'));
+ assert.ok(!harness({archived:true}).render().some(node=>node.props.label==='Edit account'));
 });

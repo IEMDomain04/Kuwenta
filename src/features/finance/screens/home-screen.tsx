@@ -21,7 +21,7 @@ import { PeriodOverview } from "../components/period-overview";
 import { AddTransactionButton, FinanceScreen } from "../components/ui";
 import { dashboardGreeting, dashboardReport } from "../dashboard";
 import { formatTransactionDateTime, philippineDateTime } from "../dates";
-import { exchangeLabel } from "../exchanges";
+import { exchangeLabel, exchangeSummary } from "../exchanges";
 import { moneyInsightReaction, moneyInsights } from "../insights";
 import { formatMoney } from "../money";
 import { useFinance } from "../provider";
@@ -74,7 +74,7 @@ export default function HomeScreen() {
   const recent = useMemo(
     () =>
       transactions
-        .filter((row) => row.type !== "EXTERNAL")
+        .filter((row) => row.type !== "EXTERNAL" && !row.exchangeParentId)
         .sort(
           (a, b) =>
             b.transactionDate.localeCompare(a.transactionDate) ||
@@ -437,6 +437,7 @@ export default function HomeScreen() {
                       {transaction.category + " / " + account}
                     </ThemedText>
                   )}
+                  {transaction.exchange ? <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{formatMoney(transaction.exchange.paid, true)} paid / {formatMoney(transaction.exchange.received, true)} received</ThemedText> : null}
                   <ThemedText
                     type="small"
                     themeColor="textSecondary"
@@ -452,13 +453,13 @@ export default function HomeScreen() {
                   type="smallBold"
                   style={{
                     color:
-                      transaction.type === "INCOME" ? theme.income : theme.text,
+                      transaction.exchange ? transaction.exchange.received > transaction.exchange.paid ? theme.income : transaction.exchange.received < transaction.exchange.paid ? theme.expense : theme.text : transaction.type === "INCOME" ? theme.income : theme.text,
                     fontVariant: ["tabular-nums"],
                     flexShrink: 1,
                   }}
                 >
-                  {transfer ? "" : increase ? "+" : "−"}
-                  {formatMoney(transaction.amount)}
+                  {transaction.exchange || transfer ? "" : increase ? "+" : "−"}
+                  {transaction.exchange ? exchangeSummary(transaction.exchange) : formatMoney(transaction.amount)}
                 </ThemedText>
               </Pressable>
             );

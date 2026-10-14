@@ -34,6 +34,8 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     ? initial ? initial.archived ? null : { ...initial } : { id: '', name: '', currency: 'PHP', openingBalance: 0, purpose: initialPurpose, icon: 'wallet', color: initialPurpose === 'savings' ? 'green' : 'blue', includedInAvailable: initialPurpose === 'spending', archived: false }
     : null);
   const [opening, setOpening] = useState(initial ? formatEditableMoney(moneyInput(initial.openingBalance), true)! : onClose ? '0' : '');
+  const [expectedBalance, setExpectedBalance] = useState(initial ? calculateAccountSummary(initial, transactions, month).balance : 0);
+  const [currentBalance, setCurrentBalance] = useState(initial ? moneyInput(calculateAccountSummary(initial, transactions, month).balance) : '0');
   const [correctOpening, setCorrectOpening] = useState(initialCorrectOpening);
   const [rejected, setRejected] = useState(false);
   const nameInput = useRef<TextInput>(null);
@@ -53,15 +55,18 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     setAppearanceOpen(null);
     newId.current = undefined;
     setCorrectOpening(false);
+    const balance = account ? calculateAccountSummary(account, transactions, month).balance : 0;
+    setExpectedBalance(balance); setCurrentBalance(moneyInput(balance));
     setEditor(account ? { ...account } : { id: '', name: '', currency: 'PHP', openingBalance: 0, purpose: initialPurpose, icon: 'wallet', color: initialPurpose === 'savings' ? 'green' : 'blue', includedInAvailable: initialPurpose === 'spending', archived: false });
     setOpening(account ? formatEditableMoney(moneyInput(account.openingBalance), true)! : '0');
     setRejected(false); setFieldErrors({}); setError('');
   }
-  async function commit(account: Account, creating: boolean) {
+  async function commit(account: Account, creating: boolean, target?: number) {
     setWorking(true);
     try {
       const id = creating ? (newId.current ??= await newSubmissionId()) : account.id;
-      await saveAccount({ ...account, id }, creating);
+      const balanceChange = target === undefined ? undefined : { id: newId.current ??= await newSubmissionId(), target, expected: expectedBalance };
+      await saveAccount({ ...account, id }, creating, balanceChange);
       setEditor(null); newId.current = undefined; setError(''); onClose?.();
     } catch { /* The provider already shows the save error. */ }
     finally { pending.current = false; setWorking(false); }
@@ -70,12 +75,27 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
     if (!editor || locked || pending.current || rejected) return;
     if (!editor.name.trim()) { setFieldErrors({ name: 'Enter an account name.' }); setError('Enter an account name.'); nameInput.current?.focus(); return; }
     let draft: Account;
+    let target: number | undefined;
     try {
       draft = { ...editor, id: editor.id || 'new-account', name: editor.name.trim(), includedInAvailable: editor.purpose === 'spending', openingBalance: editor.id && !correctOpening ? editor.openingBalance : parseMoney(opening.replace(/,/g, ''), { allowZero: true, allowNegative: true }) };
       validateAccount(draft);
       calculateAccountSummary(draft, transactions, month);
+      if (editor.id && !correctOpening) {
+        const cents = parseMoney(currentBalance.replace(/,/g, ''), { allowZero: true, allowNegative: true });
+        const delta = BigInt(cents) - BigInt(expectedBalance);
+        if (delta > BigInt(Number.MAX_SAFE_INTEGER) || delta < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Adjustment exceeds the supported range.');
+        if (cents !== expectedBalance) target = cents;
+      }
     } catch (cause) { setFieldErrors({ amount: cause instanceof Error ? cause.message : 'Invalid account.' }); setError(cause instanceof Error ? cause.message : 'Invalid account.'); amountInput.current?.focus(); return; }
     Keyboard.dismiss(); pending.current = true;
+    if (target !== undefined) {
+      let confirmed = false;
+      confirmation.alert('Update current balance?', 'Records a balance correction, separate from income and expenses. The starting balance and existing transactions stay unchanged.', [
+        { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
+        { text: 'Confirm', onPress: () => { if (confirmed) return; confirmed = true; void commit(draft, false, target); } },
+      ], { icon: 'wallet-outline', rows: [{ label: 'Account', value: draft.name }], change: { label: 'Current balance', before: formatMoney(expectedBalance), after: formatMoney(target) } });
+      return;
+    }
     if (!editor.id || !correctOpening || draft.openingBalance === editor.openingBalance) { void commit(draft, !editor.id); return; }
     confirmation.alert('Correct opening balance?', 'This changes the historical starting balance and current balance, separate from income.', [
       { text: 'Cancel', style: 'cancel', onPress: () => { pending.current = false; } },
@@ -139,8 +159,14 @@ export function AccountManager({ accountId, onClose, initialPurpose = 'spending'
         <ThemedText type="small" numberOfLines={1} style={{ flex: 1 }}>{editor.purpose === 'spending' ? 'Spending' : 'Savings'}</ThemedText>
         <Ionicons name="chevron-down" size={16} color={theme.textSecondary} />
       </Pressable>
+      {editor.id && !correctOpening ? <>
+        <ThemedText type="small">Current balance</ThemedText>
+        <MoneyField ref={amountInput} signed accessibilityLabel="Account current balance in pesos" value={currentBalance} onValueChange={value => { setCurrentBalance(value); setFieldErrors({}); setRejected(false); }}
+          onRejected={() => { setRejected(true); setFieldErrors({ amount: 'Use digits and up to two decimal places.' }); }} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={[inputStyle, { borderColor: fieldErrors.amount ? theme.error : theme.border }]} />
+        <FieldError message={fieldErrors.amount} />
+      </> : null}
       {(!editor.id || correctOpening) ? <ThemedText type="small">{editor.id ? 'Correct original opening balance' : 'Starting balance'}</ThemedText> : null}
-      {editor.id && correctOpening ? <ThemedText type="small" themeColor="textSecondary">This changes your historical starting balance. To correct today's balance, use Adjust balance instead.</ThemedText> : null}
+      {editor.id && correctOpening ? <ThemedText type="small" themeColor="textSecondary">This changes your historical starting balance. Current balance corrections are recorded separately from the starting balance.</ThemedText> : null}
       {(!editor.id || correctOpening) && <>
       <MoneyField ref={amountInput} signed accessibilityLabel="Account opening balance in pesos" value={opening} onValueChange={(value) => { setOpening(value); setFieldErrors({}); setRejected(false); setError(''); }}
         onRejected={() => { setRejected(true); setFieldErrors({ amount: 'Use digits, up to two decimal places, and an optional minus sign.' }); setError('Use digits, up to two decimal places, and an optional minus sign.'); }} editable={!locked} placeholder="0" placeholderTextColor={theme.textSecondary} style={[inputStyle, { borderColor: fieldErrors.amount ? theme.error : theme.border }]} />

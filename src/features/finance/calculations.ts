@@ -82,6 +82,8 @@ export function calculateSavings(accounts: readonly Account[], transactions: rea
   const reports = calculateFinanceSummary(accounts, transactions, month);
   let balance = 0;
   let savedThisMonth = 0;
+  let movedIntoSavings = 0;
+  let movedOutOfSavings = 0;
   let usesLegacyPurposes = false;
   for (const account of accounts.filter((row) => row.purpose === 'savings')) {
     balance = addCentavos(balance, calculateAccountSummary(account, transactions, month).balance);
@@ -91,10 +93,10 @@ export function calculateSavings(accounts: readonly Account[], transactions: rea
     const source = row.sourcePurpose ?? accounts.find((account) => account.id === row.accountId)!.purpose;
     const destination = row.destinationPurpose ?? accounts.find((account) => account.id === row.destinationAccountId)!.purpose;
     if (row.sourcePurpose === undefined) usesLegacyPurposes = true;
-    if (source === 'spending' && destination === 'savings') savedThisMonth = addCentavos(savedThisMonth, row.amount);
-    if (source === 'savings' && destination === 'spending') savedThisMonth = addCentavos(savedThisMonth, -row.amount);
+    if (source === 'spending' && destination === 'savings') { movedIntoSavings = addCentavos(movedIntoSavings, row.amount); savedThisMonth = addCentavos(savedThisMonth, row.amount); }
+    if (source === 'savings' && destination === 'spending') { movedOutOfSavings = addCentavos(movedOutOfSavings, row.amount); savedThisMonth = addCentavos(savedThisMonth, -row.amount); }
   }
-  return { balance, savedThisMonth, savingsRate: reports.monthlyIncome === 0 ? null : savedThisMonth / reports.monthlyIncome * 100, usesLegacyPurposes };
+  return { balance, movedIntoSavings, movedOutOfSavings, savedThisMonth, savingsRate: reports.monthlyIncome === 0 ? null : savedThisMonth / reports.monthlyIncome * 100, usesLegacyPurposes };
 }
 export function calculateGoalProgress(goal: SavingsGoal, accounts: readonly Account[], transactions: readonly Transaction[]) {
   validateGoal(goal, accounts);

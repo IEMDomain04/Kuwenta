@@ -1,6 +1,9 @@
+import { normalizeServiceExchanges } from '../exchanges';
+import { calculateAccountSummary } from '../calculations';
+import type { Account, Transaction } from '../types';
 import type { FinanceDatabase } from './database';
 
-const VERSION = 13;
+const VERSION = 14;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -97,6 +100,23 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       if (!columns.some(column => column.name === 'exchange')) await transaction.execAsync('ALTER TABLE transactions ADD COLUMN exchange TEXT;');
       if (!columns.some(column => column.name === 'exchangeParentId')) await transaction.execAsync('ALTER TABLE transactions ADD COLUMN exchangeParentId TEXT REFERENCES transactions(id) ON DELETE CASCADE;');
       await transaction.execAsync('CREATE INDEX IF NOT EXISTS transactions_exchange_parent ON transactions(exchangeParentId); PRAGMA user_version = 13;');
+    }
+    if (version < 14) {
+      const raw = await transaction.getAllAsync<Omit<Transaction, 'exchange'> & { exchange: string | null }>('SELECT * FROM transactions');
+      const rows = raw.map(row => ({ ...row, exchange: row.exchange ? JSON.parse(row.exchange) : undefined, exchangeParentId: row.exchangeParentId ?? undefined, notes: row.notes ?? undefined, destinationAccountId: row.destinationAccountId ?? undefined, adjustmentDirection: row.adjustmentDirection ?? undefined, externalName: row.externalName ?? undefined, sourcePurpose: row.sourcePurpose ?? undefined, destinationPurpose: row.destinationPurpose ?? undefined }));
+      const accounts = (await transaction.getAllAsync<Account>('SELECT * FROM accounts')).map(account => ({ ...account, includedInAvailable: Boolean(account.includedInAvailable), archived: Boolean(account.archived), color: account.color ?? undefined, icon: account.icon ?? undefined }));
+      const converted = normalizeServiceExchanges(rows, accounts);
+      for (const account of accounts) if (calculateAccountSummary(account, rows, '1900-01').balance !== calculateAccountSummary(account, converted, '1900-01').balance) throw new Error('Service exchange migration would change an account balance.');
+      const byId = new Map(converted.map(row => [row.id, row]));
+      const children = new Map(converted.filter(row => row.exchangeParentId).map(row => [row.exchangeParentId, row]));
+      for (const row of rows.filter(row => row.exchange?.kind === 'Service sale' && row.type === 'EXPENSE')) {
+        const parent = byId.get(row.id)!;
+        const child = children.get(row.id);
+        await transaction.runAsync('DELETE FROM transactions WHERE exchangeParentId = ?', row.id);
+        await transaction.runAsync('UPDATE transactions SET type = ?, category = ?, amount = ?, destinationAccountId = ?, sourcePurpose = ?, destinationPurpose = ?, exchange = ? WHERE id = ?', parent.type, parent.category, parent.amount, parent.destinationAccountId!, parent.sourcePurpose ?? null, parent.destinationPurpose ?? null, JSON.stringify(parent.exchange), parent.id);
+        if (child) await transaction.runAsync('INSERT INTO transactions(id,accountId,type,amount,category,transactionDate,transactionTime,notes,createdAt,updatedAt,exchangeParentId) VALUES (?,?,?,?,?,?,?,?,?,?,?)', child.id, child.accountId, child.type, child.amount, child.category, child.transactionDate, child.transactionTime, child.notes ?? null, child.createdAt, child.updatedAt, child.exchangeParentId!);
+      }
+      await transaction.execAsync('PRAGMA user_version = 14;');
     }
   });
 }
