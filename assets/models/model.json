@@ -1,0 +1,7 @@
+{
+  "name": "Qwen3-0.6B Q5_K_M",
+  "file": "Qwen3-0.6B-Q5_K_M.gguf",
+  "bytes": 444415680,
+  "sha256": "03c6e2127d155b89c21a512954010486b1e00e1a9eebdfad650d03b53ab4c74a",
+  "url": "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q5_K_M.gguf"
+}

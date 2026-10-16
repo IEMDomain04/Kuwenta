@@ -7,9 +7,7 @@
     "icon": "./assets/images/kuwenta-app-icon.png",
     "scheme": "kuwenta",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/images/kuwenta-app-icon.png"
-    },
+    "ios": {},
     "android": {
       "predictiveBackGestureEnabled": false,
       "package": "com.iemdomain04.Kuwenta",
@@ -48,7 +46,12 @@
         {
           "android": {
             "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.rnllama.** { *; }",
+            "buildArchs": [
+              "arm64-v8a",
+              "x86_64"
+            ]
           }
         }
       ],
@@ -61,7 +64,15 @@
           "faceIDPermission": false
         }
       ],
-      "./plugins/with-private-backup"
+      "./plugins/with-private-backup",
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": false,
+          "enableOpenCLAndHexagon": false
+        }
+      ],
+      "./plugins/with-assistant-model"
     ],
     "experiments": {
       "typedRoutes": true,

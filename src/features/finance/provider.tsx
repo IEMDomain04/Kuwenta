@@ -28,8 +28,9 @@ import { saveAccountWithBalance, createExternalTransfer, adjustAccountBalance, c
 import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
-type Snapshot = { homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
+type Snapshot = { assistantEnabled: boolean; homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
+  saveAssistantEnabled: (enabled: boolean) => Promise<void>;
   saveHomeVisualizations: (selected: HomeVisualization[]) => Promise<void>;
   saveBudgetOrder: (month: string, categories: readonly string[]) => Promise<void>;
   recoverBackup: (backup: FinanceBackup) => Promise<void>;
@@ -105,6 +106,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const lastEntryAccount = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'lastEntryAccount'"))?.value;
       const displayName = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'displayName'"))?.value;
       const needsCashSetup = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'cashSetupComplete'"))?.value === '0';
+      const assistantEnabled = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'assistantEnabled'"))?.value !== '0';
       const homeVisualizations = await loadHomeVisualizations(connection);
       const goals = await listGoals(connection);
       const budgets = await listBudgets(connection);
@@ -115,7 +117,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       catch (cause) { console.warn('Could not update Kuwenta widgets:', cause); }
       loadedMonth = month;
       if (active) {
-        const next = { homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
+        const next = { assistantEnabled, homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
         loadedSnapshot.current = next; setSnapshot(next); setError(''); setCanRecover(false); recoveryAllowed = false;
       }
     }
@@ -163,6 +165,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       saveDisplayName: (name) => write((db) => saveDisplayNameRecord(db, name), 'Name updated.'),
       saveExternal: (record) => write((db) => createExternalTransfer(db, record.id, record), 'External transfer saved', formatMoney(record.amount, true), false, 'info'),
       refresh,
+      saveAssistantEnabled: (enabled) => write(async db => {
+        if (typeof enabled !== 'boolean') throw new Error('Choose whether to enable offline chat.');
+        await db.runAsync("INSERT INTO preferences(key,value) VALUES ('assistantEnabled',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", enabled ? '1' : '0');
+      }, undefined),
       saveBudget: (budget, creating, original) => write((db) => saveBudgetRecord(db, budget, creating, original), 'Budget saved.'),
       removeBudget: (month, category) => write((db) => deleteBudget(db, month, category), 'Budget deleted.'),
       copyBudgets: (month) => write((db) => copyPreviousBudgets(db, month), 'Budgets copied.'),
@@ -238,6 +244,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     completeSetup: (cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? unavailable(),
     resetData: () => actions.current?.resetData() ?? unavailable(),
     restoreBackup: (backup) => actions.current?.restoreBackup(backup) ?? unavailable(),
+    saveAssistantEnabled: enabled => actions.current?.saveAssistantEnabled(enabled) ?? unavailable(),
     getBackupJson: () => actions.current?.getBackupJson() ?? unavailable(),
     saveAccount: (account, creating, balanceChange) => actions.current?.saveAccount(account, creating, balanceChange) ?? unavailable(),
     saveOpeningBalance: (amount) => actions.current?.saveOpeningBalance(amount) ?? unavailable(),

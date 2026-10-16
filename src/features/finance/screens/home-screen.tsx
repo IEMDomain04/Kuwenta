@@ -1,3 +1,4 @@
+import { selectAssistantInsight } from '../assistant-insights';
 import { ThemedText } from "@/components/themed-text";
 import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
@@ -18,7 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BudgetOverview } from "../components/budget-overview";
 import { CategoryIcon } from "../components/category-visual";
 import { PeriodOverview } from "../components/period-overview";
-import { AddTransactionButton, FinanceScreen } from "../components/ui";
+import { ActionButton, AddTransactionButton, FinanceScreen } from "../components/ui";
 import { dashboardGreeting, dashboardReport } from "../dashboard";
 import { formatTransactionDateTime, philippineDateTime } from "../dates";
 import { exchangeLabel, exchangeSummary } from "../exchanges";
@@ -44,6 +45,7 @@ export default function HomeScreen() {
     month,
     busy,
     homeVisualizations,
+    assistantEnabled,
   } = useFinance();
   const theme = useTheme();
   const { height, fontScale } = useWindowDimensions();
@@ -202,6 +204,7 @@ export default function HomeScreen() {
           </ThemedText>
         </Pressable>
       </LinearGradient>
+      {assistantEnabled ? <ActionButton compact label="Ask about your money" onPress={() => router.push("/assistant")} /> : null}
       <Modal
         visible={insightsOpen}
         transparent
@@ -268,6 +271,7 @@ export default function HomeScreen() {
                       }}
                     >
                       <ThemedText type="small">{insight}</ThemedText>
+                      {assistantEnabled ? <ActionButton compact label="Explain" onPress={() => { setInsightsOpen(false); router.push({ pathname: "/assistant", params: { insight, selection: JSON.stringify(selectAssistantInsight(insight, { accounts, transactions, budgets, goals })) } }); }} /> : null}
                     </View>
                   ),
                 )}

@@ -66,3 +66,7 @@ example
 /assets/images/android-icon-foreground.png
 /assets/images/android-icon-monochrome.png
 /assets/images/favicon.png
+
+# Keep the verified GGUF in the build upload; exclude partial downloads.
+/assets/models/*.part
+/assets/models/*.download

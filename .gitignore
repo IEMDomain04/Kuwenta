@@ -41,3 +41,8 @@ example
 # generated native folders
 /ios
 /android
+
+# Downloaded model weights are bundled by EAS, not committed to Git.
+/assets/models/*.gguf
+/assets/models/*.part
+/assets/models/*.download

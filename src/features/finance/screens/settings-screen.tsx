@@ -1,3 +1,4 @@
+import { AssistantSettings } from '../components/assistant-settings';
 import { HOME_VISUALIZATIONS, type HomeVisualization } from '../home-visualizations';
 import { useConfirmation } from '../components/confirmation';
 import { NotificationSettingsPanel } from '../components/notification-settings';
@@ -116,6 +117,8 @@ export default function SettingsScreen() {
       </KeyboardAvoidingView>
     </Modal>
     <ThemedText type="small" themeColor="textSecondary">Philippine Peso (PHP)</ThemedText>
+    </View><View style={section}>
+    <AssistantSettings />
     </View><View style={section}>
     <ThemedText type="smallBold" accessibilityRole="header">Notifications</ThemedText>
     <NotificationSettingsPanel onChanged={async () => { await refresh(); showNotice('Notifications updated.'); }} />

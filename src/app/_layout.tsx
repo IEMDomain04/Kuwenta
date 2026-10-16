@@ -27,6 +27,7 @@ function AppContent() {
       <Stack.Screen name="goals" />
       <Stack.Screen name="budgets" options={{ gestureEnabled: false }} />
       <Stack.Screen name="goal" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="assistant" />
       <Stack.Screen name="account" options={{ gestureEnabled: false }} />
     </Stack></FinanceProvider></ConfirmationProvider>
   </ThemeProvider></View>;

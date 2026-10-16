@@ -104,3 +104,29 @@ Accounts keeps balance definitions behind the question-mark help button, includi
 Account creation and editing offer Default, Green, Blue, Teal, Plum, and Amber card colors, with a live preview and light/dark variants. Existing accounts retain purpose-based default colors. Database schema 10 adds only an optional color column; version 8 backups preserve custom colors and still accept all older backup versions. Card colors do not affect balances or reports.
 
 Expense pickers use separate categories for meals, snacks, drinks, groceries, personal care, cleaning supplies, mobile load/data, games/entertainment, tech/accessories, and school supplies/personal items. Quick Entry maps toothbrush and toothpaste to Personal Care, and detergent or dish soap to Cleaning Supplies. Retired broad or combined categories remain supported on existing transactions, budgets, and imported backups; new entries show only the updated choices. Existing history is not automatically recategorized.
+
+## Offline money assistant
+
+The optional read-only assistant uses **Qwen3-0.6B Q5_K_M** through pinned `llama.rn` 0.12.9. Home opens chat; Explain on Home/Accounts insights passes that insight into the same chat. Settings can disable the assistant. Quick Entry remains separate.
+
+The model is bundled in a new native build; users do not download or install it from Settings. Developers cloning the repository must first run:
+
+```sh
+npm run prepare:assistant-model
+```
+
+This downloads about 444 MB and checks its pinned SHA-256. The GGUF stays out of Git but is included in the EAS upload via `.easignore`. Prebuild verifies and packages it as a native resource; it is not included in the JavaScript bundle. The model's Apache 2.0 license is bundled alongside it. Source: https://huggingface.co/unsloth/Qwen3-0.6B-GGUF and https://huggingface.co/Qwen/Qwen3-0.6B.
+
+Android builds target arm64-v8a and x86_64, matching the runtime's supported 64-bit libraries and avoiding unsupported 32-bit builds. Chat requires a new development build or standalone APK; Expo Go can still test tracking, but cannot run the assistant. The first Android chat prepares a roughly 444 MB cache copy of the packaged model for memory-mapped loading. This can recur if Android clears the cache. Allow room for both the installed model and its prepared copy. Final APK size, installed storage, speed, and peak RAM must be measured on real devices; the model-file size alone does not establish suitability for a 4 GB phone.
+
+The model loads lazily on a question, uses a 2,048-token context with bounded history and a 220-token answer limit, and releases on leaving chat/backgrounding. Stop cancels a reply; native initialization/copy must finish before its resources can be released. Chats are not saved to backups or disk. Calculations remain in app code; replies get a figure check and fall back to a recorded summary when unavailable or unsupported. This check does not prove a model's interpretation is correct. No records are changed and no AI notification is scheduled.
+
+Before release, test first chat in airplane mode, repeated chat/back/background/Stop, low-memory behavior on the target phone, disabling/re-enabling, and ordinary tracking after chat. Native/device validation is required in addition to the automated finance checks and JavaScript export.
+
+The assistant now filters unrelated requests before inference (including coding requests) and checks replies for code, unsupported amounts, and vague balance-check advice. Purchase answers must include the known available balance and the calculated result; otherwise an app-written factual reply is shown. Daily-cost scenarios include seven days (five for school days), a labeled 30-day/20-school-day comparison, and a question about replacing existing spending. Comparisons use one budget allowance or recent recorded spending, never a universal low/high threshold or assumed future income. These lightweight checks reduce unrelated and ungrounded replies; they do not prove every interpretation correct. Test the controller, everyday meals, follow-up prices and unrelated-code examples on-device before release.
+
+Assistant chat renders paired bold spans, paragraphs and short lists using the existing themed text components. Context, replies and recorded-summary dates use readable month/day labels; database and backup date keys remain unchanged. Purchase fallbacks have a conclusion and explanation, while simple balance fallbacks stay direct. No Markdown package or native rebuild is needed for these JavaScript changes.
+
+Insight Explain actions pass a small typed selection (kind, period, category/account/goal) to chat. Category shares, matching-date comparisons, budget amounts, income, savings movements and goal progress are calculated in app code, with relevant per-insight fallbacks. Why/comparison/adjustment follow-ups keep that insight; a new purchase question uses the purchase context instead.
+
+Native completion callbacks stream only checked completed portions in batches of at most one update per 80 ms. Preparing / Thinking / Replying distinguish loading, waiting and output. Partial figures are buffered; internal reasoning is never displayed. Unsupported output stops generation and the completed reply falls back to the selected explanation. Stop retains checked text with a Stopped label; record changes discard the pending reply. Test these behaviors on-device, including rapid back/background/Stop. No new model, native dependency or timer-based typing animation was added.
