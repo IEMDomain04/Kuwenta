@@ -7,7 +7,7 @@ const { cash, record } = require('./fixtures.cjs');
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], onSubmit = () => {}, deleteFailure = false, refreshRecords } = {}) {
   const hooks = []; let cursor = 0; const saved = [], prompts = [], notices = [], removed = [], navigation = [], effects = [], refreshed = [];
-  const finance = { removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
+  const finance = { saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
   finance.refresh = async () => { refreshed.push(true); refreshRecords?.(finance); };
   const state = initial => { const index = cursor++; if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial; return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }]; };
   const jsx = (type, props) => ({ type, props });
@@ -329,4 +329,69 @@ test('a removed equal-exchange child ID opens its surviving parent after an upda
  const records=api.exchangeRecords('equal',draft,'2026-10-13T04:00:00.000Z');
  const h=harness('screens/transaction-screen.tsx',{params:{id:['equal:extra']},accounts:[cash,bank],transactions:records});
  assert.equal(h.render().find('TransactionForm').props.original.id,'equal');
+});
+
+
+test('external editor prefills values and previews replacement instead of adding the original twice', async () => {
+  const original = record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase', amount: 10000, notes: 'Cash received' });
+  const h = harness('screens/transfer-screen.tsx', { params: { id: original.id }, transactions: [original] });
+  assert.equal(h.render().input('External source name').props.value, 'Friend');
+  assert.equal(h.render().input('Transfer amount').props.value, '100.00');
+  h.render().input('Transfer amount').props.onValueChange('200.00');
+  const { formatMoney } = require('../../.expo/finance-tests/money.js');
+  assert.ok(h.render().nodes.some(node => Array.isArray(node.props.children) && node.props.children.includes(formatMoney(120000))));
+  h.render().button('Save changes').props.onPress();
+  const prompt = h.prompts.at(-1); prompt[2].find(button => button.text === 'Save').onPress(); prompt[2].find(button => button.text === 'Save').onPress(); await settle();
+  assert.equal(h.saved.length, 1); assert.equal(h.saved[0][0].id, original.id); assert.equal(h.saved[0][0].amount, 20000); assert.equal(h.saved[0][0].createdAt, original.createdAt); assert.equal(h.saved[0][1], true);
+});
+test('external editor changes direction and account without changing its record type', async () => {
+  const original = record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase', amount: 10000 });
+  const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: 50000 };
+  const h = harness('screens/transfer-screen.tsx', { params: { id: original.id }, accounts: [cash, bank], transactions: [original] });
+  h.render().button('Money out').props.onPress();
+  h.render().input('Choose from').props.onPress(); h.render().find('SelectionSheet').props.onSelect('bank');
+  h.render().button('Save changes').props.onPress(); h.prompts.at(-1)[2].find(button => button.text === 'Save').onPress(); await settle();
+  assert.equal(h.saved[0][0].type, 'EXTERNAL'); assert.equal(h.saved[0][0].adjustmentDirection, 'decrease'); assert.equal(h.saved[0][0].accountId, 'bank');
+});
+test('external deletion shows the reverted balance, cancels safely, and submits only once', async () => {
+  for (const direction of ['increase', 'decrease']) {
+    const original = record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: direction, amount: 10000 });
+    const h = harness('screens/transfer-screen.tsx', { params: { id: original.id }, transactions: [original] });
+    h.render().button('Delete movement').props.onPress();
+    const { formatMoney } = require('../../.expo/finance-tests/money.js');
+    assert.equal(h.prompts.at(-1)[3].rows.find(row => row.label === 'Balance after deletion').value, formatMoney(cash.openingBalance));
+    h.prompts.at(-1)[2].find(button => button.text === 'Cancel').onPress(); assert.equal(h.removed.length, 0);
+    h.render().button('Delete movement').props.onPress(); const button = h.prompts.at(-1)[2].find(button => button.text === 'Delete');
+    assert.equal(button.style, 'destructive'); button.onPress(); button.onPress(); await settle(); assert.deepEqual(h.removed, [original.id]);
+  }
+});
+test('archived external movements can be deleted but cannot be edited; failed deletion leaves a retry', async () => {
+  const original = record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'decrease' });
+  const h = harness('screens/transfer-screen.tsx', { params: { id: original.id }, accounts: [{ ...cash, archived: true }], transactions: [original], deleteFailure: true });
+  assert.equal(h.render().button('Save changes').props.disabled, true); assert.equal(h.render().input('Transfer amount').props.editable, false);
+  assert.equal(h.render().button('Delete movement').props.disabled, false);
+  h.render().button('Delete movement').props.onPress(); h.prompts.at(-1)[2].find(button => button.text === 'Delete').onPress(); await settle();
+  assert.ok(h.notices.includes('Could not delete.')); assert.equal(h.render().button('Delete movement').props.disabled, false);
+});
+test('a stale external movement reloads before editing and a missing record cannot be saved as new', async () => {
+  const original = record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase' });
+  const h = harness('screens/transfer-screen.tsx', { params: { id: original.id }, refreshRecords: finance => { finance.transactions = [original]; } });
+  h.render(); await settle(); h.render();
+  assert.equal(h.render().input('Transfer amount').props.value, '120.00');
+  const missing = harness('screens/transfer-screen.tsx', { params: { id: 'missing' }, refreshRecords: () => {} });
+  missing.render(); await settle(); assert.equal(missing.render().button('Save changes'), undefined);
+});
+
+
+test('new normal transfers and new external movements keep their existing create flows', async () => {
+  const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: 0 };
+  const h = harness('screens/transfer-screen.tsx', { params: { accountId: 'cash', destinationAccountId: 'bank' }, accounts: [cash, bank] });
+  h.render().input('Transfer amount').props.onValueChange('100.00'); h.render().button('Save transfer').props.onPress();
+  h.prompts.at(-1)[2].find(button => button.text === 'Save').onPress(); await settle();
+  assert.equal(h.saved[0][1].type, 'TRANSFER'); assert.equal(h.saved[0][2], false);
+  const external = harness('screens/transfer-screen.tsx', { params: { destinationAccountId: 'cash' } });
+  external.render().input('Choose from').props.onPress(); external.render().find('SelectionSheet').props.onSelect('external');
+  external.render().input('External source name').props.onChangeText('Friend'); external.render().input('Transfer amount').props.onValueChange('50.00');
+  external.render().button('Save transfer').props.onPress(); external.prompts.at(-1)[2].find(button => button.text === 'Save').onPress(); await settle();
+  assert.equal(external.saved[0][0].id, 'new-id'); assert.equal(external.saved[0][0].type, 'EXTERNAL'); assert.equal(external.saved[0][1], false);
 });

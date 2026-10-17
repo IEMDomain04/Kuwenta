@@ -8,12 +8,12 @@ const source = ts.transpileModule(fs.readFileSync('src/features/finance/screens/
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 
-function harness({ id = 'bank', archived = false } = {}) {
+function harness({ id = 'bank', archived = false, movements = [] } = {}) {
   const hooks = []; let cursor = 0, confirmation;
-  const removed = [], saved = [], adjusted = [];
+  const removed = [], saved = [], adjusted = [], opened = [];
   const accounts = [cash, { ...cash, id: 'bank', name: 'Bank', purpose: 'savings', includedInAvailable: false, openingBalance: 50000, archived }];
   const finance = {
-    accounts, transactions: [record({ accountId: 'bank' }), record({ id: 'transfer', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 10000 })],
+    accounts, transactions: [record({ accountId: 'bank' }), record({ id: 'transfer', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 10000 }), ...movements],
     goals: [{ id: 'goal', name: 'Emergency', accountId: 'bank' }], month: '2026-10', busy: false, showNotice() {},
     newSubmissionId: async () => 'adjustment-id',
     adjustBalance: async (...args) => adjusted.push(args),
@@ -32,7 +32,7 @@ function harness({ id = 'bank', archived = false } = {}) {
     if (name === '../components/confirmation') return { useConfirmation: () => ({ alert: (title, message, buttons, options) => { confirmation = { title, message, buttons, options }; } }) };
     if (name.endsWith('/field-error')) return { FieldError: 'FieldError' };
     if (name === 'react-native') return { View: 'View', Modal: 'Modal', Pressable: 'Pressable', TextInput: 'Input', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'android' } };
-    if (name === 'expo-router') return { useLocalSearchParams: () => ({ id }), router: { canGoBack: () => true, back() {}, push() {}, replace() {} } };
+    if (name === 'expo-router') return { useLocalSearchParams: () => ({ id }), router: { canGoBack: () => true, back() {}, push(value) { opened.push(value); }, replace() {} } };
     if (name === '@react-native-vector-icons/ionicons') return { Ionicons: 'Icon' };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: '#06633E', border: '#73877A' }) };
@@ -60,7 +60,7 @@ function harness({ id = 'bank', archived = false } = {}) {
     const button = render().find(node => node.type === 'Pressable' && Array.isArray(node.props.children) && node.props.children.some(child => child?.type === 'Text' && child.props.children === text.props.children));
     return button.props;
   }
-  return { render, pressOption, removed, saved, adjusted, confirmation: () => confirmation };
+  return { render, pressOption, removed, saved, adjusted, opened, confirmation: () => confirmation };
 }
 
 test('active and archived account deletion requires confirmation with records, goal and transfer impact', async () => {
@@ -106,4 +106,13 @@ test('Edit account replaces Adjust balance beside Transfer money and is absent f
  nodes.find(node=>node.props.label==='Edit account').props.onPress();
  assert.ok(h.render().some(node=>node.type==='AccountManager'));
  assert.ok(!harness({archived:true}).render().some(node=>node.props.label==='Edit account'));
+});
+
+
+test('external movement rows open their dedicated editor from account details', () => {
+  const movement = record({ id: 'external-row', accountId: 'bank', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase' });
+  const h = harness({ movements: [movement] });
+  const row = h.render().find(node => node.props.accessibilityLabel === 'Edit external movement with Friend');
+  assert.equal(row.props.accessibilityRole, 'button'); row.props.onPress();
+  assert.equal(h.opened[0].pathname, '/transfer'); assert.equal(h.opened[0].params.id, movement.id);
 });

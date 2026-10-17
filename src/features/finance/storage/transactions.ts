@@ -152,6 +152,23 @@ export async function createExternalTransfer(db: FinanceDatabase, id: string, re
 }
 
 
+/** External movements retain their identity and stay outside income/expense reports. */
+export async function updateExternalTransfer(db: FinanceDatabase, id: string, record: Transaction): Promise<void> {
+  validateId(id);
+  if (record.id !== id || record.type !== 'EXTERNAL') throw new Error('Invalid external movement.');
+  validateManualRecord(record);
+  await db.withExclusiveTransactionAsync(async transaction => {
+    const original = await getTransaction(transaction, id);
+    if (!original || original.type !== 'EXTERNAL') throw new Error('This external movement is no longer available.');
+    if ((await getAccount(transaction, original.accountId)).archived) throw new Error('Unarchive the original account before editing this movement.');
+    if ((await getAccount(transaction, record.accountId)).archived) throw new Error('Choose an active account.');
+    await transaction.runAsync('UPDATE transactions SET accountId = ?, amount = ?, transactionDate = ?, transactionTime = ?, notes = ?, updatedAt = ?, adjustmentDirection = ?, externalName = ? WHERE id = ?',
+      record.accountId, record.amount, record.transactionDate, record.transactionTime, record.notes ?? null, new Date().toISOString(), record.adjustmentDirection!, record.externalName!, id);
+    calculateFinanceSummary(await listAccounts(transaction), await listTransactions(transaction), record.transactionDate.slice(0, 7));
+  });
+}
+
+
 async function saveExchange(db: FinanceDatabase, id: string, draft: TransactionDraft, editing: boolean): Promise<Transaction> {
   validateId(id); let saved: Transaction | undefined;
   await db.withExclusiveTransactionAsync(async transaction => {

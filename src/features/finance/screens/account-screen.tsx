@@ -107,11 +107,11 @@ export default function AccountScreen() {
             {history.some((row) => row.type === 'EXTERNAL') ? <View style={{ padding: 12, gap: 10, borderRadius: 18, backgroundColor: theme.backgroundElement }}>
               <ThemedText type="smallBold">External movements</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">Kept for account balances and backups; excluded from History and income/expense reports.</ThemedText>
-              {history.filter((row) => row.type === 'EXTERNAL').map((row) => <View key={row.id} style={{ gap: 3 }}>
-                <ThemedText type="smallBold">{row.externalName}: {row.adjustmentDirection === 'increase' ? '+' : '-'}{formatMoney(row.amount)}</ThemedText>
+              {history.filter((row) => row.type === 'EXTERNAL').map((row) => <Pressable key={row.id} accessibilityRole="button" accessibilityLabel={'Edit external movement with ' + row.externalName} disabled={locked} onPress={() => router.push({ pathname: '/transfer', params: { id: row.id } })} style={({ pressed }) => ({ gap: 3, paddingVertical: 8, opacity: pressed ? 0.6 : 1 })}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><ThemedText type="smallBold" style={{ flex: 1 }}>{row.externalName}: {row.adjustmentDirection === 'increase' ? '+' : '-'}{formatMoney(row.amount)}</ThemedText><Ionicons name="chevron-forward" size={16} color={theme.textSecondary} /></View>
                 <ThemedText type="small" themeColor="textSecondary">{formatTransactionDateTime(row.transactionDate, row.transactionTime)}</ThemedText>
                 {row.notes ? <ThemedText type="small">{row.notes}</ThemedText> : null}
-              </View>)}
+              </Pressable>)}
             </View> : null}
             <Modal visible={optionsOpen} transparent animationType="fade" onRequestClose={() => setOptionsOpen(false)}>
               <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: theme.overlay }}>
