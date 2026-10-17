@@ -8,6 +8,7 @@ import { View, useWindowDimensions } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 
 const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
+  'Overall spending': { color: Colors.light.accent, icon: 'wallet-outline' },
   'Balance adjustment': { color: Colors.light.accent, icon: 'options-outline' },
   Transfer: { color: Colors.light.accent, icon: 'swap-horizontal' },
   Groceries: { color: '#527326', icon: 'cart' },

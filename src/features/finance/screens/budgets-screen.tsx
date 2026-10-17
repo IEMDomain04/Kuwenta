@@ -18,7 +18,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { BUDGET_CATEGORIES, budgetGroups, budgetReport, validateBudget } from "../budgets";
+import { OVERALL_BUDGET, mergeBudgetOrder, BUDGET_CATEGORIES, budgetGroups, budgetReport, validateBudget } from "../budgets";
 import { calculateCurrentMoney } from "../calculations";
 import { BudgetUsage } from "../components/budget-usage";
 import { CategoryIcon, categoryVisual } from "../components/category-visual";
@@ -184,12 +184,73 @@ export default function BudgetsScreen() {
     } else if (original) {
       confirm(
         'Save budget changes?',
-        moved ? 'Moves this category budget to the selected period. Recorded expenses stay unchanged.' : 'Updates this category limit. Recorded expenses stay unchanged.',
+        moved ? 'Moves this budget to the selected period. Recorded expenses stay unchanged.' : 'Updates this spending limit. Recorded expenses stay unchanged.',
         () => finance.saveBudget(budget, false, original),
         false,
         { rows: [{ label: 'Category', value: budget.category }, { label: 'Period', value: budgetPeriodLabel(budget.month) }, { label: 'Limit', value: formatMoney(budget.limitAmount) }], change: moved ? { label: 'Budget period', before: budgetPeriodLabel(original.month), after: budgetPeriodLabel(budget.month) } : { label: 'Budget limit', before: formatMoney(original.limitAmount), after: formatMoney(budget.limitAmount) } },
       );
     }
+  }
+
+  function renderBudget(row: ReturnType<typeof budgetReport>['rows'][number], totalRemaining: number, current: boolean, onHold?: (event: import('react-native').GestureResponderEvent) => void) {
+    return (
+      <View
+        key={row.category}
+        style={{
+          gap: 8,
+        }}
+      >
+        <BudgetUsage
+          row={row}
+          onHold={onHold}
+          available={available}
+          totalRemaining={totalRemaining}
+          currentMonth={current}
+          actions={
+            <View style={{ flexDirection: "row", gap: 4 }}>
+              <IconButton
+                icon="pencil-outline"
+                label={"Edit " + row.category + " budget"}
+                disabled={locked}
+                onPress={() => {
+                  setEditor({
+                    month: row.month,
+                    original: row,
+                    category: row.category,
+                    amount: formatEditableMoney(
+                      moneyInput(row.limitAmount),
+                    )!,
+                    creating: false,
+                  });
+                  setFieldErrors({});
+                  setError("");
+                  setRejected(false);
+                }}
+              />
+              <IconButton
+                icon="trash-outline"
+                destructive
+                label={"Delete " + row.category + " budget"}
+                disabled={locked}
+                onPress={() =>
+                  confirm(
+                    "Delete budget?",
+                    "Remove " +
+                      row.category +
+                      " budget for " +
+                      budgetPeriodLabel(row.month) +
+                      "? Your expenses are kept.",
+                    () => finance.removeBudget(row.month, row.category),
+                    true,
+                    { rows: [{ label: 'Category', value: row.category }, { label: 'Period', value: budgetPeriodLabel(row.month) }, { label: 'Limit', value: formatMoney(row.limitAmount) }] },
+                  )
+                }
+              />
+            </View>
+          }
+        />
+      </View>
+    );
   }
 
   const unused = BUDGET_CATEGORIES.filter(
@@ -237,68 +298,13 @@ export default function BudgetsScreen() {
             {groups.map(group => <View key={group.scope} style={{ gap: 10 }}>
               <ThemedText type="smallBold">{group.period === 'daily' ? 'Daily' : group.period === 'weekly' ? 'Weekly' : 'Monthly'} | {budgetPeriodLabel(group.scope)}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">{formatMoney(group.budgetedSpent, true)} spent of {formatMoney(group.totalLimit, true)} | {formatMoney(Math.abs(group.remaining), true)} {group.remaining < 0 ? 'over budget' : 'remaining'}</ThemedText>
-            <BudgetList key={group.scope + JSON.stringify(group.rows.map(row => row.category))} rows={group.rows} disabled={locked} onDraggingChange={setDragging} onReorder={categories => finance.saveBudgetOrder(group.scope, categories)} renderRow={(row, onHold) => (
-              <View
-                key={row.category}
-                style={{
-                  gap: 8,
-                }}
-              >
-                <BudgetUsage
-                  row={row}
-                  onHold={onHold}
-                  available={available}
-                  totalRemaining={group.positiveRemaining}
-                  currentMonth={group.start <= today && group.end >= today}
-                  actions={
-                    <View style={{ flexDirection: "row", gap: 4 }}>
-                      <IconButton
-                        icon="pencil-outline"
-                        label={"Edit " + row.category + " budget"}
-                        disabled={locked}
-                        onPress={() => {
-                          setEditor({
-                            month: row.month,
-                            original: row,
-                            category: row.category,
-                            amount: formatEditableMoney(
-                              moneyInput(row.limitAmount),
-                            )!,
-                            creating: false,
-                          });
-                          setFieldErrors({});
-                          setError("");
-                          setRejected(false);
-                        }}
-                      />
-                      <IconButton
-                        icon="trash-outline"
-                        destructive
-                        label={"Delete " + row.category + " budget"}
-                        disabled={locked}
-                        onPress={() =>
-                          confirm(
-                            "Delete budget?",
-                            "Remove " +
-                              row.category +
-                              " budget for " +
-                              budgetPeriodLabel(row.month) +
-                              "? Your expenses are kept.",
-                            () => finance.removeBudget(row.month, row.category),
-                            true,
-                            { rows: [{ label: 'Category', value: row.category }, { label: 'Period', value: budgetPeriodLabel(row.month) }, { label: 'Limit', value: formatMoney(row.limitAmount) }] },
-                          )
-                        }
-                      />
-                    </View>
-                  }
-                />
-              </View>
-            )} />
+            {group.rows.filter(row => row.category === OVERALL_BUDGET).map(row => <View key={row.category}>{renderBudget(row, group.positiveRemaining, group.start <= today && group.end >= today)}</View>)}
+            {group.rows.some(row => row.category === OVERALL_BUDGET) && group.rows.some(row => row.category !== OVERALL_BUDGET) ? <ThemedText type="smallBold">Category limits</ThemedText> : null}
+            <BudgetList key={group.scope + JSON.stringify(group.rows.map(row => row.category))} rows={group.rows.filter(row => row.category !== OVERALL_BUDGET)} disabled={locked} onDraggingChange={setDragging} onReorder={categories => finance.saveBudgetOrder(group.scope, mergeBudgetOrder(group.rows.map(row => row.category), categories))} renderRow={(row, onHold) => renderBudget(row, group.positiveRemaining, group.start <= today && group.end >= today, onHold)} />
             </View>)}
             {groups.length === 0 ? (
               <ThemedText type="small" themeColor="textSecondary">
-                No budgets yet. Tap Add to set a category limit.
+                No budgets yet. Tap Add to set a spending limit.
               </ThemedText>
             ) : null}
           </>
@@ -316,7 +322,7 @@ export default function BudgetsScreen() {
               {editor.creating ? "Add budget" : "Edit budget"} -{" "}
               {budgetPeriodLabel(editor.month)}
             </ThemedText>
-            <ThemedText type="small">Category</ThemedText>
+            <ThemedText type="small">Spending covered</ThemedText>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Budget category"
@@ -402,7 +408,7 @@ export default function BudgetsScreen() {
         )}
         <SelectionSheet
           visible={categoryOpen && Boolean(editor)}
-          title="Budget category"
+          title="Spending covered"
           options={unused.map((category) => ({
             value: category,
             label: category,
@@ -460,7 +466,7 @@ export default function BudgetsScreen() {
                 ))
               ) : (
                 <ThemedText type="small" themeColor="textSecondary">
-                  No spending outside budgeted categories.
+                  No spending outside your budgets.
                 </ThemedText>
               )
             ) : null}

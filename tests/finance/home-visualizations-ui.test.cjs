@@ -13,6 +13,7 @@ function render(visible) {
     if(name==='react-native')return{View:'View',Pressable:'Button',useWindowDimensions:()=>({fontScale:1})};
     if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
     if(name==='@/components/themed-text')return{ThemedText:'Text'};
+    if(name==='@/hooks/use-color-scheme')return{useColorScheme:()=> 'light'};
     if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
     if(name==='./account-balances')return{AccountBalances:'Balances'};
     if(name==='./selection-sheet')return{SelectionSheet:'SelectionSheet'};

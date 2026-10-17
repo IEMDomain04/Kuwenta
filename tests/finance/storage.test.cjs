@@ -1543,3 +1543,33 @@ test('an external edit that overflows a balance rolls back atomically', async t 
   await assert.rejects(() => updateExternalTransfer(db, original.id, { ...original, accountId: 'full' }), /supported range/);
   assert.deepEqual(await getTransaction(db, original.id), initial);
 });
+
+
+test('overall budgets create, edit, reorder with categories, restore JSON and Excel, and delete without affecting records', async t => {
+  const { OVERALL_BUDGET, mergeBudgetOrder, budgetReport } = require('../../.expo/finance-tests/budgets.js');
+  const { saveBudget, listBudgets, saveBudgetOrder, deleteBudget } = require('../../.expo/finance-tests/storage/budgets.js');
+  const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
+  const db = await setup(t);
+  await createTransaction(db, 'meal', { ...expense(), category: 'Meals' });
+  const originalRows = await listTransactions(db);
+  const overall = { month: '2026-10', category: OVERALL_BUDGET, limitAmount: 50000 };
+  await saveBudget(db, overall, true);
+  await saveBudget(db, { ...overall, category: 'Meals', limitAmount: 20000 }, true);
+  await saveBudget(db, { ...overall, category: 'Transport', limitAmount: 10000 }, true);
+  await assert.rejects(saveBudget(db, { ...overall, limitAmount: 60000 }, true), /already/);
+  await saveBudget(db, { ...overall, limitAmount: 55000 }, false);
+  const ordered = mergeBudgetOrder((await listBudgets(db)).map(row => row.category), ['Transport', 'Meals']);
+  await saveBudgetOrder(db, overall.month, ordered);
+  const saved = await listBudgets(db);
+  assert.equal(budgetReport(saved, originalRows, overall.month).totalLimit, 55000);
+  const backup = parseBackup(await readBackupJson(db));
+  await restoreBackup(db, backup);
+  assert.deepEqual((await listBudgets(db)).sort((a, b) => a.category.localeCompare(b.category)), [...saved].sort((a, b) => a.category.localeCompare(b.category)));
+  await restoreBackup(db, parseExcelBackup(createExcelBackup(backup)));
+  assert.deepEqual((await listBudgets(db)).sort((a, b) => a.category.localeCompare(b.category)), [...saved].sort((a, b) => a.category.localeCompare(b.category)));
+  await deleteBudget(db, overall.month, OVERALL_BUDGET);
+  assert.equal((await listBudgets(db)).length, 2);
+  assert.deepEqual(await listTransactions(db), originalRows);
+});

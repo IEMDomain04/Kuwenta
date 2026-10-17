@@ -3,12 +3,14 @@ import { CATEGORIES, LEGACY_EXPENSE_CATEGORIES, type Budget, type Transaction } 
 import { budgetPeriodRange, isBudgetPeriodKey } from './budget-periods';
 
 
+// Stored only as a budget target, never as a transaction category.
+export const OVERALL_BUDGET = 'Overall spending';
 /** Cash-in/out are entry modes; their actual expense category is Fees. */
-export const BUDGET_CATEGORIES = CATEGORIES.EXPENSE.filter(category => category !== 'Cash-in (E-bank)' && category !== 'Cash-out (E-bank)' && category !== 'Service exchange');
+export const BUDGET_CATEGORIES: readonly string[] = [OVERALL_BUDGET, ...CATEGORIES.EXPENSE.filter(category => category !== 'Cash-in (E-bank)' && category !== 'Cash-out (E-bank)' && category !== 'Service exchange')];
 
 export function validateBudget(budget: Budget): void {
   if (!isBudgetPeriodKey(budget.month)) throw new Error('Choose a valid budget period.');
-  if (!(CATEGORIES.EXPENSE as readonly string[]).includes(budget.category) && !LEGACY_EXPENSE_CATEGORIES.includes(budget.category)) throw new Error('Choose an expense category.');
+  if (budget.category !== OVERALL_BUDGET && !(CATEGORIES.EXPENSE as readonly string[]).includes(budget.category) && !LEGACY_EXPENSE_CATEGORIES.includes(budget.category)) throw new Error('Choose an expense category.');
   if (!Number.isSafeInteger(budget.limitAmount) || budget.limitAmount <= 0) throw new Error('Budget limit must be positive integer centavos.');
 }
 export function budgetReport(budgets: readonly Budget[], transactions: readonly Transaction[], month: string) {
@@ -21,24 +23,27 @@ export function budgetReport(budgets: readonly Budget[], transactions: readonly 
     amounts.set(row.category, total);
   }
   const spending = [...amounts].map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
+  const allSpent = spending.reduce((sum, row) => { const next = sum + row.amount; if (!Number.isSafeInteger(next)) throw new Error('Budget spending exceeds the supported range.'); return next; }, 0);
   const keys = new Set<string>();
   const rows = budgets.filter((budget) => budget.month === month).map((budget) => {
     validateBudget(budget);
     if (keys.has(budget.category)) throw new Error('Duplicate category budget.');
     keys.add(budget.category);
-    const spent = spending.find((row) => row.category === budget.category)?.amount ?? 0;
+    const spent = budget.category === OVERALL_BUDGET ? allSpent : amounts.get(budget.category) ?? 0;
     return { ...budget, spent, remaining: budget.limitAmount - spent, progress: spent / budget.limitAmount,
       status: spent > budget.limitAmount ? 'Over budget' : spent === budget.limitAmount ? 'Limit reached' : 'Within budget' };
   });
   let totalLimit = 0;
   let budgetedSpent = 0;
-  for (const row of rows) {
+  // Overall spending already contains category expenses; never sum overlapping limits.
+  const overall = rows.find(row => row.category === OVERALL_BUDGET);
+  for (const row of overall ? [overall] : rows) {
     if (totalLimit > Number.MAX_SAFE_INTEGER - row.limitAmount) throw new Error('Total budget exceeds the supported range.');
     if (budgetedSpent > Number.MAX_SAFE_INTEGER - row.spent) throw new Error('Budget spending exceeds the supported range.');
     totalLimit += row.limitAmount; budgetedSpent += row.spent;
   }
-  const unbudgeted = spending.filter((row) => !keys.has(row.category));
-  return { rows, totalLimit, budgetedSpent, remaining: totalLimit - budgetedSpent, unbudgeted };
+  const unbudgeted = overall ? [] : spending.filter((row) => !keys.has(row.category));
+  return { rows, totalLimit, budgetedSpent, remaining: totalLimit - budgetedSpent, unbudgeted, positiveRemaining: overall ? Math.max(0, overall.remaining) : rows.reduce((sum, row) => sum + Math.max(0, row.remaining), 0) };
 }
 
 /** A category limit is an allowance, not a separate pot of cash. */
@@ -49,14 +54,14 @@ export function budgetFeedback(row: ReturnType<typeof budgetReport>['rows'][numb
     : row.spent === 0 ? `${money(row.remaining)} left.`
     : row.progress >= 0.8 ? `${money(row.remaining)} left; close to the limit.`
     : `${money(row.remaining)} left.`;
-  const details = [row.spent === 0 ? 'No spending recorded in this category.' : `${money(row.spent)} spent of a ${money(row.limitAmount)} limit.`];
+  const details = [row.spent === 0 ? row.category === OVERALL_BUDGET ? 'No spending recorded in this period.' : 'No spending recorded in this category.' : `${money(row.spent)} spent of a ${money(row.limitAmount)} limit.`];
   if (!currentMonth) details.push('This is a past or future period. Current balances are not compared with it.');
   else if (available <= 0) details.push(available < 0 ? 'Available money is negative. Check account balances before spending.' : 'No available spending money is recorded. A remaining budget is not cash.');
   else if (row.remaining > available) details.push(`The budget has ${money(row.remaining)} left, but spending accounts have ${money(available)} available.`);
   else if (totalRemaining > available) details.push(`${money(available)} is available, below the ${money(totalRemaining)} left across all budgets. Prioritize upcoming essentials.`);
   else details.push(`${money(available)} is available in spending accounts. It covers remaining budget allowances; upcoming bills may still need money.`);
   if (row.remaining < 0) details.push('Review spending or adjust the limit. Changing the budget does not change your balance.');
-  else if (row.progress >= 0.8) details.push('Check upcoming purchases before spending more in this category.');
+  else if (row.progress >= 0.8) details.push(row.category === OVERALL_BUDGET ? 'Check upcoming purchases before spending more this period.' : 'Check upcoming purchases before spending more in this category.');
   return { message, details };
 }
 
@@ -81,6 +86,6 @@ export function budgetGroups(budgets: readonly Budget[], transactions: readonly 
   scopes.sort((a, b) => ranks[a.period] - ranks[b.period] || b.start.localeCompare(a.start));
   return scopes.map(range => {
     const report = budgetReport(byScope.get(range.scope)!, transactions, range.scope);
-    return { ...range, ...report, positiveRemaining: report.rows.reduce((sum, row) => sum + Math.max(0, row.remaining), 0) };
+    return { ...range, ...report, positiveRemaining: report.positiveRemaining };
   });
 }
