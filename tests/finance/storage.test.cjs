@@ -1484,3 +1484,62 @@ test('version 14 converts old service pairs atomically, preserves balances and s
  assert.equal(calculateFinanceSummary(accounts,await listTransactions(db),'2026-10').monthlyIncome,1000);
  await deleteTransaction(db,'legacy-sale:extra');assert.equal((await listTransactions(db)).length,0);
 });
+
+
+test('external edits retain identity, recalculate both accounts and stay outside reports and backups history', async t => {
+  const db = await setup(t);
+  const { createExternalTransfer, updateExternalTransfer } = require('../../.expo/finance-tests/storage/transactions.js');
+  const { saveAccountDetails, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { calculateFinanceSummary } = require('../../.expo/finance-tests/calculations.js');
+  const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { filterTransactions } = require('../../.expo/finance-tests/reporting.js');
+  await saveAccountDetails(db, { id: 'bank', name: 'Bank', currency: 'PHP', openingBalance: 50000, purpose: 'savings', includedInAvailable: false, archived: false }, true);
+  const original = record({ id: 'external-edit', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase', amount: 10000 });
+  await createExternalTransfer(db, original.id, original);
+  const initial = await getTransaction(db, original.id);
+  await updateExternalTransfer(db, original.id, { ...original, accountId: 'bank', amount: 3000, adjustmentDirection: 'decrease', externalName: 'Parent', notes: 'Corrected', transactionDate: '2026-10-10' });
+  const saved = await getTransaction(db, original.id);
+  assert.equal(saved.createdAt, original.createdAt); assert.equal(saved.type, 'EXTERNAL'); assert.equal(saved.externalName, 'Parent'); assert.equal(saved.notes, 'Corrected');
+  const accounts = await listAccounts(db), rows = await listTransactions(db);
+  assert.equal(rows.length, 1);
+  assert.equal(calculateAccountSummary(accounts.find(row => row.id === 'cash'), rows, '2026-10').balance, 0);
+  assert.equal(calculateAccountSummary(accounts.find(row => row.id === 'bank'), rows, '2026-10').balance, 47000);
+  const totals = calculateFinanceSummary(accounts, rows, '2026-10');
+  assert.equal(totals.monthlyIncome, 0); assert.equal(totals.monthlyExpenses, 0); assert.equal(filterTransactions(rows, '2026-10').length, 0);
+  const backup = parseBackup(await readBackupJson(db));
+  await restoreBackup(db, backup);
+  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
+  await restoreBackup(db, parseExcelBackup(createExcelBackup(backup)));
+  assert.deepEqual(await getTransaction(db, original.id), saved);
+  await deleteTransaction(db, original.id);
+  assert.equal(calculateAccountSummary(accounts.find(row => row.id === 'bank'), await listTransactions(db), '2026-10').balance, 50000);
+});
+test('external edits reject archived accounts, wrong types, missing IDs and invalid fields without altering records', async t => {
+  const db = await setup(t);
+  const { createExternalTransfer, updateExternalTransfer } = require('../../.expo/finance-tests/storage/transactions.js');
+  const { saveAccountDetails } = require('../../.expo/finance-tests/storage/accounts.js');
+  const archived = { id: 'old', name: 'Old', currency: 'PHP', openingBalance: 0, purpose: 'spending', includedInAvailable: true, archived: true };
+  await saveAccountDetails(db, { ...archived, archived: false }, true); await saveAccountDetails(db, archived, false);
+  const original = record({ id: 'external-check', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase' });
+  await createExternalTransfer(db, original.id, original);
+  const initial = await getTransaction(db, original.id);
+  for (const change of [{ accountId: 'old' }, { amount: -100 }, { externalName: '' }, { transactionDate: 'bad' }, { type: 'INCOME', category: 'Salary' }]) await assert.rejects(() => updateExternalTransfer(db, original.id, { ...original, ...change }));
+  await assert.rejects(() => updateExternalTransfer(db, 'missing', { ...original, id: 'missing' }), /no longer available/);
+  const cash = await getCashAccount(db); await saveAccountDetails(db, { ...cash, archived: true }, false);
+  await assert.rejects(() => updateExternalTransfer(db, original.id, { ...original, amount: 2000 }), /Unarchive the original/);
+  assert.deepEqual(await getTransaction(db, original.id), initial);
+  await deleteTransaction(db, original.id); // Deletion remains available for an archived account.
+  assert.equal(await getTransaction(db, original.id), null);
+});
+test('an external edit that overflows a balance rolls back atomically', async t => {
+  const db = await setup(t);
+  const { createExternalTransfer, updateExternalTransfer } = require('../../.expo/finance-tests/storage/transactions.js');
+  const { saveAccountDetails } = require('../../.expo/finance-tests/storage/accounts.js');
+  await saveAccountDetails(db, { id: 'full', name: 'Full', currency: 'PHP', openingBalance: Number.MAX_SAFE_INTEGER, purpose: 'spending', includedInAvailable: true, archived: false }, true);
+  const original = record({ id: 'external-overflow', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase', amount: 1 });
+  await createExternalTransfer(db, original.id, original);
+  const initial = await getTransaction(db, original.id);
+  await assert.rejects(() => updateExternalTransfer(db, original.id, { ...original, accountId: 'full' }), /supported range/);
+  assert.deepEqual(await getTransaction(db, original.id), initial);
+});

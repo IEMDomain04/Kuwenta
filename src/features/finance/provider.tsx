@@ -24,7 +24,7 @@ import { listGoals, saveGoal as saveGoalRecord, deleteGoal } from './storage/goa
 import { saveAccountOrder as saveAccountOrderRecord, deleteAccount, saveDisplayName as saveDisplayNameRecord, completeCashSetup, listAccounts, saveAccount as saveAccountRecords, updateOpeningBalance } from './storage/accounts';
 import { resetFinancialData, restoreBackup as restoreBackupRecords } from './storage/backup';
 import { serializeBackup, type FinanceBackup } from './backup';
-import { saveAccountWithBalance, createExternalTransfer, adjustAccountBalance, createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
+import { saveAccountWithBalance, createExternalTransfer, updateExternalTransfer, adjustAccountBalance, createTransactionId, createTransaction, updateTransaction, deleteTransaction, listTransactions } from './storage/transactions';
 import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
@@ -35,7 +35,8 @@ type Actions = {
   recoverBackup: (backup: FinanceBackup) => Promise<void>;
   saveAccountOrder: (ids: readonly string[]) => Promise<void>;
   saveDisplayName: (name: string) => Promise<void>;
-  saveExternal: (record: Transaction) => Promise<void>;
+  saveExternal: (record: Transaction, editing?: boolean) => Promise<void>;
+  removeExternal: (id: string) => Promise<void>;
   saveBudget: (budget: Budget, creating: boolean, original?: Pick<Budget, 'month' | 'category'>) => Promise<void>;
   removeBudget: (month: string, category: string) => Promise<void>;
   copyBudgets: (month: string) => Promise<void>;
@@ -161,7 +162,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       },
       saveAccountOrder: (ids) => write(db => saveAccountOrderRecord(db, ids), undefined),
       saveDisplayName: (name) => write((db) => saveDisplayNameRecord(db, name), 'Name updated.'),
-      saveExternal: (record) => write((db) => createExternalTransfer(db, record.id, record), 'External transfer saved', formatMoney(record.amount, true), false, 'info'),
+      removeExternal: (id) => write(db => deleteTransaction(db, id), 'External movement deleted.'),
+      saveExternal: (record, editing) => write((db) => editing ? updateExternalTransfer(db, record.id, record) : createExternalTransfer(db, record.id, record), editing ? 'External movement updated' : 'External transfer saved', formatMoney(record.amount, true), false, 'info'),
       refresh,
       saveBudget: (budget, creating, original) => write((db) => saveBudgetRecord(db, budget, creating, original), 'Budget saved.'),
       removeBudget: (month, category) => write((db) => deleteBudget(db, month, category), 'Budget deleted.'),
@@ -226,7 +228,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     saveAccountOrder: (ids) => actions.current?.saveAccountOrder(ids) ?? unavailable(),
     setMonth: (month) => { if (!isValidMonth(month)) throw new Error('Invalid reporting month.'); setSelectedMonth(month === snapshot.month ? null : month); },
     saveDisplayName: (name) => actions.current?.saveDisplayName(name) ?? unavailable(),
-    saveExternal: (record) => actions.current?.saveExternal(record) ?? unavailable(),
+    saveExternal: (record, editing) => actions.current?.saveExternal(record, editing) ?? unavailable(),
+    removeExternal: id => actions.current?.removeExternal(id) ?? unavailable(),
     saveBudget: (budget, creating, original) => actions.current?.saveBudget(budget, creating, original) ?? unavailable(),
     removeBudget: (month, category) => actions.current?.removeBudget(month, category) ?? unavailable(),
     copyBudgets: (month) => actions.current?.copyBudgets(month) ?? unavailable(),
