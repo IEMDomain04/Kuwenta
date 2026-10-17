@@ -395,3 +395,31 @@ test('new normal transfers and new external movements keep their existing create
   external.render().button('Save transfer').props.onPress(); external.prompts.at(-1)[2].find(button => button.text === 'Save').onPress(); await settle();
   assert.equal(external.saved[0][0].id, 'new-id'); assert.equal(external.saved[0][0].type, 'EXTERNAL'); assert.equal(external.saved[0][1], false);
 });
+
+
+test('new budgets can select overall spending using the existing picker', async () => {
+  const h = harness('screens/budgets-screen.tsx');
+  h.render().button('Add').props.onPress();
+  h.render().button('Budget category').props.onPress();
+  const picker = h.render().find('SelectionSheet');
+  assert.ok(picker.props.options.some(option => option.value === 'Overall spending'));
+  picker.props.onSelect('Overall spending');
+  h.render().input('Budget limit in pesos').props.onValueChange('500');
+  h.render().button('Save').props.onPress(); await settle();
+  assert.equal(h.saved.length, 1);
+  assert.equal(h.saved[0][0].category, 'Overall spending');
+  assert.equal(h.saved[0][0].limitAmount, 50000);
+});
+
+test('overall budget has edit actions separately from the category list', async () => {
+  const budgets = [{ month: '2026-10', category: 'Overall spending', limitAmount: 50000 }, { month: '2026-10', category: 'Meals', limitAmount: 15000 }];
+  const h = harness('screens/budgets-screen.tsx', { budgets });
+  assert.deepEqual(h.render().find('BudgetList').props.rows.map(row => row.category), ['Meals']);
+  h.render().button('Edit Overall spending budget').props.onPress();
+  h.render().input('Budget limit in pesos').props.onValueChange('600');
+  h.render().button('Save').props.onPress();
+  assert.equal(h.prompts.length, 1);
+  h.prompts[0][2].find(button => button.text === 'Confirm').onPress(); await settle();
+  assert.equal(h.saved[0][0].category, 'Overall spending');
+  assert.equal(h.saved[0][0].limitAmount, 60000);
+});

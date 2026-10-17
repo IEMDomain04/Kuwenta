@@ -8,6 +8,7 @@ import { Pressable, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { activityWeek, dashboardReport, dashboardSpending, type DashboardPeriod } from '../dashboard';
 import { philippineDateTime, readableTransactionDate } from '../dates';
 import { formatMoney } from '../money';
@@ -17,6 +18,7 @@ export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: {
   const { transactions } = useFinance();
   const month = philippineDateTime(now).transactionDate.slice(0, 7);
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
   const { fontScale } = useWindowDimensions();
   const [period, setPeriod] = useState<DashboardPeriod>('day');
   const [selectedDate, setSelectedDate] = useState('');
@@ -36,7 +38,9 @@ export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: {
   const trendDays = useMemo(() => showTrend ? showActivity && weekOffset === 0 && period === 'week' ? days : dashboardSpending(transactions, period, month, now) : [], [transactions, period, month, now, showTrend, showActivity, days, weekOffset]);
   const selected = days.find((day) => day.date === selectedDate);
   const hasExpenses = days.some((day) => day.expenses > 0);
-  const spendingColors = [theme.background, '#14532D', '#15803D', '#22C55E', '#86EFAC'];
+  const spendingColors = dark
+    ? [theme.background, '#14532D', '#15803D', '#22C55E', '#86EFAC']
+    : [theme.background, '#DCFCE7', '#86EFAC', '#16A34A', '#14532D'];
   function choosePeriod(value: DashboardPeriod) { setPeriod(value); }
   const periodPicker = <View style={{ flexDirection: 'row', backgroundColor: theme.incomeSurface, borderRadius: 20, marginTop: 2 }}>
         {(['day', 'week', 'month'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value + ' report'} accessibilityState={{ selected: period === value }} onPress={() => choosePeriod(value)} style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: period === value ? theme.accent : 'transparent' }}>

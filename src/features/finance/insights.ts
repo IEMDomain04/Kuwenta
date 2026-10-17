@@ -35,7 +35,7 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
       : row.remaining === 0 ? row.category + ' budget limit reached for ' + period + '.'
       : row.category + ': ' + Math.round(row.progress * 100) + '% of the ' + period + ' budget used; ' + money(row.remaining) + ' remaining.');
   }
-  const remaining = report.rows.reduce((total, row) => total + Math.max(0, row.remaining), 0);
+  const remaining = report.positiveRemaining;
   if (recorded.some(row => row.transactionDate.slice(0, 7) === month)) {
     const available = calculateCurrentMoney(accounts, transactions).availableMoney;
     if (remaining > 0 && available < remaining) {
@@ -109,7 +109,7 @@ export function accountInsights(accounts: readonly Account[], transactions: read
     insights.push(row.account.name + ' has a negative recorded balance of ' + money(row.balance) + '. Review its activity.');
   }
   const throughToday = transactions.filter(row => row.transactionDate <= date);
-  const remaining = budgetReport(budgets, throughToday, month).rows.reduce((total, row) => total + Math.max(0, row.remaining), 0);
+  const remaining = budgetReport(budgets, throughToday, month).positiveRemaining;
   const savings = balances.filter(row => row.account.purpose === 'savings' && !row.account.includedInAvailable).reduce((total, row) => total + BigInt(row.balance), 0n);
   if (savings > BigInt(Number.MAX_SAFE_INTEGER) || savings < BigInt(Number.MIN_SAFE_INTEGER)) throw new Error('Savings total exceeds the supported range.');
   if (savings > 0n && (totals.availableMoney <= 0 || totals.availableMoney < remaining || BigInt(totals.availableMoney) * 10n < savings)) {

@@ -10,7 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
 import { CATEGORIES } from '../types';
-import { BUDGET_CATEGORIES, budgetGroups, mergeBudgetOrder } from '../budgets';
+import { OVERALL_BUDGET, BUDGET_CATEGORIES, budgetGroups, mergeBudgetOrder } from '../budgets';
 import { formatMoney } from '../money';
 import { philippineDateTime } from '../dates';
 import { ActionButton } from './ui';
@@ -48,7 +48,9 @@ export function BudgetOverview({ compact = false, reportingMonth, onDraggingChan
       {groups.map(group => <View key={group.scope} style={{ gap: 8 }}>
         <ThemedText type="smallBold">{group.period === 'daily' ? 'Daily' : group.period === 'weekly' ? 'Weekly' : 'Monthly'} | {budgetPeriodLabel(group.scope)}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">{formatMoney(group.budgetedSpent, true)} spent of {formatMoney(group.totalLimit, true)}</ThemedText>
-        <BudgetList key={group.scope + JSON.stringify(group.rows.map(row => row.category))} rows={group.rows} disabled={finance.busy} onDraggingChange={onDraggingChange}
+        {group.rows.filter(row => row.category === OVERALL_BUDGET).map(row => <BudgetUsage key={row.category} row={row} available={available} totalRemaining={group.positiveRemaining} currentMonth={group.start <= today && group.end >= today} />)}
+        {group.rows.some(row => row.category !== OVERALL_BUDGET) && group.rows.some(row => row.category === OVERALL_BUDGET) ? <ThemedText type="smallBold">Category limits</ThemedText> : null}
+        <BudgetList key={group.scope + JSON.stringify(group.rows.map(row => row.category))} rows={group.rows.filter(row => row.category !== OVERALL_BUDGET)} disabled={finance.busy} onDraggingChange={onDraggingChange}
           onReorder={categories => finance.saveBudgetOrder(group.scope, mergeBudgetOrder(group.rows.map(row => row.category), categories))}
           renderRow={(row, onHold) => <BudgetUsage row={row} onHold={onHold} available={available} totalRemaining={group.positiveRemaining} currentMonth={group.start <= today && group.end >= today} />} />
       </View>)}
