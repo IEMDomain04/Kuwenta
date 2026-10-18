@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { AccountIcon } from './account-icon';
 import { accountCardColor } from '../account-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -9,7 +10,6 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
 import { calculateAccountSummary } from '../calculations';
-import { formatMoney } from '../money';
 import { ActionButton } from './ui';
 
 // Keep each card mounted in its original slot while neighboring cards preview the drop.
@@ -32,6 +32,7 @@ function MovingCard({ x, y, active, order, children, ...props }: { x: number; y:
 export function AccountsOverview({ compact = false, showAdd = true, onDraggingChange }: { compact?: boolean; showAdd?: boolean; onDraggingChange?: (dragging: boolean) => void }) {
   const { accounts, transactions, busy, saveAccountOrder } = useFinance();
   const theme = useTheme();
+  const { formatAmount: formatMoney } = useAmountVisibility();
   const dark = useColorScheme() === 'dark';
   const cardText = dark ? '#082417' : '#FFFFFF';
   const { fontScale } = useWindowDimensions();

@@ -15,6 +15,7 @@ function harness() {
   };
   const jsx = (type, props) => ({ type, props });
   const sandbox = { exports: {}, require(name) {
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({formatAmount:require('../../.expo/finance-tests/money.js').formatMoney})};
     if (name === './account-icon') return { AccountIcon: 'AccountIcon' };
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect() {} };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };

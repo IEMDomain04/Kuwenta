@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -5,13 +6,13 @@ import { accountCardColor } from '../account-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { calculateAccountSummary, calculateCurrentMoney } from '../calculations';
-import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 import { AccountIcon } from './account-icon';
 
 export function AccountBalances() {
   const { accounts, transactions } = useFinance();
   const theme = useTheme();
+  const { formatAmount: formatMoney } = useAmountVisibility();
   const dark = useColorScheme() === 'dark';
   const { rows, totals, maximum } = useMemo(() => {
     const totals = calculateCurrentMoney(accounts, transactions);

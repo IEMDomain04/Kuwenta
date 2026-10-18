@@ -1,3 +1,5 @@
+import { AmountVisibilityButton } from '../components/amount-visibility-button';
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { ThemedText } from "@/components/themed-text";
 import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
@@ -23,7 +25,6 @@ import { dashboardGreeting, dashboardReport } from "../dashboard";
 import { formatTransactionDateTime, philippineDateTime } from "../dates";
 import { exchangeLabel, exchangeSummary } from "../exchanges";
 import { moneyInsightReaction, moneyInsights } from "../insights";
-import { formatMoney } from "../money";
 import { useFinance } from "../provider";
 
 const mascotImages = {
@@ -46,6 +47,7 @@ export default function HomeScreen() {
     homeVisualizations,
   } = useFinance();
   const theme = useTheme();
+  const { formatAmount: formatMoney, conceal } = useAmountVisibility();
   const { height, fontScale } = useWindowDimensions();
   const [draggingBudget, setDraggingBudget] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -135,9 +137,9 @@ export default function HomeScreen() {
         <ThemedText type="small" themeColor="textSecondary">
           {dateLabel}
         </ThemedText>
-        <ThemedText accessibilityRole="header" style={styles.heading}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><ThemedText accessibilityRole="header" style={[styles.heading, { flex: 1 }]}>
           {dashboardGreeting(displayName ?? "", now)}
-        </ThemedText>
+        </ThemedText><AmountVisibilityButton /></View>
       </View>
       <LinearGradient
         colors={[theme.backgroundSelected, theme.background]}
@@ -198,7 +200,7 @@ export default function HomeScreen() {
             ellipsizeMode="tail"
             style={styles.message}
           >
-            {insightMessage}
+            {conceal(insightMessage)}
           </ThemedText>
         </Pressable>
       </LinearGradient>
@@ -267,7 +269,7 @@ export default function HomeScreen() {
                         borderColor: theme.border,
                       }}
                     >
-                      <ThemedText type="small">{insight}</ThemedText>
+                      <ThemedText type="small">{conceal(insight)}</ThemedText>
                     </View>
                   ),
                 )}
@@ -459,7 +461,7 @@ export default function HomeScreen() {
                   }}
                 >
                   {transaction.exchange || transfer ? "" : increase ? "+" : "−"}
-                  {transaction.exchange ? exchangeSummary(transaction.exchange) : formatMoney(transaction.amount)}
+                  {transaction.exchange ? conceal(exchangeSummary(transaction.exchange)) : formatMoney(transaction.amount)}
                 </ThemedText>
               </Pressable>
             );

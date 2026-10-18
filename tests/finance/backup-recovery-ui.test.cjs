@@ -17,6 +17,7 @@ function harness({ legacy = false, recovery = true, failRestore = false } = {}) 
   };
   const jsx = (type, props) => ({ type, props });
   const sandbox = { Error, exports: {}, require(name) {
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({conceal:text=>text})};
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect(effect, deps) {
       const index = cursor++;
       if (!hooks[index] || deps.some((value, i) => value !== hooks[index][i])) { hooks[index] = deps; effects.push(effect); }

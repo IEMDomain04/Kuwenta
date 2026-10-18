@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import type { AccountBalanceChange } from './storage/accounts';
 import { loadHomeVisualizations, saveHomeVisualizations as saveHomeVisualizationsRecord, type HomeVisualization } from './home-visualizations';
 import { Image } from 'expo-image';
@@ -60,6 +61,7 @@ const Context = createContext<FinanceState | null>(null);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const theme = useTheme();
+  const { conceal } = useAmountVisibility();
   const dark = useColorScheme() === 'dark';
   const [opaqueNotice, setOpaqueNotice] = useState(true);
   useEffect(() => {
@@ -258,8 +260,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           <Ionicons name={notice.tone === 'error' ? 'alert-circle-outline' : notice.tone === 'income' ? 'arrow-up' : notice.tone === 'expense' ? 'arrow-down' : 'checkmark'} size={16} color={noticeColor} />
         </View>
         <View style={{ flex: 1, gap: 2 }} accessibilityLiveRegion="polite">
-          <ThemedText type="smallBold" style={{ color: theme.text, fontSize: 12 }}>{notice.message}</ThemedText>
-          {notice.detail ? <ThemedText type="small" numberOfLines={2} style={{ color: theme.textSecondary, fontSize: 11 }}>{notice.detail}</ThemedText> : null}
+          <ThemedText type="smallBold" style={{ color: theme.text, fontSize: 12 }}>{conceal(notice.message)}</ThemedText>
+          {notice.detail ? <ThemedText type="small" numberOfLines={2} style={{ color: theme.textSecondary, fontSize: 11 }}>{conceal(notice.detail)}</ThemedText> : null}
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notice" onPress={() => setNotice(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={16} color={theme.textSecondary} /></Pressable>
       </View>
