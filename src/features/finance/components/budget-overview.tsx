@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { BudgetPeriodPicker } from './budget-period-picker';
 import { budgetPeriodKey, budgetPeriodLabel, type BudgetPeriod } from '../budget-periods';
 import { useMemo, useState } from 'react';
@@ -11,7 +12,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
 import { CATEGORIES } from '../types';
 import { OVERALL_BUDGET, BUDGET_CATEGORIES, budgetGroups, mergeBudgetOrder } from '../budgets';
-import { formatMoney } from '../money';
 import { philippineDateTime } from '../dates';
 import { ActionButton } from './ui';
 
@@ -20,6 +20,7 @@ import { Ionicons } from '@react-native-vector-icons/ionicons';
 export function BudgetOverview({ compact = false, reportingMonth, onDraggingChange }: { compact?: boolean; reportingMonth?: string; onDraggingChange?: (dragging: boolean) => void }) {
   const finance = useFinance();
   const theme = useTheme();
+  const { formatAmount: formatMoney } = useAmountVisibility();
   const today = philippineDateTime().transactionDate;
   const [period, setPeriod] = useState<BudgetPeriod | 'all'>('all');
   const selectedMonth = reportingMonth ?? today.slice(0, 7);

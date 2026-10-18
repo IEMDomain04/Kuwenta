@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { BudgetPeriodPicker } from '../components/budget-period-picker';
 import { budgetPeriodKey, budgetPeriodLabel, budgetPeriodRange, isBudgetPeriodKey, type BudgetPeriod } from '../budget-periods';
 import { philippineDateTime } from '../dates';
@@ -39,6 +40,7 @@ export default function BudgetsScreen() {
   const params = useLocalSearchParams<{ add?: string; category?: string; scope?: string }>();
   const finance = useFinance();
   const theme = useTheme();
+  const { formatAmount } = useAmountVisibility();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const confirmation = useConfirmation();
   const { budgets, transactions, busy } = finance;
@@ -297,7 +299,7 @@ export default function BudgetsScreen() {
           <>
             {groups.map(group => <View key={group.scope} style={{ gap: 10 }}>
               <ThemedText type="smallBold">{group.period === 'daily' ? 'Daily' : group.period === 'weekly' ? 'Weekly' : 'Monthly'} | {budgetPeriodLabel(group.scope)}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">{formatMoney(group.budgetedSpent, true)} spent of {formatMoney(group.totalLimit, true)} | {formatMoney(Math.abs(group.remaining), true)} {group.remaining < 0 ? 'over budget' : 'remaining'}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{formatAmount(group.budgetedSpent, true)} spent of {formatAmount(group.totalLimit, true)} | {formatAmount(Math.abs(group.remaining), true)} {group.remaining < 0 ? 'over budget' : 'remaining'}</ThemedText>
             {group.rows.filter(row => row.category === OVERALL_BUDGET).map(row => <View key={row.category}>{renderBudget(row, group.positiveRemaining, group.start <= today && group.end >= today)}</View>)}
             {group.rows.some(row => row.category === OVERALL_BUDGET) && group.rows.some(row => row.category !== OVERALL_BUDGET) ? <ThemedText type="smallBold">Category limits</ThemedText> : null}
             <BudgetList key={group.scope + JSON.stringify(group.rows.map(row => row.category))} rows={group.rows.filter(row => row.category !== OVERALL_BUDGET)} disabled={locked} onDraggingChange={setDragging} onReorder={categories => finance.saveBudgetOrder(group.scope, mergeBudgetOrder(group.rows.map(row => row.category), categories))} renderRow={(row, onHold) => renderBudget(row, group.positiveRemaining, group.start <= today && group.end >= today, onHold)} />
@@ -460,7 +462,7 @@ export default function BudgetsScreen() {
                       {row.category}
                     </ThemedText>
                     <ThemedText type="small">
-                      {formatMoney(row.amount, true)}
+                      {formatAmount(row.amount, true)}
                     </ThemedText>
                   </View>
                 ))

@@ -1,3 +1,4 @@
+import { AmountVisibilityProvider } from '@/hooks/amount-visibility';
 import { ConfirmationProvider } from '@/features/finance/components/confirmation';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -10,7 +11,7 @@ import { FinanceProvider } from '@/features/finance/provider';
 SplashScreen.preventAutoHideAsync();
 export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function RootLayout() {
-  return <AppearanceProvider><AppContent /></AppearanceProvider>;
+  return <AppearanceProvider><AmountVisibilityProvider><AppContent /></AmountVisibilityProvider></AppearanceProvider>;
 }
 function AppContent() {
   const { scheme, ready } = useAppearance();

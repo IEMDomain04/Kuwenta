@@ -5,9 +5,10 @@ const ts = require('typescript');
 const vm = require('node:vm');
 const money = require('../../.expo/finance-tests/money.js');
 const cash = { id: 'cash', name: 'Cash', currency: 'PHP', openingBalance: 100000, purpose: 'spending', includedInAvailable: true, archived: false };
-function render(accounts, transactions = [], dark = false) {
+function render(accounts, transactions = [], dark = false, hidden = false) {
   const jsx = (type, props) => ({ type, props });
   const sandbox = { exports: {}, require(name) {
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden,formatAmount:(amount,trim)=>hidden?String.fromCodePoint(8226).repeat(4):money.formatMoney(amount,trim),conceal:text=>text})};
     if (name === 'react') return { useMemo: factory => factory() };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === 'react-native') return { View: 'View' };
@@ -63,4 +64,14 @@ test('total and available money appear before individual account balances',()=>{
  const available=nodes.findIndex(node=>node.type==='Text'&&Array.isArray(node.props.children)&&node.props.children[0]==='Available for spending: ');
  const name=nodes.findIndex(node=>node.type==='Text'&&node.props.children==='Cash');
  assert.ok(total>=0&&total<available&&available<name);
+});
+
+
+test('hidden balances conceal amounts in summaries and accessibility labels', () => {
+  const nodes = render([cash], [], false, true);
+  assert.ok(nodes.some(node => node.props.accessibilityLabel === 'Cash, balance '+String.fromCodePoint(8226).repeat(4)));
+  for(const node of nodes) {
+    const text=typeof node.props.children==='string'?node.props.children:Array.isArray(node.props.children)?node.props.children.filter(item=>typeof item==='string').join(' '):'';
+    assert.ok(!text.includes(String.fromCodePoint(8369)));
+  }
 });

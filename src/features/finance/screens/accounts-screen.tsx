@@ -1,4 +1,5 @@
 import { selectAssistantInsight } from '../assistant-insights';
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo, useState } from 'react';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +11,6 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { accountInsights } from '../insights';
 import { philippineDateTime } from '../dates';
-import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 import { AccountsOverview } from '../components/accounts-overview';
 import { FinanceScreen, AddTransactionButton, ActionButton } from '../components/ui';
@@ -18,6 +18,7 @@ import { FinanceScreen, AddTransactionButton, ActionButton } from '../components
 export default function AccountsScreen() {
   const { accounts, transactions, budgets, goals, busy, assistantEnabled } = useFinance();
   const theme = useTheme();
+  const { formatAmount: formatMoney, conceal } = useAmountVisibility();
   const { height } = useWindowDimensions();
   const [dragging, setDragging] = useState(false);
   const [details, setDetails] = useState<'money' | 'insights' | null>(null);
@@ -53,7 +54,7 @@ export default function AccountsScreen() {
         <Ionicons name="bulb-outline" size={18} color={theme.accent} /><ThemedText type="smallBold" style={{ flex: 1 }}>Account insight</ThemedText>
         <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
       </View>
-      <ThemedText type="small">{money.insights[0]}</ThemedText>
+      <ThemedText type="small">{conceal(money.insights[0])}</ThemedText>
     </Pressable> : null}
     <Modal visible={details !== null} transparent animationType="fade" onRequestClose={() => setDetails(null)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
@@ -80,7 +81,7 @@ export default function AccountsScreen() {
                   <ThemedText type="smallBold">Available Money: {formatMoney(money.availableMoney, true)}</ThemedText>
                 </> : null}
                 <ThemedText type="small" themeColor="textSecondary">Balances come from starting money and recorded activity. Kuwenta does not check your bank or actual cash.</ThemedText>
-              </> : money?.insights.map(insight => <View key={insight} style={{ gap: 8 }}><ThemedText type="small">{insight}</ThemedText>{assistantEnabled ? <ActionButton compact label="Explain" onPress={() => { setDetails(null); router.push({ pathname: "/assistant", params: { insight, selection: JSON.stringify(selectAssistantInsight(insight, { accounts, transactions, budgets, goals })) } }); }} /> : null}</View>)}
+              </> : money?.insights.map(insight => <View key={insight} style={{ gap: 8 }}><ThemedText type="small">{conceal(insight)}</ThemedText>{assistantEnabled ? <ActionButton compact label="Explain" onPress={() => { setDetails(null); router.push({ pathname: "/assistant", params: { insight, selection: JSON.stringify(selectAssistantInsight(insight, { accounts, transactions, budgets, goals })) } }); }} /> : null}</View>)}
             </ScrollView>
           </View>
         </SafeAreaView>

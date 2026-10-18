@@ -1,5 +1,5 @@
-import { selectAssistantInsight } from '../assistant-insights';
 import { ThemedText } from "@/components/themed-text";
+import { useAmountVisibility } from "@/hooks/amount-visibility";
 import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
@@ -16,15 +16,19 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AmountVisibilityButton } from "../components/amount-visibility-button";
 import { BudgetOverview } from "../components/budget-overview";
 import { CategoryIcon } from "../components/category-visual";
 import { PeriodOverview } from "../components/period-overview";
-import { ActionButton, AddTransactionButton, FinanceScreen } from "../components/ui";
+import {
+  ActionButton,
+  AddTransactionButton,
+  FinanceScreen,
+} from "../components/ui";
 import { dashboardGreeting, dashboardReport } from "../dashboard";
 import { formatTransactionDateTime, philippineDateTime } from "../dates";
 import { exchangeLabel, exchangeSummary } from "../exchanges";
 import { moneyInsightReaction, moneyInsights } from "../insights";
-import { formatMoney } from "../money";
 import { useFinance } from "../provider";
 
 const mascotImages = {
@@ -48,6 +52,7 @@ export default function HomeScreen() {
     assistantEnabled,
   } = useFinance();
   const theme = useTheme();
+  const { formatAmount: formatMoney, conceal } = useAmountVisibility();
   const { height, fontScale } = useWindowDimensions();
   const [draggingBudget, setDraggingBudget] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -137,9 +142,15 @@ export default function HomeScreen() {
         <ThemedText type="small" themeColor="textSecondary">
           {dateLabel}
         </ThemedText>
-        <ThemedText accessibilityRole="header" style={styles.heading}>
-          {dashboardGreeting(displayName ?? "", now)}
-        </ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <ThemedText
+            accessibilityRole="header"
+            style={[styles.heading, { flex: 1 }]}
+          >
+            {dashboardGreeting(displayName ?? "", now)}
+          </ThemedText>
+          <AmountVisibilityButton />
+        </View>
       </View>
       <LinearGradient
         colors={[theme.backgroundSelected, theme.background]}
@@ -200,11 +211,17 @@ export default function HomeScreen() {
             ellipsizeMode="tail"
             style={styles.message}
           >
-            {insightMessage}
+            {conceal(insightMessage)}
           </ThemedText>
         </Pressable>
       </LinearGradient>
-      {assistantEnabled ? <ActionButton compact label="Ask about your money" onPress={() => router.push("/assistant")} /> : null}
+      {assistantEnabled ? (
+        <ActionButton
+          compact
+          label="Ask about your money"
+          onPress={() => router.push("/assistant")}
+        />
+      ) : null}
       <Modal
         visible={insightsOpen}
         transparent
@@ -271,7 +288,6 @@ export default function HomeScreen() {
                       }}
                     >
                       <ThemedText type="small">{insight}</ThemedText>
-                      {assistantEnabled ? <ActionButton compact label="Explain" onPress={() => { setInsightsOpen(false); router.push({ pathname: "/assistant", params: { insight, selection: JSON.stringify(selectAssistantInsight(insight, { accounts, transactions, budgets, goals })) } }); }} /> : null}
                     </View>
                   ),
                 )}
@@ -280,11 +296,19 @@ export default function HomeScreen() {
           </SafeAreaView>
         </View>
       </Modal>
-      {homeVisualizations.includes("balances") || (hasActivity &&
-      homeVisualizations.some(
-        (value) => value !== "budgets" && value !== "balances",
-      )) ? (
-        <PeriodOverview now={now} visible={hasActivity ? homeVisualizations : homeVisualizations.filter(value => value === "balances")} />
+      {homeVisualizations.includes("balances") ||
+      (hasActivity &&
+        homeVisualizations.some(
+          (value) => value !== "budgets" && value !== "balances",
+        )) ? (
+        <PeriodOverview
+          now={now}
+          visible={
+            hasActivity
+              ? homeVisualizations
+              : homeVisualizations.filter((value) => value === "balances")
+          }
+        />
       ) : null}
       {homeVisualizations.includes("budgets") ? (
         <BudgetOverview
@@ -441,7 +465,17 @@ export default function HomeScreen() {
                       {transaction.category + " / " + account}
                     </ThemedText>
                   )}
-                  {transaction.exchange ? <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{formatMoney(transaction.exchange.paid, true)} paid / {formatMoney(transaction.exchange.received, true)} received</ThemedText> : null}
+                  {transaction.exchange ? (
+                    <ThemedText
+                      type="small"
+                      themeColor="textSecondary"
+                      style={{ fontSize: 11, lineHeight: 16 }}
+                    >
+                      {formatMoney(transaction.exchange.paid, true)} paid /{" "}
+                      {formatMoney(transaction.exchange.received, true)}{" "}
+                      received
+                    </ThemedText>
+                  ) : null}
                   <ThemedText
                     type="small"
                     themeColor="textSecondary"
@@ -456,14 +490,25 @@ export default function HomeScreen() {
                 <ThemedText
                   type="smallBold"
                   style={{
-                    color:
-                      transaction.exchange ? transaction.exchange.received > transaction.exchange.paid ? theme.income : transaction.exchange.received < transaction.exchange.paid ? theme.expense : theme.text : transaction.type === "INCOME" ? theme.income : theme.text,
+                    color: transaction.exchange
+                      ? transaction.exchange.received >
+                        transaction.exchange.paid
+                        ? theme.income
+                        : transaction.exchange.received <
+                            transaction.exchange.paid
+                          ? theme.expense
+                          : theme.text
+                      : transaction.type === "INCOME"
+                        ? theme.income
+                        : theme.text,
                     fontVariant: ["tabular-nums"],
                     flexShrink: 1,
                   }}
                 >
                   {transaction.exchange || transfer ? "" : increase ? "+" : "−"}
-                  {transaction.exchange ? exchangeSummary(transaction.exchange) : formatMoney(transaction.amount)}
+                  {transaction.exchange
+                    ? conceal(exchangeSummary(transaction.exchange))
+                    : formatMoney(transaction.amount)}
                 </ThemedText>
               </Pressable>
             );

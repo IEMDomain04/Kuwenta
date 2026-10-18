@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { View } from 'react-native';
 import { router } from 'expo-router';
@@ -5,13 +6,13 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
 import { calculateSavings, calculateGoalProgress } from '../calculations';
-import { formatMoney } from '../money';
 import { readableReportingMonth, formatTransactionDateTime } from '../dates';
 import { ActionButton, IconButton } from './ui';
 
 export function SavingsOverview({ compact = false, goalsOnly = false, reportingMonth }: { compact?: boolean; goalsOnly?: boolean; reportingMonth?: string }) {
   const { accounts, transactions, goals, month: selectedMonth, busy } = useFinance();
   const theme = useTheme();
+  const { hidden: amountsHidden, formatAmount: formatMoney, conceal } = useAmountVisibility();
   const month = reportingMonth ?? selectedMonth;
   let savings: ReturnType<typeof calculateSavings> | undefined;
   let error = '';
@@ -50,10 +51,10 @@ export function SavingsOverview({ compact = false, goalsOnly = false, reportingM
           <ThemedText type="smallBold" numberOfLines={1} ellipsizeMode="tail">{goal.name}</ThemedText>
           <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" themeColor="textSecondary">{account.name}{account.archived ? ' | Archived' : ''}{goal.targetDate ? ' | Target ' + formatTransactionDateTime(goal.targetDate, '00:00:00').split(' · ')[0] : ''}</ThemedText>
           <ThemedText type="small">{formatMoney(progress.balance)} of {formatMoney(goal.targetAmount)}</ThemedText>
-          <View accessibilityRole="progressbar" accessibilityLabel={goal.name + ' progress'} accessibilityValue={{ min: 0, max: 100, now: Math.round(progress.progress * 100) }} style={{ height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: theme.incomeSurface }}>
+          <View accessibilityRole="progressbar" accessibilityLabel={goal.name + ' progress'} accessibilityValue={amountsHidden ? { text: 'Amount hidden' } : { min: 0, max: 100, now: Math.round(progress.progress * 100) }} style={{ height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: theme.incomeSurface }}>
             <View style={{ height: 8, backgroundColor: theme.income, width: ((progress.progress * 100) + '%') as `${number}%` }} />
           </View>
-          <ThemedText type="small" themeColor="textSecondary">{progress.achieved ? 'Target reached' : Math.round(progress.progress * 100) + '% saved / ' + formatMoney(progress.remaining) + ' remaining'}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">{conceal(progress.achieved ? 'Target reached' : Math.round(progress.progress * 100) + '% saved / ' + formatMoney(progress.remaining) + ' remaining')}</ThemedText>
           {progress.balance < 0 && <ThemedText accessibilityRole="alert" style={{ color: theme.warning, backgroundColor: theme.warningSurface }}>Warning: this savings account has a negative balance.</ThemedText>}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <ActionButton compact primary label="Add money" disabled={busy || account.archived || !accounts.some((row) => !row.archived && row.id !== account.id)}

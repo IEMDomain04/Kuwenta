@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { AccountBalances } from './account-balances';
 import { SelectionSheet } from './selection-sheet';
 import { SpendingTrend, IncomeExpenseChart } from './dashboard-charts';
@@ -11,13 +12,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { activityWeek, dashboardReport, dashboardSpending, type DashboardPeriod } from '../dashboard';
 import { philippineDateTime, readableTransactionDate } from '../dates';
-import { formatMoney } from '../money';
 import { useFinance } from '../provider';
 
 export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: { now: Date; visible?: readonly HomeVisualization[] }) {
   const { transactions } = useFinance();
   const month = philippineDateTime(now).transactionDate.slice(0, 7);
   const theme = useTheme();
+  const { formatAmount: formatMoney } = useAmountVisibility();
   const dark = useColorScheme() === 'dark';
   const { fontScale } = useWindowDimensions();
   const [period, setPeriod] = useState<DashboardPeriod>('day');

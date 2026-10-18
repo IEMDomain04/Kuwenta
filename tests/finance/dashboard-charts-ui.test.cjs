@@ -3,9 +3,10 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ts=require('typescript');
 const vm=require('node:vm');
-function charts() {
+function charts(hidden = false) {
  const jsx=(type,props)=>({type,props});
  const sandbox={exports:{},require(name){
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden,formatAmount:(amount,trim)=>hidden?String.fromCodePoint(8226).repeat(4):require('../../.expo/finance-tests/money.js').formatMoney(amount,trim),conceal:text=>text})};
   if(name==='react')return{useState:initial=>[initial,()=>{}]};
   if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
   if(name==='react-native')return{View:'View'};
@@ -42,4 +43,16 @@ test('all account colors are distinct and keep readable text in both themes',()=
   const text=luminance(theme==='light'?'#FFFFFF':'#082417');
   for(const color of colors){const background=luminance(color);assert.ok((Math.max(text,background)+0.05)/(Math.min(text,background)+0.05)>=4.5,color+' has insufficient text contrast');}
  }
+});
+
+
+test('hidden chart values do not expose amounts in text, chart labels, or point details', () => {
+ const api=charts(true);
+ const rendered=[...nodes(api.SpendingTrend({days:[{date:'2026-10-18',expenses:12345}],period:'day'})),...nodes(api.IncomeExpenseChart({income:98765,expenses:12345}))];
+ for(const node of rendered){
+   const label=node.props.accessibilityLabel??'';
+   const text=typeof node.props.children==='string'?node.props.children:Array.isArray(node.props.children)?node.props.children.filter(item=>typeof item==='string').join(' '):'';
+   for(const value of ['123.45','987.65',String.fromCodePoint(8369)])assert.ok(!(label+' '+text).includes(value));
+ }
+ assert.ok(rendered.some(node=>String(node.props.accessibilityLabel).includes(String.fromCodePoint(8226).repeat(4))));
 });

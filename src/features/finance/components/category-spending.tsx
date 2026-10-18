@@ -1,15 +1,16 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { dashboardCategories } from '../dashboard';
-import { formatMoney } from '../money';
 import type { Transaction } from '../types';
 import { ActionButton } from './ui';
 
 export function CategorySpending({ transactions, start, end, period }: { transactions: readonly Transaction[]; start: string; end: string; period: string }) {
   const theme = useTheme();
+  const { hidden: amountsHidden, formatAmount: formatMoney } = useAmountVisibility();
   const [expanded, setExpanded] = useState(false);
   const { total, rows } = useMemo(() => dashboardCategories(transactions, start, end), [transactions, start, end]);
   const colors = [theme.accent, theme.budget, theme.secondary, theme.warning, theme.expense, theme.textSecondary];
@@ -37,7 +38,7 @@ export function CategorySpending({ transactions, start, end, period }: { transac
           {(expanded ? rows : slices).map((row, index) => <View key={row.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors[Math.min(index, 5)] }} />
             <ThemedText type="small" numberOfLines={1} style={{ flex: 1, fontSize: 11 }}>{row.category}</ThemedText>
-            <ThemedText type="small" style={{ fontSize: 11 }}>{formatMoney(row.amount, true)} / {(row.amount / total * 100).toFixed(1)}%</ThemedText>
+            <ThemedText type="small" style={{ fontSize: 11 }}>{formatMoney(row.amount, true)} / {amountsHidden ? '\u2022\u2022\u2022\u2022' : (row.amount / total * 100).toFixed(1) + '%'}</ThemedText>
           </View>)}
         </View>
       </View>

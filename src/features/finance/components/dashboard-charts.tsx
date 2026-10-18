@@ -1,3 +1,4 @@
+import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Line, Polyline } from 'react-native-svg';
@@ -5,10 +6,10 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import type { dashboardSpending } from '../dashboard';
 import { readableTransactionDate } from '../dates';
-import { formatMoney } from '../money';
 
 export function SpendingTrend({ days, period }: { days: ReturnType<typeof dashboardSpending>; period: string }) {
   const theme = useTheme();
+  const { formatAmount: formatMoney } = useAmountVisibility();
   const [selectedDate, setSelectedDate] = useState('');
   const maximum = Math.max(0, ...days.map(day => day.expenses));
   const dateLabel = (date?: string) => date ? new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z')) : '';
@@ -35,6 +36,7 @@ export function SpendingTrend({ days, period }: { days: ReturnType<typeof dashbo
 
 export function IncomeExpenseChart({ income, expenses }: { income: number; expenses: number }) {
   const theme = useTheme();
+  const { formatAmount: formatMoney } = useAmountVisibility();
   const maximum = Math.max(1, income, expenses);
   return <View style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 14, gap: 12 }}>
     <ThemedText type="smallBold" accessibilityRole="header">Income vs. expenses</ThemedText>

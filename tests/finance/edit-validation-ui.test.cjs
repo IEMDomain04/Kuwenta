@@ -13,6 +13,7 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
   const jsx = (type, props) => ({ type, props });
   const theme = { text: '#0A1129', border: '#73877A', accent: '#06633E', error: '#B4233C' };
   const sandbox = { Error, exports: {}, require(name) {
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:false,formatAmount:require('../../.expo/finance-tests/money.js').formatMoney,conceal:text=>text})};
     if (name.endsWith('/peso-icon')) return { PesoIcon: 'PesoIcon' };
     if (name.endsWith('/account-icon')) return { AccountIcon: 'AccountIcon' };
     if (name.endsWith('/budget-period-picker')) return { BudgetPeriodPicker: 'BudgetPeriodPicker' };
