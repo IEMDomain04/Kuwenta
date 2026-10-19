@@ -32,6 +32,8 @@ export function CategorySpending({ transactions, start, end, period }: { transac
               const previous = offset; offset += length;
               return <Circle key={slice.category} cx={50} cy={50} r={40} fill="none" stroke={colors[index]} strokeWidth={14} strokeDasharray={[length, circumference - length]} strokeDashoffset={-previous} rotation={-90} origin="50,50" />;
             })}
+            <Circle cx={50} cy={50} r={47} fill="none" stroke={theme.border} strokeWidth={1} />
+            <Circle cx={50} cy={50} r={33} fill="none" stroke={theme.border} strokeWidth={1} />
           </Svg>
         </View>
         <View style={{ flex: 1, minWidth: 140, gap: 7 }}>

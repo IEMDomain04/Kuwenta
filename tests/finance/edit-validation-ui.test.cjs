@@ -486,3 +486,43 @@ test('switching back to Just now requires an account and keeps the original bala
  h.render().find('SelectionSheet').props.onSelect('cash');h.render().button('Save debt').props.onPress();await settle();
  assert.equal(h.saved.length,1);assert.equal(h.saved[0].existing,undefined);assert.equal(h.saved[0].accountId,'cash');
 });
+
+
+test('new and edited exchange previews retain account history and match saved exchange amounts', () => {
+  const api = require('../../.expo/finance-tests/exchanges.js');
+  const { calculateAccountSummary } = require('../../.expo/finance-tests/calculations.js');
+  const { formatMoney } = require('../../.expo/finance-tests/money.js');
+  const accounts = [{ ...cash, openingBalance: 100000 }, { ...cash, id: 'bank', name: 'MariBank', openingBalance: 1009500 }];
+  const stamp = '2026-10-13T04:00:00.000Z';
+  const draftFor = (kind, paid, received) => api.exchangeDraft('bank', { kind, paid, received, receivedAccountId: 'cash', extraAccountId: received > paid ? 'cash' : 'bank', earningsConfirmed: true }, '2026-10-13', '12:00:00');
+  const history = [record({ id: 'bank-expense', accountId: 'bank', amount: 400000 }), record({ id: 'cash-expense', amount: 10000 }), ...api.exchangeRecords('previous', draftFor('Service sale', 9500, 10000), stamp)];
+  assert.equal(calculateAccountSummary(accounts[1], history, '2026-10').balance, 600000);
+  for (const [category, kind, paid, received] of [
+    ['Service exchange', 'Service sale', 14850, 15000],
+    ['Service exchange', 'Service sale', 15000, 15000],
+    ['Service exchange', 'Service sale', 15000, 14850],
+    ['Cash-in (E-bank)', 'E-bank Cash-in', 104000, 100000],
+    ['Cash-out (E-bank)', 'E-bank Cash-out', 100000, 98000],
+  ]) for (const editing of [false, true]) {
+    const previous = editing ? api.exchangeRecords('editing', draftFor(kind, 20000, 19000), stamp) : [];
+    let saved;
+    const h = harness('components/transaction-form.tsx', { accounts, transactions: [...history, ...previous], params: { original: previous[0], accountId: 'bank' }, onSubmit: value => { saved = value; } });
+    if (!editing) {
+      h.render().button('Category: Meals. Change category.').props.onPress();
+      h.render().button(category).props.onPress();
+      h.render().nodes.find(node => node.props.accessibilityLabel?.startsWith('Paid from, ')).props.onPress();
+      h.render().button('MariBank').props.onPress();
+      h.render().button('Received into').props.onPress(); h.render().button('Cash').props.onPress();
+    }
+    h.render().input('Amount paid in pesos').props.onValueChange(String(paid / 100));
+    h.render().input(kind === 'E-bank Cash-out' ? 'Fee in pesos' : 'Amount received in pesos').props.onValueChange(String((kind === 'E-bank Cash-out' ? paid - received : received) / 100));
+    const text = h.render().nodes.filter(node => node.type === 'Text').map(node => [].concat(node.props.children).join(''));
+    assert.ok(text.includes('MariBank: ' + formatMoney(600000 - paid)), category + ' source preview, editing=' + editing);
+    assert.ok(text.includes('Cash: ' + formatMoney(100000 + received)), category + ' destination preview, editing=' + editing);
+    h.render().button(editing ? 'Save changes' : 'Save').props.onPress();
+    assert.ok(saved);
+    const records = [...history, ...api.exchangeRecords('saved', saved, stamp)];
+    assert.equal(calculateAccountSummary(accounts[1], records, '2026-10').balance, 600000 - paid);
+    assert.equal(calculateAccountSummary(accounts[0], records, '2026-10').balance, 100000 + received);
+  }
+});

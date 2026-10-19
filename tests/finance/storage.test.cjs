@@ -1760,3 +1760,27 @@ test('version 16 preserves old linked debts and repayments and rolls back an int
  await debtStore.createDebt(db,sampleDebt({id:'tracked',existing:true,accountId:undefined}));
  assert.equal((await listTransactions(db)).length,2);
 });
+
+
+test('service exchange preserves recorded history when saving, editing and deleting from a 6000 bank balance', async t => {
+  const db = await setup(t);
+  const { saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
+  const { exchangeDraft } = require('../../.expo/finance-tests/exchanges.js');
+  const cash = await getCashAccount(db);
+  await saveAccount(db, { ...cash, id: 'bank', name: 'MariBank', openingBalance: 1000000 }, true);
+  await createTransaction(db, 'earlier-expense', { ...expense(), accountId: 'bank', amount: 400000 });
+  const balance = async id => calculateAccountSummary((await listAccounts(db)).find(account => account.id === id), await listTransactions(db), '2026-10').balance;
+  assert.equal(await balance('bank'), 600000);
+  const cashBefore = await balance('cash');
+  const draft = paid => exchangeDraft('bank', { kind: 'Service sale', paid, received: 15000, receivedAccountId: 'cash', extraAccountId: 'cash', earningsConfirmed: true }, '2026-10-13', '12:00:00');
+  await createTransaction(db, 'exchange-history', draft(14850));
+  assert.equal(await balance('bank'), 585150);
+  assert.equal(await balance('cash'), cashBefore + 15000);
+  await updateTransaction(db, 'exchange-history', draft(14700));
+  assert.equal(await balance('bank'), 585300);
+  assert.equal(await balance('cash'), cashBefore + 15000);
+  await deleteTransaction(db, 'exchange-history');
+  assert.equal(await balance('bank'), 600000);
+  assert.equal(await balance('cash'), cashBefore);
+  assert.ok(await getTransaction(db, 'earlier-expense'));
+});
