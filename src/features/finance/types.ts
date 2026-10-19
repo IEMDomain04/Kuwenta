@@ -65,3 +65,14 @@ export type SavingsGoal = {
 
 /** month is a stable period key: YYYY-MM, daily:YYYY-MM-DD, or weekly:Monday date. */
 export type Budget = { month: string; category: string; limitAmount: number };
+
+
+export type Debt = {
+  id: string; name: string; kind: 'owe' | 'owed'; amount: number; accountId?: string; existing?: boolean;
+  transactionDate: string; transactionTime: string; dueDate?: string; notes?: string;
+  createdAt: string; updatedAt: string;
+};
+export type DebtPayment = {
+  id: string; debtId: string; accountId: string; amount: number;
+  transactionDate: string; transactionTime: string; notes?: string; createdAt: string;
+};

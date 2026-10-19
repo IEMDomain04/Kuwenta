@@ -8,6 +8,7 @@ test('holding budget feedback starts rearranging without expanding it; a normal 
   let expanded=false, holds=0;
   const jsx=(type,props)=>({type,props});
   const sandbox={exports:{},require(name){
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:false,formatAmount:require('../../.expo/finance-tests/money.js').formatMoney,conceal:text=>text})};
     if(name==='react')return{useRef:value=>({current:value}),useState:()=>[expanded,update=>{expanded=update(expanded);} ]};
     if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
     if(name==='react-native')return{Pressable:'Button',View:'View'};

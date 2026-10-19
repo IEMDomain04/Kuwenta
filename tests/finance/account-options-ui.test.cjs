@@ -12,7 +12,7 @@ function harness({ id = 'bank', archived = false, movements = [] } = {}) {
   const hooks = []; let cursor = 0, confirmation;
   const removed = [], saved = [], adjusted = [], opened = [];
   const accounts = [cash, { ...cash, id: 'bank', name: 'Bank', purpose: 'savings', includedInAvailable: false, openingBalance: 50000, archived }];
-  const finance = {
+  const finance = { debts: [], debtPayments: [],
     accounts, transactions: [record({ accountId: 'bank' }), record({ id: 'transfer', type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 10000 }), ...movements],
     goals: [{ id: 'goal', name: 'Emergency', accountId: 'bank' }], month: '2026-10', busy: false, showNotice() {},
     newSubmissionId: async () => 'adjustment-id',

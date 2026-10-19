@@ -5,7 +5,7 @@ import { moneyInput, parseMoney } from './money';
 
 // Preserve exact centavos, stable IDs, and date strings while keeping sheets readable.
 type Column = [key: string, label: string, kind?: 'money' | 'boolean' | 'json', optional?: boolean];
-const tables: { name: string; key: 'accounts' | 'transactions' | 'budgets' | 'goals'; columns: Column[] }[] = [
+const tables: { name: string; key: 'accounts' | 'transactions' | 'budgets' | 'goals' | 'debts' | 'debtPayments'; columns: Column[] }[] = [
   { name: 'Transactions', key: 'transactions', columns: [
     ['transactionDate', 'Date'], ['transactionTime', 'Time'], ['type', 'Type'], ['category', 'Category'],
     ['amount', 'Amount (PHP)', 'money'], ['_accountName', 'Account'], ['_destinationName', 'Destination', undefined, true],
@@ -26,6 +26,14 @@ const tables: { name: string; key: 'accounts' | 'transactions' | 'budgets' | 'go
     ['id', 'Goal ID'], ['name', 'Name'], ['accountId', 'Account ID'], ['targetAmount', 'Target (PHP)', 'money'],
     ['targetDate', 'Target date', undefined, true], ['createdAt', 'Created at'], ['updatedAt', 'Updated at'],
   ] },
+  { name: 'Debts', key: 'debts', columns: [
+    ['id','Debt ID'], ['name','Person'], ['kind','Direction'], ['amount','Original amount (PHP)','money'], ['accountId','Account ID',undefined,true], ['existing','Existing debt','boolean',true],
+    ['transactionDate','Date'], ['transactionTime','Time'], ['dueDate','Due date',undefined,true], ['notes','Notes',undefined,true], ['createdAt','Created at'], ['updatedAt','Updated at'],
+  ] },
+  { name: 'Debt repayments', key: 'debtPayments', columns: [
+    ['id','Repayment ID'], ['debtId','Debt ID'], ['accountId','Account ID'], ['amount','Amount (PHP)','money'],
+    ['transactionDate','Date'], ['transactionTime','Time'], ['notes','Notes',undefined,true], ['createdAt','Created at'],
+  ] },
 ];
 const MAX_ROWS = 50000;
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -44,12 +52,13 @@ export function createExcelBackup(backup: FinanceBackup): Uint8Array {
   const validated = parseBackup(JSON.stringify(backup));
   const workbook = XLSX.utils.book_new();
   const names = new Map(validated.accounts.map(account => [account.id, account.name]));
-  for (const table of tables) {
+  for (const table of tables.filter(table => validated.version >= 12 || (table.key !== 'debts' && table.key !== 'debtPayments'))) {
+    const columns = validated.version === 13 ? table.columns : table.columns.filter(([key]) => key !== 'existing');
     const records = validated[table.key] ?? [];
     if (records.length > MAX_ROWS) throw new Error('This backup has too many rows for Excel. Export JSON instead.');
     const rows = records.map(record => {
       const row = record as unknown as Record<string, unknown>;
-      return table.columns.map(([key, , kind]) => {
+      return columns.map(([key, , kind]) => {
         if (table.key === 'budgets' && key.startsWith('_')) { const range = budgetPeriodRange(row.month as string); return key === '_period' ? range.period : key === '_start' ? range.start : range.end; }
         if (key === '_accountName') return names.get(row.accountId as string) ?? '';
         if (key === '_destinationName') return names.get(row.destinationAccountId as string) ?? null;
@@ -58,10 +67,10 @@ export function createExcelBackup(backup: FinanceBackup): Uint8Array {
         return value === undefined ? null : kind === 'money' ? moneyCell(value as number) : kind === 'json' ? JSON.stringify(value) : value as string | boolean;
       });
     });
-    const sheet = XLSX.utils.aoa_to_sheet([table.columns.map(column => column[1]), ...rows]);
-    sheet['!cols'] = table.columns.map(([key, , kind]) => ({ wch: kind === 'money' ? 20 : key === 'notes' ? 36 : 22, hidden: table.name === 'Transactions' && (key === 'id' || key.endsWith('Id')) || table.key === 'budgets' && key === 'month' }));
+    const sheet = XLSX.utils.aoa_to_sheet([columns.map(column => column[1]), ...rows]);
+    sheet['!cols'] = columns.map(([key, , kind]) => ({ wch: kind === 'money' ? 20 : key === 'notes' ? 36 : 22, hidden: table.name === 'Transactions' && (key === 'id' || key.endsWith('Id')) || table.key === 'budgets' && key === 'month' }));
     sheet['!autofilter'] = { ref: sheet['!ref']! };
-    table.columns.forEach(([, , kind], column) => {
+    columns.forEach(([, , kind], column) => {
       if (kind !== 'money') return;
       for (let row = 1; row <= rows.length; row++) {
         const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
@@ -71,7 +80,7 @@ export function createExcelBackup(backup: FinanceBackup): Uint8Array {
     XLSX.utils.book_append_sheet(workbook, sheet, table.name);
   }
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
-    ['Key', 'Value'], ['format', 'kuwenta-excel'], ['workbookVersion', 3], ['backupVersion', validated.version],
+    ['Key', 'Value'], ['format', 'kuwenta-excel'], ['workbookVersion', validated.version === 13 ? 5 : validated.version === 12 ? 4 : 3], ['backupVersion', validated.version],
     ['currency', validated.currency], ['timezone', validated.timezone], ['exportedAt', validated.exportedAt],
   ]), 'Kuwenta');
   const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx', compression: true }));
@@ -106,14 +115,13 @@ function checkArchive(bytes: Uint8Array): void {
 export function parseExcelBackup(bytes: Uint8Array): FinanceBackup {
   checkArchive(bytes);
   const workbook = XLSX.read(bytes, { type: 'array', cellFormula: true, cellDates: false, cellText: false, sheetRows: MAX_ROWS + 2 });
-  const expected = [...tables.map(table => table.name), 'Kuwenta'];
-  if (workbook.SheetNames.length !== expected.length || expected.some(name => !workbook.Sheets[name])) throw new Error('Choose an Excel backup exported by Kuwenta, with all backup sheets.');
   function cell(sheet: XLSX.WorkSheet, row: number, column: number): unknown {
     const value = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
     if (value?.f || value?.t === 'e') throw new Error('Excel backups cannot contain formulas or cell errors.');
     return value?.v;
   }
   const metadata = workbook.Sheets.Kuwenta;
+  if (!metadata) throw new Error('Choose an Excel backup exported by Kuwenta, with all backup sheets.');
   const keys = ['format', 'workbookVersion', 'backupVersion', 'currency', 'timezone', 'exportedAt'];
   if (cell(metadata, 0, 0) !== 'Key' || cell(metadata, 0, 1) !== 'Value') throw new Error('Missing Kuwenta backup information.');
   const info: Record<string, unknown> = {};
@@ -121,10 +129,14 @@ export function parseExcelBackup(bytes: Uint8Array): FinanceBackup {
     if (cell(metadata, index + 1, 0) !== key) throw new Error('Invalid Kuwenta backup information.');
     info[key] = cell(metadata, index + 1, 1);
   });
-  if (info.format !== 'kuwenta-excel' || (info.workbookVersion !== 1 && info.workbookVersion !== 2 && info.workbookVersion !== 3)) throw new Error('Unsupported Kuwenta Excel backup version.');
+  if (info.format !== 'kuwenta-excel' || (info.workbookVersion !== 1 && info.workbookVersion !== 2 && info.workbookVersion !== 3 && info.workbookVersion !== 4 && info.workbookVersion !== 5)) throw new Error('Unsupported Kuwenta Excel backup version.');
+  const activeTables = tables.filter(table => (info.workbookVersion === 4 || info.workbookVersion === 5) || (table.key !== 'debts' && table.key !== 'debtPayments'));
+  const expected = [...activeTables.map(table => table.name), 'Kuwenta'];
+  if (workbook.SheetNames.length !== expected.length || expected.some(name => !workbook.Sheets[name])) throw new Error('Choose an Excel backup exported by Kuwenta, with all backup sheets.');
   const result: Record<string, unknown> = { format: 'kuwenta-finance', version: info.backupVersion, currency: info.currency, timezone: info.timezone, exportedAt: info.exportedAt };
-  for (const original of tables) {
-    const table = info.workbookVersion === 1 ? { ...original, columns: original.columns.filter(([key]) => key !== 'icon' && !(original.key === 'budgets' && key.startsWith('_')) && !['exchange','exchangeParentId'].includes(key)) } : info.workbookVersion === 2 ? { ...original, columns: original.columns.filter(([key]) => !['exchange','exchangeParentId'].includes(key)) } : original;
+  for (const original of activeTables) {
+    const originalColumns = info.workbookVersion === 5 ? original : { ...original, columns: original.columns.filter(([key]) => key !== 'existing') };
+    const table = info.workbookVersion === 1 ? { ...originalColumns, columns: originalColumns.columns.filter(([key]) => key !== 'icon' && !(original.key === 'budgets' && key.startsWith('_')) && !['exchange','exchangeParentId'].includes(key)) } : info.workbookVersion === 2 ? { ...originalColumns, columns: originalColumns.columns.filter(([key]) => !['exchange','exchangeParentId'].includes(key)) } : originalColumns;
     const sheet = workbook.Sheets[table.name];
     const range = XLSX.utils.decode_range(sheet['!fullref'] ?? sheet['!ref'] ?? 'A1');
     if (range.s.r !== 0 || range.s.c !== 0 || range.e.r > MAX_ROWS || range.e.c !== table.columns.length - 1) throw new Error('Invalid or oversized ' + table.name + ' backup sheet.');

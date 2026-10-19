@@ -126,6 +126,7 @@ export function BackupImportPreview({ disabled = false, busy = false, onRestore:
       { label: 'Transactions', value: String(preview.summary.transactionCount) },
       { label: 'Budgets', value: String(preview.summary.budgetCount) },
       { label: 'Savings goals', value: String(preview.summary.goalCount) },
+      { label: 'Debts', value: String(preview.summary.debtCount) },
     ] });
   }
   useEffect(() => {

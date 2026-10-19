@@ -75,6 +75,7 @@ export async function completeCashSetup(db: FinanceDatabase, cents: number, disp
 export async function deleteAccount(db: FinanceDatabase, id: string): Promise<void> {
   if (id === 'cash') throw new Error('The default Cash account cannot be deleted. Use Reset all data to start over.');
   await db.withExclusiveTransactionAsync(async (transaction) => {
+    if (await transaction.getFirstAsync('SELECT id FROM debts WHERE accountId = ? UNION ALL SELECT id FROM debt_payments WHERE accountId = ?',id,id)) throw new Error('This account has debt records. Archive it to keep them, or remove those records in Plans > Debts first.');
     const account = await transaction.getFirstAsync<AccountRow>('SELECT * FROM accounts WHERE id = ?', id);
     if (!account) return; // Repeated deletion cannot affect another account.
     const removed = await transaction.getAllAsync<{ transactionDate: string }>('SELECT transactionDate FROM transactions WHERE accountId = ? OR destinationAccountId = ?', id, id);

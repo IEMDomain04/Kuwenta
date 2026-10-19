@@ -25,7 +25,7 @@ test('backup round trip preserves money, Philippine time, notes, IDs and audit t
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
   assert.deepEqual(previewBackup(restored), {
-    exportedAt, accountCount: 1, transactionCount: 2, incomeCount: 1, expenseCount: 1, adjustmentCount: 0, externalCount: 0, transferCount: 0, goalCount: 0, budgetCount: 0, cashBalance: 138000,
+    exportedAt, accountCount: 1, transactionCount: 2, incomeCount: 1, expenseCount: 1, adjustmentCount: 0, externalCount: 0, transferCount: 0, goalCount: 0, budgetCount: 0, debtCount: 0, cashBalance: 138000,
   });
 });
 
