@@ -13,7 +13,7 @@ import { accountInsights } from '../insights';
 import { philippineDateTime } from '../dates';
 import { useFinance } from '../provider';
 import { AccountsOverview } from '../components/accounts-overview';
-import { FinanceScreen, AddTransactionButton, ActionButton } from '../components/ui';
+import { FinanceScreen, AddTransactionButton } from '../components/ui';
 
 export default function AccountsScreen() {
   const { accounts, transactions, budgets, goals, busy, assistantEnabled } = useFinance();
@@ -30,7 +30,7 @@ export default function AccountsScreen() {
   const { money, error } = result;
   return <FinanceScreen title="Accounts" scrollEnabled={!dragging} headerAccessory={<Pressable accessibilityRole="button" accessibilityLabel="Add account" disabled={busy} onPress={() => router.push('/account')} style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', gap: 4, alignItems: 'center', backgroundColor: theme.backgroundSelected, opacity: pressed || busy ? 0.5 : 1 })}>
         <Ionicons name="add" size={16} color={theme.accent} /><ThemedText type="smallBold" themeColor="accent">Add account</ThemedText>
-      </Pressable>} floatingAction={<AddTransactionButton disabled={busy} />}>
+      </Pressable>} floatingAction={<AddTransactionButton disabled={busy} assistantEnabled={assistantEnabled} />}>
     <LinearGradient colors={[theme.backgroundSelected, theme.background]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 12, borderRadius: 22, gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <View style={{ width: 80, alignSelf: 'stretch', justifyContent: 'center', paddingTop: 28 }}>
@@ -81,7 +81,7 @@ export default function AccountsScreen() {
                   <ThemedText type="smallBold">Available Money: {formatMoney(money.availableMoney, true)}</ThemedText>
                 </> : null}
                 <ThemedText type="small" themeColor="textSecondary">Balances come from starting money and recorded activity. Kuwenta does not check your bank or actual cash.</ThemedText>
-              </> : money?.insights.map(insight => <View key={insight} style={{ gap: 8 }}><ThemedText type="small">{conceal(insight)}</ThemedText>{assistantEnabled ? <ActionButton compact label="Explain" onPress={() => { setDetails(null); router.push({ pathname: "/assistant", params: { insight, selection: JSON.stringify(selectAssistantInsight(insight, { accounts, transactions, budgets, goals })) } }); }} /> : null}</View>)}
+              </> : money?.insights.map((insight, index) => <View key={insight} style={{ gap: 2, paddingTop: index ? 12 : 0, borderTopWidth: index ? 1 : 0, borderColor: theme.border }}><ThemedText type="small">{conceal(insight)}</ThemedText>{assistantEnabled ? <Pressable accessibilityRole="button" accessibilityLabel="Explain insight" hitSlop={8} style={({ pressed }) => ({ alignSelf: 'flex-start', paddingVertical: 4, opacity: pressed ? 0.6 : 1 })} onPress={() => { setDetails(null); router.push({ pathname: "/assistant", params: { insight, selection: JSON.stringify(selectAssistantInsight(insight, { accounts, transactions, budgets, goals })) } }); }}><ThemedText type="smallBold" themeColor="accent" style={{ fontSize: 12, lineHeight: 18 }}>Explain</ThemedText></Pressable> : null}</View>)}
             </ScrollView>
           </View>
         </SafeAreaView>

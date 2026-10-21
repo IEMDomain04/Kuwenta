@@ -88,7 +88,7 @@ export function BackButton({ onPress, disabled = false }: { onPress?: () => void
     <Ionicons name="arrow-back" size={24} color={theme.text} />
   </Pressable>;
 }
-export function AddTransactionButton({ disabled }: { disabled: boolean }) {
+export function AddTransactionButton({ disabled, assistantEnabled = false }: { disabled: boolean; assistantEnabled?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
@@ -97,6 +97,7 @@ export function AddTransactionButton({ disabled }: { disabled: boolean }) {
     { label: 'Expense', description: 'Record spending', icon: 'arrow-up-outline', type: 'EXPENSE' },
     { label: 'Transfer', description: 'Move money between accounts', icon: 'swap-horizontal', type: 'TRANSFER' },
     { label: 'Quick Entry', description: 'Type a transaction', icon: 'create-outline', type: 'QUICK' },
+    ...(assistantEnabled ? [{ label: 'Ask about your money', description: 'Open money assistant', icon: 'chatbubble-outline', type: 'ASSISTANT' } as const] : []),
   ] as const;
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel="Add money activity" disabled={disabled} accessibilityState={{ disabled, expanded: open }} onPress={() => setOpen(true)} style={({ pressed }) => ({ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent, elevation: 4, opacity: disabled || pressed ? 0.5 : 1 })}><Ionicons name="add" size={30} color={theme.onAccent} /></Pressable>
@@ -106,7 +107,8 @@ export function AddTransactionButton({ disabled }: { disabled: boolean }) {
         <View accessibilityViewIsModal style={{ width: '100%', maxWidth: 300, padding: 10, borderRadius: 20, backgroundColor: theme.backgroundElement }}>
           {items.map((item) => <Pressable key={item.type} accessibilityRole="button" disabled={disabled} onPress={() => {
             setOpen(false);
-            if (item.type === 'QUICK') router.push({ pathname: '/transaction', params: { quick: '1' } });
+            if (item.type === 'ASSISTANT') router.push('/assistant');
+            else if (item.type === 'QUICK') router.push({ pathname: '/transaction', params: { quick: '1' } });
             else if (item.type === 'TRANSFER') router.push('/transfer');
             else router.push({ pathname: '/transaction', params: { type: item.type } });
           }} style={{ minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}>

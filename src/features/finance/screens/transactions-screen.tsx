@@ -15,7 +15,7 @@ import { useFinance } from '../provider';
 import type { Transaction } from '../types';
 
 export default function TransactionsScreen() {
-  const { accounts, transactions, month, refresh, busy, removeTransaction, showNotice } = useFinance();
+  const { accounts, transactions, month, refresh, busy, assistantEnabled, removeTransaction, showNotice } = useFinance();
   const theme = useTheme();
   const confirmation = useConfirmation();
   const params = useLocalSearchParams<{ accountId?: string }>();
@@ -47,7 +47,7 @@ export default function TransactionsScreen() {
       } },
     ], { rows: [{ label: 'Category', value: transaction.category }, { label: 'Amount', value: formatMoney(transaction.amount) }, { label: 'Account', value: accountLabel }, { label: 'Date', value: formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime) }] });
   }
-  return <FinanceScreen title="Transaction history" centeredTitle scroll={false} floatingAction={<AddTransactionButton disabled={busy} />}>
+  return <FinanceScreen title="Transaction history" centeredTitle scroll={false} floatingAction={<AddTransactionButton disabled={busy} assistantEnabled={assistantEnabled} />}>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {(['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)}

@@ -21,7 +21,6 @@ import { BudgetOverview } from "../components/budget-overview";
 import { CategoryIcon } from "../components/category-visual";
 import { PeriodOverview } from "../components/period-overview";
 import {
-  ActionButton,
   AddTransactionButton,
   FinanceScreen,
 } from "../components/ui";
@@ -136,7 +135,7 @@ export default function HomeScreen() {
     <FinanceScreen
       title="Kuwenta"
       scrollEnabled={!draggingBudget}
-      floatingAction={<AddTransactionButton disabled={busy} />}
+      floatingAction={<AddTransactionButton disabled={busy} assistantEnabled={assistantEnabled} />}
     >
       <View style={styles.greeting}>
         <ThemedText type="small" themeColor="textSecondary">
@@ -215,13 +214,6 @@ export default function HomeScreen() {
           </ThemedText>
         </Pressable>
       </LinearGradient>
-      {assistantEnabled ? (
-        <ActionButton
-          compact
-          label="Ask about your money"
-          onPress={() => router.push("/assistant")}
-        />
-      ) : null}
       <Modal
         visible={insightsOpen}
         transparent
