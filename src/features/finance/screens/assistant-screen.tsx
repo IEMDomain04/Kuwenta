@@ -1,3 +1,5 @@
+import { AssistantMascot } from '../components/assistant-mascot';
+import { createAssistantReveal } from '../assistant-reveal';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -35,6 +37,8 @@ export default function AssistantScreen() {
   const invalidated = useRef(false);
   const ids = useRef(0);
   const scroll = useRef<ScrollView>(null);
+  const followBottom = useRef(true);
+  const [reveal] = useState(createAssistantReveal);
   const latest = useRef(finance); latest.current = finance;
   const sessionCleanup = useRef<Promise<void>>(Promise.resolve());
   useFocusEffect(useCallback(() => {
@@ -43,18 +47,20 @@ export default function AssistantScreen() {
     session.current = createAssistantSession();
     setStatus('idle'); pending.current = false;
     return () => {
-      active.current = false; ++epoch.current; canceled.current = true;
+      active.current = false; ++epoch.current; canceled.current = true; reveal.cancel();
+      setStatus('idle');
       releaseSession();
       setMessages([]); setInput('');
     };
   }, []));
   const unavailable = assistantAvailability();
   const busy = status !== 'idle';
-  function stop() { canceled.current = true; setStatus('stopping'); void session.current?.stop().catch(() => {}); }
+  function stop() { canceled.current = true; reveal.cancel(); setStatus('stopping'); void session.current?.stop().catch(() => {}); }
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
       if (state !== 'active') {
-        canceled.current = true;
+        canceled.current = true; reveal.cancel();
+        setStatus('idle');
         releaseSession();
       }
     });
@@ -65,6 +71,7 @@ export default function AssistantScreen() {
   async function send(text = input) {
     const question = text.trim();
     if (!question || pending.current || !finance.assistantEnabled || finance.busy || unavailable) return;
+    followBottom.current = true;
     pending.current = true; canceled.current = false; invalidated.current = false; setNotice(''); setStatus('loading'); setInput('');
     const generation = epoch.current;
     const isCurrent = () => active.current && epoch.current === generation;
@@ -76,56 +83,76 @@ export default function AssistantScreen() {
     const direct = assistantQuestionReply(insightFollowup ? 'money ' + user.text : user.text, history);
     user.offTopic = Boolean(direct);
     if (!direct) insightActive.current = Boolean(insightFollowup);
-    setMessages(current => [...current.slice(-11), user]);
-    let replyId: number | undefined;
+    const replyId = ++ids.current;
+    setMessages(current => [...current.slice(-11), user, { id: replyId, role: 'assistant', text: '', streaming: true, offTopic: Boolean(direct) }]);
+    let streamed = '';
     const updateReply = (text: string, streaming: boolean, fallback = false) => {
       const current = latest.current;
       if (!isCurrent() || current.accounts !== snapshot.accounts || current.transactions !== snapshot.transactions || current.budgets !== snapshot.budgets || current.goals !== snapshot.goals) return;
       setMessages(previous => previous.map(message => message.id === replyId ? { ...message, text, streaming, fallback, facts: streaming ? undefined : context?.summary } : message));
     };
     let context: ReturnType<typeof buildAssistantContext> | undefined;
+    async function finishReply(text: string, fallback = false) {
+      if (!isCurrent() || canceled.current) return;
+      setStatus('answering');
+      const prefix = !fallback && text.startsWith(streamed) ? streamed : '';
+      updateReply(prefix, true, fallback);
+      const complete = await reveal.reveal(text, prefix, value => updateReply(value, true, fallback));
+      if (complete && !canceled.current) updateReply(text, false, fallback);
+    }
     try {
       if (direct) {
-        setMessages(previous => [...previous, { id: ++ids.current, role: 'assistant', text: direct, offTopic: true }]);
+        await finishReply(direct);
         return;
       }
       context = insightFollowup && selected.current ? buildInsightContext(snapshot, selected.current, user.text) : buildAssistantContext(snapshot, user.text, history);
       await sessionCleanup.current;
       if (!isCurrent() || canceled.current) return;
       session.current ??= createAssistantSession();
-      replyId = ++ids.current;
-      setMessages(previous => [...previous, { id: replyId!, role: 'assistant', text: '', streaming: true }]);
-      const reply = await session.current.ask(user.text, context, history, value => { if (isCurrent() && !canceled.current) setStatus(value); }, text => { if (!canceled.current) updateReply(text, true); });
+      const reply = await session.current.ask(user.text, context, history, value => { if (isCurrent() && !canceled.current) setStatus(value); }, text => { if (!canceled.current && isCurrent()) void reveal.reveal(text, streamed, value => { streamed = value; updateReply(value, true); }); });
       const current = latest.current;
       if (!isCurrent() || canceled.current || current.accounts !== snapshot.accounts || current.transactions !== snapshot.transactions || current.budgets !== snapshot.budgets || current.goals !== snapshot.goals) return;
       const checked = checkedAssistantReply(reply, context, user.text);
-      updateReply(checked ?? context.fallback, false, !checked);
+      await finishReply(checked ?? context.fallback, !checked);
     } catch (cause) {
       if (isCurrent() && !canceled.current) {
         setNotice('The assistant could not finish this reply. You can try again.');
-        if (context && replyId !== undefined) updateReply(context.fallback, false, true);
+        if (context && replyId !== undefined) await finishReply(context.fallback, true);
         else setNotice(cause instanceof Error ? cause.message : 'Could not read your records.');
         releaseSession();
       }
     } finally { if (isCurrent()) {
       if (canceled.current && replyId !== undefined) setMessages(previous => previous.filter(message => message.id !== replyId || (!invalidated.current && Boolean(message.text))).map(message => message.id === replyId ? { ...message, streaming: false, stopped: true } : message));
+      setMessages(previous => previous.filter(message => message.id !== replyId || Boolean(message.text)));
       pending.current = false; setStatus('idle');
     } }
   }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <FinanceScreen title="Money assistant" tabScreen={false} scroll={false} headerLeading={<BackButton onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }} />}>
       {!finance.assistantEnabled ? <View style={{ gap: 8 }}><ThemedText>Offline chat is disabled.</ThemedText><ActionButton label="Open Settings" onPress={() => router.navigate('/settings')} /></View> : unavailable ? <ThemedText>{unavailable}</ThemedText> : null}
-      <ScrollView ref={scroll} style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingVertical: 8 }} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
+      <ScrollView ref={scroll} style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingVertical: 8 }} onScrollBeginDrag={() => { followBottom.current = false; }} scrollEventThrottle={16}
+        onScroll={({ nativeEvent }) => { followBottom.current = nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height - nativeEvent.contentOffset.y < 48; }}
+        onContentSizeChange={() => { if (followBottom.current) scroll.current?.scrollToEnd({ animated: false }); }}>
         {!messages.length ? <View style={{ gap: 10 }}>
+          <AssistantMascot size={72} />
           <ThemedText type="small">Ask about your balances, spending, budgets, or a purchase. Replies use your recorded activity.</ThemedText>
           {starters.map(question => <ActionButton key={question} compact label={question} disabled={busy || !finance.assistantEnabled || Boolean(unavailable)} onPress={() => { void send(question); }} />)}
         </View> : null}
-        {messages.map(message => <View key={message.id} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'stretch', maxWidth: message.role === 'user' ? '90%' : '100%', padding: 12, borderRadius: 16, gap: 8, backgroundColor: message.role === 'user' ? theme.backgroundSelected : theme.backgroundElement }}>
-          <ThemedText type="smallBold">{message.role === 'user' ? 'You' : message.stopped ? 'Stopped' : message.fallback ? 'Recorded summary' : 'Assistant'}</ThemedText>
-          <View>{message.role === 'assistant' ? <AssistantMessage text={message.text} streaming={message.streaming} /> : <ThemedText type="small" selectable>{message.text}</ThemedText>}</View>
-          {message.facts ? <View style={{ gap: 3, paddingTop: 4 }}><ThemedText type="smallBold" themeColor="textSecondary">Based on your records</ThemedText>{message.facts.map(fact => <ThemedText key={fact} type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{fact}</ThemedText>)}</View> : null}
-        </View>)}
-        {busy ? <ThemedText type="small" accessibilityLiveRegion="polite">{status === 'loading' ? 'Preparing assistant...' : status === 'stopping' ? 'Stopping...' : status === 'thinking' ? 'Thinking...' : 'Replying...'}</ThemedText> : null}
+        {messages.map(message => {
+          const waiting = message.role === 'assistant' && message.streaming && !message.text && busy;
+          if (message.role === 'assistant' && !message.text && !waiting) return null;
+          return <View key={message.id} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'stretch', maxWidth: message.role === 'user' ? '90%' : '100%', padding: 12, borderRadius: 16, gap: 8, backgroundColor: message.role === 'user' ? theme.backgroundSelected : theme.backgroundElement }}>
+            {waiting ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <AssistantMascot thinking animated={status !== 'stopping'} size={48}>
+              <ThemedText type="small" accessibilityLiveRegion="polite">{status === 'loading' ? 'Preparing assistant...' : status === 'stopping' ? 'Stopping...' : status === 'thinking' ? 'Thinking...' : 'Replying...'}</ThemedText>
+              </AssistantMascot>
+            </View> : <>
+              {message.role === 'user' || message.stopped || message.fallback ? <ThemedText type="smallBold">{message.role === 'user' ? 'You' : message.stopped ? 'Stopped' : 'Recorded summary'}</ThemedText> : null}
+              <View>{message.role === 'assistant' ? <AssistantMessage text={message.text} streaming={message.streaming} /> : <ThemedText type="small" selectable>{message.text}</ThemedText>}</View>
+              {message.facts ? <View style={{ gap: 3, paddingTop: 4 }}><ThemedText type="smallBold" themeColor="textSecondary">Based on your records</ThemedText>{message.facts.map(fact => <ThemedText key={fact} type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{fact}</ThemedText>)}</View> : null}
+            </>}
+          </View>;
+        })}
         {notice ? <ThemedText type="small" accessibilityLiveRegion="polite" themeColor="textSecondary">{notice}</ThemedText> : null}
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>

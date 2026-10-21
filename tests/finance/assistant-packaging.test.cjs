@@ -43,3 +43,11 @@ test('verified native resource and license are packaged for Android and iOS', as
     assert.ok(h.resources.every(resource => resource.isBuildFile && resource.groupName === 'Resources'));
   } finally { await fs.rm(h.root, { recursive: true, force: true }); }
 });
+
+
+test('EAS uploads include required model resources and exclude partial downloads', async () => {
+  const ignore = await fs.readFile('.easignore', 'utf8');
+  assert.ok(!ignore.split(/\r?\n/).some(line => /^\/?assets\/models\/?$/.test(line.trim())));
+  assert.ok(ignore.includes('/assets/models/*.part'));
+  assert.ok(ignore.includes('/assets/models/*.download'));
+});
