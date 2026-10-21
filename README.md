@@ -120,3 +120,6 @@ Chat shows one thinking mascot with subtle native-driver motion and status dots 
 
 
 Assistant guidance is scoped to balance, spending, income, budgets, savings, goals, or purchase questions. Short follow-ups use the latest topic and price; singular peso and k prices are recognized. Calculated fallbacks remain specific to the question, repeated model sentences are rejected, and supporting figures are collapsed behind View figures used. The current model, sampling settings, and financial storage are unchanged. Test actual generated wording on a phone; regression tests check the context, fallback calculations, guards, streaming, and UI behavior.
+
+
+Assistant what-if replies can offer one app-calculated comparison: an illustrative cheaper price, fewer purchases per week, keeping an amount untouched, a conditional savings-goal schedule, or a possible category reduction. Scenario assumptions are labeled and never saved as transactions, budgets, goals, or reserved cash. Followups distinguish product prices from frequency and reserve amounts. Illustrative prices are not market quotes, schedules do not predict income, and reducing food or transport is not assumed appropriate. The existing model and native runtime are unchanged.

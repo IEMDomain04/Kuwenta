@@ -79,7 +79,7 @@ export default function AssistantScreen() {
     const user: Message = { id: ++ids.current, role: 'user', text: question.slice(0, 1000) };
     const history = messages.filter(message => !message.offTopic).slice(-8);
     if (!selected.current && (seed || /^explain this:/i.test(user.text))) { selected.current = selectAssistantInsight(seed || user.text.replace(/^explain this:\s*/i, ''), finance); insightActive.current = true; }
-    const insightFollowup = selected.current && insightActive.current && /explain|why|compar|last month|previous month|adjust|reduce|cut back|tell me more|what about/i.test(user.text) && !/\b(?:buy|afford|purchase|controller|costs?|price)\b/i.test(user.text);
+    const insightFollowup = selected.current && insightActive.current && /explain|why|compar|last month|previous month|adjust|reduce|cut back|tell me more|what about|what if|reach|plan|set aside/i.test(user.text) && !/\b(?:buy|afford|purchase|controller|costs?|price)\b/i.test(user.text);
     const direct = assistantQuestionReply(insightFollowup ? 'money ' + user.text : user.text, history);
     user.offTopic = Boolean(direct);
     if (!direct) insightActive.current = Boolean(insightFollowup);
@@ -105,7 +105,7 @@ export default function AssistantScreen() {
         await finishReply(direct);
         return;
       }
-      context = insightFollowup && selected.current ? buildInsightContext(snapshot, selected.current, user.text) : buildAssistantContext(snapshot, user.text, history);
+      context = insightFollowup && selected.current ? buildInsightContext(snapshot, selected.current, user.text, undefined, history) : buildAssistantContext(snapshot, user.text, history);
       await sessionCleanup.current;
       if (!isCurrent() || canceled.current) return;
       session.current ??= createAssistantSession();

@@ -25,7 +25,7 @@ test('short price followups work but spending summaries do not ask for a purchas
 });
 test('daily cost calculations are explicit scenarios, not invented monthly forecasts', () => {
   const context = build('Should I buy mami rice every day? It costs 60 pesos');
-  assert.match(context.facts.join(' '), /7 days costs .*420.*30 days costs .*1,800/);
+  assert.match(context.facts.join(' '), /7 days costs .*420.*three times.*180.*820/);
   assert.match(build('Should I buy it on school days for 60 pesos?').facts.join(' '), /5 school days costs .*300/);
 });
 test('future records stay out of balances and current summaries; transfers are not income', () => {
@@ -84,14 +84,14 @@ test('purchase guidance starts with known balance, asks only for price, and comp
   assert.match(known.facts.join(' '), /100 below/);
   assert.ok(!/get a job|check your balance/i.test(known.fallback));
 });
-test('everyday spending has exact seven and thirty day scenarios and replacement clarification', () => {
+test('everyday spending has a seven day answer and one lower-frequency comparison', () => {
   const result = build('Is it alright if I spend 60 pesos on mami rice everyday?');
-  assert.match(result.fallback, /420.*580.*1,000 available.*1,800.*replace/);
+  assert.match(result.fallback, /420.*580.*1,000 available.*replace.*three times.*180.*820/);
   assert.deepEqual(result.requiredAmounts, [100000, 42000, 58000]);
   const short = build('Can I buy meals every day for 60 pesos?', { ...base, accounts: [{ ...cash, openingBalance: 20000 }] });
   assert.match(short.fallback, /220 more than your available/);
   const school = build('Can I buy lunch for 60 pesos on school days?');
-  assert.match(school.fallback, /5 school days.*300.*20 school days.*1,200/);
+  assert.match(school.fallback, /5 school days.*300.*three times.*180/);
 });
 test('a frequency followup reuses the known daily price and latest quoted price', () => {
   const history = [{ role: 'user', text: 'Can I buy rice everyday for 60 pesos?' }, { role: 'assistant', text: 'Known facts' }];

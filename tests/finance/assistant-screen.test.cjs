@@ -195,3 +195,14 @@ test('figures used are collapsed until requested and can be hidden again', async
   h.render().find(node => node.props.accessibilityLabel === 'Hide figures used').props.onPress();
   assert.equal(figure(), false); h.blur();
 });
+
+
+test('a goal Explain followup keeps its selected goal when asking for a contribution scenario', async () => {
+  const h = harness({ insight: 'Laptop needs more savings.', selection: JSON.stringify({ kind: 'goal', goalId: 'goal', period: '2026-10' }) });
+  h.finance.accounts = [cash, { ...cash, id: 'bank', name: 'Savings', purpose: 'savings', includedInAvailable: false, openingBalance: 300000 }];
+  h.finance.goals = [{ id: 'goal', name: 'Laptop', accountId: 'bank', targetAmount: 500000, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }];
+  h.send('What if I set aside 200 pesos each week?'); await tick();
+  assert.ok(h.sessions[0].context.facts.some(text => text.includes('Selected insight:')));
+  assert.match(h.sessions[0].context.hypothetical.text, /200 each week.*10 weeks/);
+  h.sessions[0].finish('Goal scenario'); await tick(); h.blur();
+});

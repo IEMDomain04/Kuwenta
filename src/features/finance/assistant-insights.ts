@@ -1,4 +1,5 @@
-import type { AssistantContext, AssistantRecordContext } from './assistant-context';
+import { categoryScenario, goalScenario, scenarioInputs, type AssistantScenario } from './assistant-scenarios';
+import type { AssistantContext, AssistantRecordContext, AssistantTurn } from './assistant-context';
 import { calculateAccountSummary, calculateCurrentMoney, calculateFinanceSummary, calculateGoalProgress, calculateSavings } from './calculations';
 import { budgetReport } from './budgets';
 import { budgetPeriodKey, budgetPeriodLabel, isBudgetPeriodKey } from './budget-periods';
@@ -42,13 +43,14 @@ export function parseInsightSelection(value: unknown): InsightSelection | undefi
 }
 
 /** Exact, relevant support for an insight and its follow-ups. Never changes records. */
-export function buildInsightContext(data: AssistantRecordContext, selected: InsightSelection, question: string, now = new Date()): AssistantContext {
+export function buildInsightContext(data: AssistantRecordContext, selected: InsightSelection, question: string, now = new Date(), history: readonly AssistantTurn[] = []): AssistantContext {
   const date = philippineDateTime(now).transactionDate;
   const month = isValidMonth(selected.period) ? selected.period : selected.period.slice(-10, -3);
   calculateFinanceSummary(data.accounts, data.transactions, month);
   const records = data.transactions.filter(row => row.transactionDate <= date);
   const report = calculateFinanceSummary(data.accounts, records, month);
   const period = readableReportingMonth(month);
+  let hypothetical: AssistantScenario | undefined;
   let summary: string[] = [];
   let requiredAmounts: number[] = [];
   let explanation = 'There is not enough recorded activity for this insight yet. Add any missing records before drawing a conclusion.';
@@ -79,6 +81,7 @@ export function buildInsightContext(data: AssistantRecordContext, selected: Insi
       requiredAmounts = [category.amount, report.monthlyExpenses];
       explanation = '**' + category.category + ' accounts for about ' + percent + '% of your recorded ' + period + ' expenses.**\n\nYou recorded ' + money(category.amount) + ' out of ' + money(report.monthlyExpenses) + ', making it ' + rank + '.' + (other ? ' ' + other.category + ' has ' + money(other.amount) + ' recorded.' : '') + ' If you want to reduce spending, reviewing these purchases is one place to start. A large share alone does not mean you overspent.';
       if (/reduce|cut back|adjust|save/i.test(question)) {
+        hypothetical = categoryScenario(category.category, category.amount);
         explanation = category.category + ' has ' + money(category.amount) + ' out of ' + money(report.monthlyExpenses) + ' in recorded expenses for ' + period + '. Review the purchases in this category and choose which you could reduce or skip. A large share alone does not mean you overspent; essentials may still need that money.';
       } else if (/^why|how so/i.test(question.trim())) {
         explanation = 'It stands out because ' + category.category + ' totals ' + money(category.amount) + ' out of ' + money(report.monthlyExpenses) + ' in ' + period + ' expenses, about ' + percent + '%. This reflects the purchases you recorded; it does not explain why you made them or prove you overspent.';
@@ -116,6 +119,8 @@ export function buildInsightContext(data: AssistantRecordContext, selected: Insi
     const goal = data.goals.find(row => row.id === selected.goalId);
     if (goal) {
       const progress = calculateGoalProgress(goal, data.accounts, records);
+      const turns = [question, ...history.filter(turn => turn.role === 'user').map(turn => turn.text).reverse()];
+      if (/reach|plan|approach|set aside|what if/i.test(turns.join(' '))) hypothetical = goalScenario(progress.remaining, calculateCurrentMoney(data.accounts, records).availableMoney, turns.map(text => scenarioInputs(text).reserve).find(amount => amount !== undefined), /month/i.test(turns.find(text => /month|week/i.test(text)) ?? question));
       summary = [goal.name, 'Current: ' + money(progress.balance), 'Target: ' + money(goal.targetAmount), 'Remaining: ' + money(progress.remaining), 'Goal progress: ' + Math.round(progress.progress * 100) + '%']; requiredAmounts = [progress.balance, goal.targetAmount];
       explanation = '**' + goal.name + (progress.achieved ? ' has reached its target.' : ' needs ' + money(progress.remaining) + ' more.') + '**\n\nIts linked savings account has ' + money(progress.balance) + ' against a ' + money(goal.targetAmount) + ' target. Progress follows that account balance, so moving or spending its money can change progress. Reaching the target does not automatically spend or lock the money.';
     }
@@ -137,6 +142,8 @@ export function buildInsightContext(data: AssistantRecordContext, selected: Insi
     if (monthlyBudgets.rows.length) summary.push('Remaining ' + period + ' allowances: ' + money(allowance));
     explanation = '**You have ' + money(totals.availableMoney) + ' available for spending.**\n\nAvailable Money includes only the accounts you marked included; your total recorded money is ' + money(totals.totalMoney) + '.' + (records.length ? ' You recorded ' + money(report.monthlyExpenses) + ' in expenses for ' + period + '. Upcoming costs and unrecorded purchases may still need money.' : ' There is not enough transaction history to judge a spending trend yet.') + (monthlyBudgets.rows.length ? ' Your remaining ' + period + ' budget allowances total ' + money(allowance) + (totals.availableMoney < allowance ? ', above your available money.' : ', covered by your recorded available balance.') + ' These are spending plans, not reserved cash or confirmed bills.' : '');
   }
+  const replyGuide = readableAssistantDates(explanation);
+  if (hypothetical) { facts.push('HYPOTHETICAL (not recorded; assumptions only): ' + hypothetical.text); summary.push('What-if only: ' + hypothetical.text); explanation += ' ' + hypothetical.text; }
   const fallback = readableAssistantDates(explanation);
-  return { facts: [...facts.map(readableAssistantDates), ...summary, 'REPLY GUIDE: ' + fallback, 'Answer the follow-up about this selected insight. Do not replace it with unrelated totals or speculate about why purchases happened.'], summary, fallback, requiredAmounts };
+  return { facts: [...facts.map(readableAssistantDates), ...summary, 'REPLY GUIDE: ' + replyGuide, 'Answer the follow-up about this selected insight. Do not replace it with unrelated totals or speculate about why purchases happened.'], summary, fallback, requiredAmounts, hypothetical };
 }
