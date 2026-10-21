@@ -31,7 +31,7 @@ function harness({ legacy = false, recovery = true, failRestore = false } = {}) 
     if (name === './ui') return { ActionButton: 'Button' };
     if (name === '../backup-files') return { pickBackupFile: async () => ({ name: 'backup.json', json: '{}', backup: legacy ? null : backup }) };
     if (name === '../encrypted-backup') return { validateBackupPassword() {}, decryptBackup: async (_, password) => { unlocked++; assert.equal(password, 'password123'); return backup; } };
-    if (name === '../backup') return { previewBackup: () => ({ accountCount: 1, transactionCount: 0, budgetCount: 0, goalCount: 0, cashBalance: 100000 }) };
+    if (name === '../backup') return { previewBackup: () => ({ accountCount: 1, transactionCount: 0, budgetCount: 0, goalCount: 0, debtCount: 0, cashBalance: 100000 }) };
     if (name === '../calculations') return { calculateCurrentMoney: () => ({ totalMoney: 100000 }) };
     if (name === '../money') return { formatMoney: amount => String(amount) };
     if (name === '../dates') return { formatTransactionDateTime: (date, time) => date + ' / ' + time, philippineDateTime: () => ({ transactionDate: '2026-10-12', transactionTime: '08:00:00' }) };
@@ -119,7 +119,7 @@ test('canceling the preview keeps current data and clears the selected backup', 
   app.render().button('Choose backup file').props.onPress(); await settle();
   app.render();
   assert.equal(app.confirmation().title, 'Backup preview');
-  assert.deepEqual(Array.from(app.confirmation().options.rows, row => row.label), ['Total money', 'Backup file', 'Exported', 'Accounts', 'Transactions', 'Budgets', 'Savings goals']);
+  assert.deepEqual(Array.from(app.confirmation().options.rows, row => row.label), ['Total money', 'Backup file', 'Exported', 'Accounts', 'Transactions', 'Budgets', 'Savings goals', 'Debts']);
   app.confirmation().buttons.find(button => button.text === 'Cancel').onPress();
   assert.equal(app.restored(), 0);
   assert.equal(app.render().button('Review backup'), undefined);

@@ -88,7 +88,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
       const draft = buildExchange(parseMoney(amount.replace(/,/g,'')));
       difference = draft.exchange!.received - draft.exchange!.paid;
       const audit = new Date().toISOString();
-      const records = [...transactions.filter(row=>row.id!==original?.id && row.exchangeParentId!==original?.id), ...exchangeRecords(original?.id ?? 'exchange-preview',draft,original?.createdAt ?? audit,[audit,original?.updatedAt ?? ''].sort().at(-1)!)];
+      const records = [...transactions.filter(row => !original || (row.id !== original.id && row.exchangeParentId !== original.id)), ...exchangeRecords(original?.id ?? 'exchange-preview',draft,original?.createdAt ?? audit,[audit,original?.updatedAt ?? ''].sort().at(-1)!)];
       calculateFinanceSummary(accounts, records, date.slice(0,7));
       exchangePreview = [selectedAccount,selectedDestination].filter((account): account is NonNullable<typeof account> => Boolean(account)).map(account=>({name:account.name,balance:calculateAccountSummary(account,records,'1900-01').balance}));
       if (original?.exchange && original.exchange.extraAccountId !== draft.exchange!.extraAccountId && difference !== 0 && kind !== 'Service sale') allocationNotice = (difference < 0 ? 'Fee will be recorded in ' : 'Earnings will be recorded in ') + (accounts.find(account=>account.id===draft.exchange!.extraAccountId)?.name ?? '') + '.';

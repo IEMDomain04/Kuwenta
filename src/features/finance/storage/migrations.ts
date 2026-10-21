@@ -3,7 +3,7 @@ import { calculateAccountSummary } from '../calculations';
 import type { Account, Transaction } from '../types';
 import type { FinanceDatabase } from './database';
 
-const VERSION = 14;
+const VERSION = 16;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -118,5 +118,47 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       }
       await transaction.execAsync('PRAGMA user_version = 14;');
     }
+    if (version < 15) await transaction.execAsync(`
+      CREATE TABLE IF NOT EXISTS debts (
+        id TEXT PRIMARY KEY NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
+        name TEXT NOT NULL CHECK(length(trim(name)) > 0), kind TEXT NOT NULL CHECK(kind IN ('owe','owed')),
+        amount INTEGER NOT NULL CHECK(typeof(amount) = 'integer' AND amount BETWEEN 1 AND 9007199254740991),
+        accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+        transactionDate TEXT NOT NULL, transactionTime TEXT NOT NULL, dueDate TEXT, notes TEXT,
+        createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS debt_payments (
+        id TEXT PRIMARY KEY NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
+        debtId TEXT NOT NULL REFERENCES debts(id) ON DELETE RESTRICT,
+        accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+        amount INTEGER NOT NULL CHECK(typeof(amount) = 'integer' AND amount BETWEEN 1 AND 9007199254740991),
+        transactionDate TEXT NOT NULL, transactionTime TEXT NOT NULL, notes TEXT, createdAt TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS debt_payments_debt ON debt_payments(debtId);
+      PRAGMA user_version = 15;
+    `);
+    if (version < 16) await transaction.execAsync(`
+      CREATE TABLE debts_new (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL CHECK(length(trim(name)) > 0), kind TEXT NOT NULL CHECK(kind IN ('owe','owed')),
+        amount INTEGER NOT NULL CHECK(typeof(amount) = 'integer' AND amount BETWEEN 1 AND 9007199254740991),
+        accountId TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+        existing INTEGER NOT NULL DEFAULT 0 CHECK(existing IN (0,1)),
+        transactionDate TEXT NOT NULL, transactionTime TEXT NOT NULL, dueDate TEXT, notes TEXT,
+        createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL,
+        CHECK((existing = 0 AND accountId IS NOT NULL) OR (existing = 1 AND accountId IS NULL)));
+      INSERT INTO debts_new(id,name,kind,amount,accountId,transactionDate,transactionTime,dueDate,notes,createdAt,updatedAt)
+        SELECT id,name,kind,amount,accountId,transactionDate,transactionTime,dueDate,notes,createdAt,updatedAt FROM debts;
+      CREATE TABLE debt_payments_new (
+        id TEXT PRIMARY KEY NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
+        debtId TEXT NOT NULL REFERENCES debts_new(id) ON DELETE RESTRICT,
+        accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+        amount INTEGER NOT NULL CHECK(typeof(amount) = 'integer' AND amount BETWEEN 1 AND 9007199254740991),
+        transactionDate TEXT NOT NULL, transactionTime TEXT NOT NULL, notes TEXT, createdAt TEXT NOT NULL);
+      INSERT INTO debt_payments_new SELECT * FROM debt_payments;
+      DROP TABLE debt_payments; DROP TABLE debts;
+      ALTER TABLE debts_new RENAME TO debts;
+      ALTER TABLE debt_payments_new RENAME TO debt_payments;
+      CREATE INDEX debt_payments_debt ON debt_payments(debtId);
+      PRAGMA user_version = 16;
+    `);
   });
 }

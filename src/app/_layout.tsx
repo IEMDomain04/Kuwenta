@@ -25,6 +25,7 @@ function AppContent() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="transaction" options={{ gestureEnabled: false }} />
       <Stack.Screen name="transfer" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="debt" options={{ gestureEnabled: false }} />
       <Stack.Screen name="goals" />
       <Stack.Screen name="budgets" options={{ gestureEnabled: false }} />
       <Stack.Screen name="goal" options={{ gestureEnabled: false }} />

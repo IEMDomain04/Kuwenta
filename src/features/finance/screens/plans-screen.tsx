@@ -1,3 +1,4 @@
+import { DebtsOverview } from '../components/debts-overview';
 import { useState } from 'react';
 import { useFinance } from '../provider';
 import { philippineDateTime } from '../dates';
@@ -12,5 +13,6 @@ export default function PlansScreen() {
   return <FinanceScreen title="Plans" scrollEnabled={!draggingBudget} floatingAction={<AddTransactionButton disabled={busy} />}>
     <BudgetOverview reportingMonth={month} onDraggingChange={setDraggingBudget} />
     <SavingsOverview reportingMonth={month} />
+    <DebtsOverview />
   </FinanceScreen>;
 }
