@@ -117,3 +117,6 @@ New debt forms use Notes for agreed repayment dates instead of a separate due-da
 ## Assistant chat feedback
 
 Chat shows one thinking mascot with subtle native-driver motion and status dots inside the pending reply. The streamed answer replaces it in the same card, without a duplicate avatar or Assistant header. Reduced-motion settings disable animation. Validated model text and calculated fallback replies appear in small word groups; Stop, navigation, backgrounding, and record changes cancel pending display timers. Scrolling up pauses automatic following until the user returns near the bottom. Financial calculations and the model remain unchanged. EAS uploads include the bundled model required by the native plugin, excluding partial downloads.
+
+
+Assistant guidance is scoped to balance, spending, income, budgets, savings, goals, or purchase questions. Short follow-ups use the latest topic and price; singular peso and k prices are recognized. Calculated fallbacks remain specific to the question, repeated model sentences are rejected, and supporting figures are collapsed behind View figures used. The current model, sampling settings, and financial storage are unchanged. Test actual generated wording on a phone; regression tests check the context, fallback calculations, guards, streaming, and UI behavior.

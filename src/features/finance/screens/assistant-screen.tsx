@@ -1,7 +1,7 @@
 import { AssistantMascot } from '../components/assistant-mascot';
 import { createAssistantReveal } from '../assistant-reveal';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, ScrollView, TextInput, View, Pressable } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { buildInsightContext, parseInsightSelection, selectAssistantInsight } from '../assistant-insights';
 import { AssistantMessage } from '../components/assistant-message';
@@ -12,7 +12,7 @@ import { FinanceScreen, ActionButton, BackButton } from '../components/ui';
 import { assistantQuestionReply, buildAssistantContext, checkedAssistantReply, type AssistantTurn } from '../assistant-context';
 import { assistantAvailability, createAssistantSession } from '../offline-assistant';
 
-type Message = AssistantTurn & { id: number; facts?: string[]; fallback?: boolean; offTopic?: boolean; streaming?: boolean; stopped?: boolean };
+type Message = AssistantTurn & { id: number; facts?: string[]; fallback?: boolean; offTopic?: boolean; streaming?: boolean; stopped?: boolean; figuresOpen?: boolean };
 const starters = ['Where did my money go this month?', 'Can I afford a purchase?', 'How are my budgets doing?'];
 export default function AssistantScreen() {
   const finance = useFinance();
@@ -77,7 +77,7 @@ export default function AssistantScreen() {
     const isCurrent = () => active.current && epoch.current === generation;
     const snapshot = finance;
     const user: Message = { id: ++ids.current, role: 'user', text: question.slice(0, 1000) };
-    const history = messages.filter(message => !message.offTopic).slice(-4);
+    const history = messages.filter(message => !message.offTopic).slice(-8);
     if (!selected.current && (seed || /^explain this:/i.test(user.text))) { selected.current = selectAssistantInsight(seed || user.text.replace(/^explain this:\s*/i, ''), finance); insightActive.current = true; }
     const insightFollowup = selected.current && insightActive.current && /explain|why|compar|last month|previous month|adjust|reduce|cut back|tell me more|what about/i.test(user.text) && !/\b(?:buy|afford|purchase|controller|costs?|price)\b/i.test(user.text);
     const direct = assistantQuestionReply(insightFollowup ? 'money ' + user.text : user.text, history);
@@ -149,7 +149,14 @@ export default function AssistantScreen() {
             </View> : <>
               {message.role === 'user' || message.stopped || message.fallback ? <ThemedText type="smallBold">{message.role === 'user' ? 'You' : message.stopped ? 'Stopped' : 'Recorded summary'}</ThemedText> : null}
               <View>{message.role === 'assistant' ? <AssistantMessage text={message.text} streaming={message.streaming} /> : <ThemedText type="small" selectable>{message.text}</ThemedText>}</View>
-              {message.facts ? <View style={{ gap: 3, paddingTop: 4 }}><ThemedText type="smallBold" themeColor="textSecondary">Based on your records</ThemedText>{message.facts.map(fact => <ThemedText key={fact} type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{fact}</ThemedText>)}</View> : null}
+              {message.facts?.length ? <View style={{ gap: 3, paddingTop: 4 }}>
+                <Pressable accessibilityRole="button" accessibilityLabel={message.figuresOpen ? 'Hide figures used' : 'View figures used'} accessibilityState={{ expanded: Boolean(message.figuresOpen) }} hitSlop={8}
+                  onPress={() => setMessages(previous => previous.map(row => row.id === message.id ? { ...row, figuresOpen: !row.figuresOpen } : row))}
+                  style={({ pressed }) => ({ alignSelf: 'flex-start', paddingVertical: 4, opacity: pressed ? 0.6 : 1 })}>
+                  <ThemedText type="small" themeColor="accent">{message.figuresOpen ? 'Hide figures used' : 'View figures used'}</ThemedText>
+                </Pressable>
+                {message.figuresOpen ? message.facts.map(fact => <ThemedText key={fact} type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{fact}</ThemedText>) : null}
+              </View> : null}
             </>}
           </View>;
         })}

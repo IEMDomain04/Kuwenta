@@ -6,7 +6,7 @@ const ts = require('typescript');
 const { cash } = require('./fixtures.cjs');
 const source = ts.transpileModule(fs.readFileSync('src/features/finance/screens/assistant-screen.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function harness(params = {}, { manualReveal = false, fallback = 'fallback' } = {}) {
+function harness(params = {}, { manualReveal = false, fallback = 'fallback', summary = [] } = {}) {
   const timers = new Map(); let timerId = 0;
   const revealSandbox = { exports: {}, setTimeout(fn) { const id = ++timerId; timers.set(id, fn); if (!manualReveal) queueMicrotask(() => { if (timers.has(id)) { timers.delete(id); fn(); } }); return id; }, clearTimeout(id) { timers.delete(id); } };
   vm.runInNewContext(fs.readFileSync('.expo/finance-tests/assistant-reveal.js', 'utf8'), revealSandbox);
@@ -17,7 +17,7 @@ function harness(params = {}, { manualReveal = false, fallback = 'fallback' } = 
   const sandbox = { exports: {}, require(name) {
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useCallback: fn => state(() => fn)[0], useEffect(fn, deps) { const i = cursor++; if (!hooks[i] || deps.some((value, j) => value !== hooks[i][j])) { hooks[i] = deps; effects.push(fn); } } };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
-    if (name === 'react-native') return { View: 'View', ScrollView: 'ScrollView', TextInput: 'Input', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'android' }, AppState: { addEventListener(_, fn) { appState = fn; return { remove() {} }; } } };
+    if (name === 'react-native') return { View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', TextInput: 'Input', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'android' }, AppState: { addEventListener(_, fn) { appState = fn; return { remove() {} }; } } };
     if (name === 'expo-router') return { useLocalSearchParams: () => params, useFocusEffect(fn) { focus = fn; }, router: { canGoBack: () => true, back() {} } };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
@@ -27,7 +27,7 @@ function harness(params = {}, { manualReveal = false, fallback = 'fallback' } = 
     if (name === '../components/assistant-message') return { AssistantMessage: 'AssistantMessage' };
     if (name === '../components/ui') return { FinanceScreen: 'Screen', ActionButton: 'Button', BackButton: 'Back' };
     if (name === '../assistant-insights') return require('../../.expo/finance-tests/assistant-insights.js');
-    if (name === '../assistant-context') return { assistantQuestionReply: require('../../.expo/finance-tests/assistant-context.js').assistantQuestionReply, buildAssistantContext: () => ({ summary: [], fallback }), checkedAssistantReply: text => text || undefined };
+    if (name === '../assistant-context') return { assistantQuestionReply: require('../../.expo/finance-tests/assistant-context.js').assistantQuestionReply, buildAssistantContext: () => ({ summary, fallback }), checkedAssistantReply: text => text || undefined };
     if (name === '../offline-assistant') return { assistantAvailability: () => undefined, createAssistantSession() {
       let finish; const reply = new Promise(resolve => { finish = resolve; });
       const item = { asks: 0, stopped: 0, released: 0, finish, emit: undefined, ask(question, context, history, status, onText) { item.asks++; item.context = context; item.question = question; item.emit = text => { status('answering'); onText?.(text); }; status('thinking'); return reply; }, async stop() { item.stopped++; finish('stopped'); }, async dispose() { item.released++; if (item.asks) await reply; } };
@@ -182,4 +182,16 @@ test('one thinking mascot becomes the response without a duplicate Assistant hea
   assert.equal(replying.filter(node => node.type === 'AssistantMessage').length, 1);
   assert.ok(!replying.some(node => node.props.children === 'Thinking...' || node.props.children === 'Assistant'));
   h.render().find(node => node.props.label === 'Stop').props.onPress(); await tick(); h.blur();
+});
+
+
+test('figures used are collapsed until requested and can be hidden again', async () => {
+  const h = harness({}, { summary: ['Available for spending: PHP 1000'] }); h.send(); await tick();
+  h.sessions[0].finish('Your available money is PHP 1000.'); await tick();
+  const figure = () => h.render().some(node => node.props.children === 'Available for spending: PHP 1000');
+  assert.equal(figure(), false);
+  h.render().find(node => node.props.accessibilityLabel === 'View figures used').props.onPress();
+  assert.equal(figure(), true);
+  h.render().find(node => node.props.accessibilityLabel === 'Hide figures used').props.onPress();
+  assert.equal(figure(), false); h.blur();
 });

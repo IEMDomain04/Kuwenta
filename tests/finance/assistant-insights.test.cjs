@@ -63,3 +63,13 @@ test('aggregate budgets, sparse activity, missing selections and future entries 
   assert.equal(build({ kind: 'category', category: cafe }, 'Explain', future).fallback, build({ kind: 'category', category: cafe }).fallback);
   assert.equal(parseInsightSelection('{"kind":"category","period":"invalid"}'), undefined);
 });
+
+
+test('Why and reduction followups explain the selected category without restarting a balance summary', () => {
+  const why = build({ kind: 'category', category: cafe }, 'Why?');
+  const reduce = build({ kind: 'category', category: cafe }, 'How can I reduce it?');
+  assert.match(why.fallback, /It stands out because.*249.*515/);
+  assert.match(reduce.fallback, /choose which you could reduce or skip/);
+  assert.notEqual(why.fallback, reduce.fallback);
+  for (const result of [why, reduce]) { assert.ok(!result.fallback.includes('available for spending')); assert.ok(checkedAssistantReply(result.fallback, result, '')); }
+});

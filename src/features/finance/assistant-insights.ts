@@ -78,6 +78,11 @@ export function buildInsightContext(data: AssistantRecordContext, selected: Insi
       if (other) summary.push(other.category + ': ' + money(other.amount));
       requiredAmounts = [category.amount, report.monthlyExpenses];
       explanation = '**' + category.category + ' accounts for about ' + percent + '% of your recorded ' + period + ' expenses.**\n\nYou recorded ' + money(category.amount) + ' out of ' + money(report.monthlyExpenses) + ', making it ' + rank + '.' + (other ? ' ' + other.category + ' has ' + money(other.amount) + ' recorded.' : '') + ' If you want to reduce spending, reviewing these purchases is one place to start. A large share alone does not mean you overspent.';
+      if (/reduce|cut back|adjust|save/i.test(question)) {
+        explanation = category.category + ' has ' + money(category.amount) + ' out of ' + money(report.monthlyExpenses) + ' in recorded expenses for ' + period + '. Review the purchases in this category and choose which you could reduce or skip. A large share alone does not mean you overspent; essentials may still need that money.';
+      } else if (/^why|how so/i.test(question.trim())) {
+        explanation = 'It stands out because ' + category.category + ' totals ' + money(category.amount) + ' out of ' + money(report.monthlyExpenses) + ' in ' + period + ' expenses, about ' + percent + '%. This reflects the purchases you recorded; it does not explain why you made them or prove you overspent.';
+      }
     }
   } else if (selected.kind === 'budget') {
     const row = budgetReport(data.budgets, records, selected.period).rows.find(row => row.category === selected.category);

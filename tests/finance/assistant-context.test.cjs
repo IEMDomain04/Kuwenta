@@ -34,7 +34,8 @@ test('future records stay out of balances and current summaries; transfers are n
   const data = { ...base, accounts: [cash, bank], transactions: rows };
   const result = build('Can I buy it for 800?', data);
   assert.equal(result.purchase.remaining, 20000);
-  assert.match(result.summary[2], /income: .*0; expenses: .*0/);
+  assert.ok(!result.facts.join(' ').includes('5,000'));
+  assert.equal(result.purchase.remaining, 20000);
 });
 test('overlapping budgets keep their distinct scopes without reserving cash twice', () => {
   const data = { ...base, budgets: [{ month: '2026-10', category: 'Food', limitAmount: 30000 }, { month: 'D:2026-10-11', category: 'Food', limitAmount: 5000 }] };
@@ -100,7 +101,7 @@ test('a frequency followup reuses the known daily price and latest quoted price'
 });
 test('low-money comparisons use recorded spending, not income assumptions or a fixed threshold', () => {
   const result = build('Can I buy it for 800?', { ...base, transactions: [record({ amount: 30000 })] });
-  assert.match(result.fallback, /100 more than your available/);
+  assert.match(result.fallback, /100 short.*800.*700 available/);
   const tight = build('Can I buy it for 400?', { ...base, transactions: [record({ amount: 40000 })] });
   assert.match(tight.fallback, /below the .*400.*last seven days/);
   assert.ok(!/job|salary|high balance|low balance/i.test(tight.fallback));
@@ -123,15 +124,15 @@ test('empty advice, unsupported purchase responses and code fall back to the app
 test('assistant context and checked answers use readable dates without changing record dates', () => {
   const data = { ...base, transactions: [record()] };
   const context = buildAssistantContext(data, 'Explain my Food spending', [], now);
-  assert.ok(context.summary[2].startsWith('October 2026 income:'));
+  assert.ok(context.summary[0].startsWith('October 2026 expenses:'));
   assert.ok(context.facts.some(text => text.includes('October 9, 2026')));
   assert.ok(context.facts.every(text => !/\b2026-10/.test(text)));
   assert.equal(data.transactions[0].transactionDate, '2026-10-09');
-  assert.ok(checkedAssistantReply('Your available money is PHP 880 in **2026-10**.', context, '').includes('**October 2026**'));
+  assert.ok(checkedAssistantReply('You recorded PHP 120 in **2026-10**.', context, '').includes('**October 2026**'));
 });
 test('purchase replies lead with a conclusion and explanation; balance replies stay direct', () => {
   const purchase = buildAssistantContext(base, 'Can I buy a controller for 800?', [], now);
-  assert.match(purchase.fallback, /^\*\*At .*200 left\.\*\*\n\nBased on your records/);
+  assert.match(purchase.fallback, /^\*\*At .*200 left\.\*\*\n\nYou have/);
   assert.ok(checkedAssistantReply(purchase.fallback, purchase, ''));
   const balance = buildAssistantContext(base, 'What is my balance?', [], now);
   assert.ok(!balance.fallback.includes('**'));
@@ -139,4 +140,71 @@ test('purchase replies lead with a conclusion and explanation; balance replies s
   assert.ok(!balance.fallback.includes('October 2026 income'));
   assert.ok(checkedAssistantReply('1. Available: **PHP 1000**\n2. After purchase: **PHP 200**', purchase, ''));
   assert.equal(checkedAssistantReply('1. Available: **PHP 1000**\n2. After purchase: **PHP 999**', purchase, ''), undefined);
+});
+
+
+test('singular peso, symbols, PHP and k prices are recognized without asking again', () => {
+  for (const price of ['1,200 peso', '1,200 pesos', '\u20b11,200', 'PHP 1,200', '1.2k']) {
+    const result = build('Is it alright if I buy a ' + price + ' controller?');
+    assert.deepEqual(result.purchase, { price: 120000, remaining: -20000, shortfall: 20000 });
+    assert.match(result.fallback, /200 short/);
+    assert.ok(!/What price/.test(result.fallback));
+    assert.ok(checkedAssistantReply(result.fallback, result, ''));
+  }
+  assert.equal(build('Can I buy it for 1.234k?').purchase, undefined);
+});
+
+test('spending, income, budgets and savings receive distinct relevant guidance', () => {
+  const data = { ...base, transactions: [record({ category: 'Meals' }), record({ id: 'income', type: 'INCOME', category: 'Allowance', amount: 50000 })], budgets: [{ category: 'Meals', month: '2026-10', limitAmount: 30000 }] };
+  const expense = build('Where did my money go this month?', data);
+  assert.match(expense.fallback, /120.*expenses.*Meals/);
+  assert.ok(!expense.fallback.includes('available for spending'));
+  assert.ok(!expense.facts.some(text => text.startsWith('Budget ') || text.startsWith('Account ')));
+  assert.match(build('How much income did I record?', data).fallback, /500.*income/);
+  assert.match(build('How are my budgets doing?', data).fallback, /Meals.*120.*300.*180/);
+  assert.match(build('How are my savings?', data).fallback, /savings accounts hold/);
+  const available = build('How much is my available spending money?', data);
+  assert.match(available.fallback, /1,380 available for spending/);
+  for (const question of ['Where did my money go this month?', 'How much income did I record?', 'How are my budgets doing?', 'How are my savings?', 'How much is my available spending money?']) {
+    const context = build(question, data);
+    assert.ok(checkedAssistantReply(context.fallback, context, ''), question);
+  }
+});
+
+test('followups retain the latest price and topic without reviving an old purchase', () => {
+  const history = [{ role: 'user', text: 'Can I buy a controller for 1200 pesos?' }];
+  assert.equal(build('What about 800?', base, history).purchase.price, 80000);
+  assert.ok(!build('Why?', base, history).fallback.startsWith('You have'));
+  const changed = [...history, { role: 'user', text: 'How are my budgets doing?' }];
+  const result = build('Why?', base, changed);
+  assert.equal(result.purchase, undefined); assert.match(result.fallback, /no active budgets/);
+  const recurring = [{ role: 'user', text: 'Can I buy rice every day for 60 pesos?' }, { role: 'user', text: 'What about monthly?' }];
+  assert.match(build('Why?', base, recurring).fallback, /30 days.*1,800/);
+});
+
+test('repeated model sentences are rejected while distinct calculated answers remain usable', () => {
+  const context = build('What is my balance?');
+  const sentence = 'You have PHP 1000 available for spending.';
+  assert.equal(checkedAssistantReply(sentence + ' ' + sentence, context, ''), undefined);
+  assert.ok(checkedAssistantReply(sentence, context, ''));
+});
+
+
+test('goal and savings guidance uses recorded savings and excludes future deposits', () => {
+  const savings = { ...cash, id: 'savings', name: 'Bank', purpose: 'savings', includedInAvailable: false, openingBalance: 200000 };
+  const goal = { id: 'goal', accountId: savings.id, name: 'Laptop', targetAmount: 300000, createdAt: record().createdAt, updatedAt: record().updatedAt };
+  const data = { ...base, accounts: [cash, savings], goals: [goal], transactions: [record({ id: 'future', accountId: savings.id, type: 'INCOME', category: 'Other Income', amount: 500000, transactionDate: '2026-11-01' })] };
+  const result = build('How is my Laptop goal?', data);
+  assert.match(result.fallback, /Laptop.*2,000.*3,000.*1,000 more/);
+  assert.ok(!result.facts.some(text => text.startsWith('Account ') || text.startsWith('Budget ')));
+  assert.ok(!result.summary.some(text => text.includes('income')));
+  assert.ok(checkedAssistantReply(result.fallback, result, ''));
+  assert.ok(checkedAssistantReply(build('How are my savings?', data).fallback, build('How are my savings?', data), ''));
+});
+
+
+test('context supplies one reply guide and known prices never trigger another price question', () => {
+  const context = buildAssistantContext(base, 'Can I buy a controller for 800 pesos?', [], now);
+  assert.equal(context.facts.filter(text => text.includes(context.fallback)).length, 1);
+  assert.equal(checkedAssistantReply('You have PHP 1000 available and PHP 200 left. What price are you considering?', context, ''), undefined);
 });
