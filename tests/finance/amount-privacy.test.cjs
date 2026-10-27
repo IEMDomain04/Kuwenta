@@ -76,3 +76,14 @@ test('the eye button exposes the correct action and toggles the shared preferenc
   button().props.onPress();
   assert.equal(button().props.accessibilityLabel, 'Hide amounts');
 });
+
+test('new debt, balance and fee insight amounts stay masked by the shared privacy setting', () => {
+ const h=harness();
+ const {moneyInsights,accountInsights}=require('../../.expo/finance-tests/insights.js');
+ const {cash}=require('./fixtures.cjs');
+ const bank={...cash,id:'bank',name:'MariBank',purpose:'savings',includedInAvailable:false,openingBalance:600000};
+ const context={debts:[{id:'debt',name:'Ana',kind:'owed',amount:45000,existing:true,transactionDate:'2026-10-01'}],payments:[],additions:[]};
+ const date=new Date('2026-10-11T02:00:00Z');
+ const messages=[...moneyInsights([cash,bank],[],[],[],date,context),...accountInsights([cash,bank],[],[],date,context).insights,`Cash-in and cash-out fees totaled ${peso}60 in October 2026.`];
+ for(const message of messages){const hidden=h.conceal(message,true);assert.ok(!hidden.includes(peso));assert.ok(!/\d+(?:\.\d+)?%/.test(hidden));assert.ok(hidden.includes(mask));}
+});

@@ -15,7 +15,7 @@ import { AccountsOverview } from '../components/accounts-overview';
 import { FinanceScreen, AddTransactionButton } from '../components/ui';
 
 export default function AccountsScreen() {
-  const { accounts, transactions, budgets, busy } = useFinance();
+  const { accounts, transactions, budgets, debts, debtPayments, debtAdditions, busy } = useFinance();
   const theme = useTheme();
   const { formatAmount: formatMoney, conceal } = useAmountVisibility();
   const { height } = useWindowDimensions();
@@ -23,9 +23,9 @@ export default function AccountsScreen() {
   const [details, setDetails] = useState<'money' | 'insights' | null>(null);
   const date = philippineDateTime(new Date()).transactionDate;
   const result = useMemo(() => {
-    try { return { money: accountInsights(accounts, transactions, budgets, new Date(date + 'T00:00:00+08:00')), error: '' }; }
+    try { return { money: accountInsights(accounts, transactions, budgets, new Date(date + 'T00:00:00+08:00'), { debts, payments:debtPayments, additions:debtAdditions }), error: '' }; }
     catch (cause) { return { money: undefined, error: cause instanceof Error ? cause.message : 'Could not calculate balances.' }; }
-  }, [accounts, transactions, budgets, date]);
+  }, [accounts, transactions, budgets, debts, debtPayments, debtAdditions, date]);
   const { money, error } = result;
   return <FinanceScreen title="Accounts" scrollEnabled={!dragging} headerAccessory={<Pressable accessibilityRole="button" accessibilityLabel="Add account" disabled={busy} onPress={() => router.push('/account')} style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', gap: 4, alignItems: 'center', backgroundColor: theme.backgroundSelected, opacity: pressed || busy ? 0.5 : 1 })}>
         <Ionicons name="add" size={16} color={theme.accent} /><ThemedText type="smallBold" themeColor="accent">Add account</ThemedText>
@@ -80,7 +80,7 @@ export default function AccountsScreen() {
                   <ThemedText type="smallBold">Available Money: {formatMoney(money.availableMoney, true)}</ThemedText>
                 </> : null}
                 <ThemedText type="small" themeColor="textSecondary">Balances come from starting money and recorded activity. Kuwenta does not check your bank or actual cash.</ThemedText>
-              </> : money?.insights.map(insight => <ThemedText key={insight} type="small">{conceal(insight)}</ThemedText>)}
+              </> : money?.insights.map((insight,index) => <View key={insight} style={{paddingTop:index ? 12 : 0,borderTopWidth:index ? 1 : 0,borderTopColor:theme.border}}><ThemedText type="small">{conceal(insight)}</ThemedText></View>)}
             </ScrollView>
           </View>
         </SafeAreaView>

@@ -72,10 +72,10 @@ test('remaining budget allowances sum positive category balances, not overspendi
   const funded = moneyInsights([cash], [record()], budget(15000), [], now);
   assert.ok(funded.some(text => /exceeds remaining budget limits.*850/.test(text) && /bills/.test(text)));
 });
-test('all applicable insights are retained instead of truncating the details to three', () => {
+test('the main insight and up to four relevant details are retained without duplicates', () => {
   const rows = [record(), record({ id: 'income', type: 'INCOME', category: 'Freelance', amount: 5000 }), record({ id: 'prior', transactionDate: '2026-09-09', amount: 1000 })];
   const result = moneyInsights([cash], rows, budget(15000), [], now);
-  assert.ok(result.length > 3);
+  assert.ok(result.length > 3 && result.length <= 5);
   assert.equal(new Set(result).size, result.length);
   assert.ok(result.some(text => /Freelance/.test(text)));
 });
@@ -85,30 +85,32 @@ test('account balance breakdown includes archived and excluded accounts consiste
   assert.equal(result.totalMoney, 160000);
   assert.equal(result.availableMoney, 120000);
   assert.equal(result.balances.length, 3);
-  assert.equal(result.insights.length, 1);
-  assert.match(result.insights[0], /available for spending/);
+  assert.ok(result.insights.some(text => /Old wallet is archived.*200.*included in Total Money/.test(text)));
+  assert.ok(result.insights.some(text => /400 in savings accounts.*available for spending/.test(text)));
 });
 test('negative balances are the first account insight and savings concentration gets useful feedback', () => {
   const accounts = [{ ...cash, openingBalance: -10000 }, { ...saving, openingBalance: 100000 }];
   const result = accountInsights(accounts, [], [], now);
   assert.match(result.insights[0], /Cash.*negative.*100/);
-  assert.match(result.insights[1], /in savings.*available for spending/);
+  assert.ok(result.insights.some(text => /in savings accounts.*available for spending/.test(text)));
   const concentrated = accountInsights([{ ...cash, openingBalance: 5000 }, { ...saving, openingBalance: 100000 }], [], [], now);
-  assert.match(concentrated.insights[0], /in savings.*50.*available/);
+  assert.ok(concentrated.insights.some(text => /in savings accounts.*50.*available/.test(text)));
 });
-test('account declines require an actual 25% change within the last 30 days', () => {
+test('account spending feedback names the account and excludes past or future activity', () => {
   const result = accountInsights([cash], [record({ amount: 30000 })], [], now);
-  assert.ok(result.insights.some(text => /fell by.*300.*last 30 days/.test(text)));
-  assert.ok(accountInsights([cash], [record({ amount: 20000 })], [], now).insights.every(text => !text.includes('fell by')));
-  assert.ok(accountInsights([cash], [record({ amount: 30000, transactionDate: '2026-08-01' })], [], now).insights.every(text => !text.includes('fell by')));
-  assert.ok(accountInsights([cash], [record({ amount: 30000, transactionDate: '2026-10-12' })], [], now).insights.every(text => !text.includes('fell by')));
+  assert.ok(result.insights.some(text => /300 in expenses from Cash.*October 2026/.test(text)));
+  assert.ok(accountInsights([cash], [record({ amount: 20000 })], [], now).insights.some(text => /200 in expenses from Cash/.test(text)));
+  for(const date of ['2026-08-01','2026-10-12']) assert.ok(accountInsights([cash], [record({transactionDate:date})], [], now).insights.every(text => !text.includes('in expenses from')));
 });
-test('a decline caused by a transfer is described as a balance change, not spending', () => {
+
+test('transfers explain account movement without calling the principal spending', () => {
   const transfer = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'save', amount: 30000 });
   const result = accountInsights([cash, saving], [transfer], [], now);
   assert.equal(result.totalMoney, cash.openingBalance);
-  assert.ok(result.insights.some(text => /fell by.*300/.test(text) && /transfers/.test(text)));
+  assert.match(result.insights[0], /300 moved from Cash to Savings.*not spending/);
+  assert.ok(result.insights.every(text => !/in expenses from|fell by/.test(text)));
 });
+
 test('tied categories are identified honestly and future expenses do not trigger warnings', () => {
   const income = category => record({ id: category, type: 'INCOME', category, amount: 50000 });
   assert.ok(moneyInsights([cash], [income('Salary'), income('Freelance')], [], [], now).some(text => /tied for your largest income source/.test(text)));
@@ -116,10 +118,10 @@ test('tied categories are identified honestly and future expenses do not trigger
 });
 
 
-test('account summary shows savings before ordinary spending and preserves centavos', () => {
+test('account feedback includes savings and actual spending while preserving centavos', () => {
   const result = accountInsights([cash, { ...saving, openingBalance: 200050 }], [record({ amount: 12025 })], [], now);
-  assert.equal(result.insights.length, 1);
-  assert.match(result.insights[0], /2,000.50 in savings.*879.75 available/);
+  assert.match(result.insights[0], /120.25 in expenses from Cash/);
+  assert.ok(result.insights.some(text => /2,000.50 in savings accounts.*879.75 available/.test(text)));
 });
 
 test('account spending summary excludes transfers, corrections, external funds and future expenses', () => {
@@ -133,8 +135,9 @@ test('account spending summary excludes transfers, corrections, external funds a
   ];
   const accounts = [cash, { ...saving, purpose: 'spending', includedInAvailable: true }];
   const result = accountInsights(accounts, rows, [], now);
-  assert.equal(result.insights.length, 1);
-  assert.match(result.insights[0], /spent.*100.50 in October 2026.*899.50 available/);
+  assert.ok(result.insights.some(text => /100.50 in expenses from Cash in October 2026/.test(text)));
+  assert.equal(result.availableMoney,89950);
+  assert.ok(result.insights.every(text => !/110.50 in expenses|150.50 in expenses/.test(text)));
   const empty = accountInsights([{ ...cash, openingBalance: 0 }], [], [], now);
   assert.deepEqual(empty.insights, ['Add your starting balances to see your money overview.']);
 });
@@ -193,4 +196,81 @@ test('higher spending and savings withdrawals are observations, not sad reaction
  const withdrawal = moneyInsights([cash, { ...saving, openingBalance: 20000 }], [out], [], [], now)[0];
  assert.match(withdrawal, /transferred out of savings/);
  assert.equal(moneyInsightReaction(withdrawal), 'thinking');
+});
+
+const debtEntry = (overrides={}) => ({id:'loan',name:'Ana',kind:'owed',amount:50000,accountId:'cash',transactionDate:'2026-10-01',transactionTime:'10:00:00',createdAt:'2026-10-01T02:00:00.000Z',updatedAt:'2026-10-01T02:00:00.000Z',...overrides});
+const paymentEntry = {id:'paid',debtId:'loan',amount:20000,accountId:'cash',transactionDate:'2026-10-02',transactionTime:'10:00:00',createdAt:'2026-10-02T02:00:00.000Z'};
+const addedEntry = {id:'more',debtId:'loan',amount:15000,accountId:'cash',transactionDate:'2026-10-03',transactionTime:'10:00:00',createdAt:'2026-10-03T02:00:00.000Z'};
+
+test('Home debt insights include later borrowing, partial repayments and both directions without changing money',()=>{
+ const context={debts:[debtEntry(),debtEntry({id:'owe',kind:'owe',amount:30000,existing:true,accountId:undefined})],payments:[paymentEntry],additions:[addedEntry]};
+ const before=JSON.stringify(context), {debtMovement,debtAdditionMovement}=require('../../.expo/finance-tests/debts.js');
+ const movements=[debtMovement(context.debts[0]),debtMovement(context.debts[0],paymentEntry),debtAdditionMovement(context.debts[0],addedEntry)];
+ const messages=moneyInsights([cash],movements,[],[],now,context);
+ assert.ok(messages.some(text=>/450 is still owed to you.*not included/.test(text)));
+ assert.ok(messages.some(text=>/300 left to repay/.test(text)));
+ assert.ok(messages.every(text=>!/expense category|largest income source/.test(text)));
+ assert.equal(JSON.stringify(context),before);
+ const result=accountInsights([cash],movements,[],now,context);
+ assert.match(result.insights[0],/lent.*650.*received.*200 back.*450 remains owed/);
+ assert.equal(result.totalMoney,55000);
+});
+
+test('tracking-only debts explain what remains owed without inventing lending or repayments',()=>{
+ const context={debts:[debtEntry({existing:true,accountId:undefined})],payments:[],additions:[{...addedEntry,existing:true,accountId:undefined}]};
+ const home=moneyInsights([cash],[],[],[],now,context);
+ assert.ok(home.some(text=>/650 is still owed to you/.test(text)));
+ const account=accountInsights([cash],[],[],now,context);
+ assert.equal(account.totalMoney,cash.openingBalance);assert.ok(account.insights.every(text=>!text.includes('You lent')));
+ const settled={...context,payments:[{...paymentEntry,amount:65000}]};
+ assert.ok(moneyInsights([cash],[],[],[],now,settled).every(text=>!text.includes('still owed')));
+ const future={debts:[debtEntry({transactionDate:'2026-10-12'})],payments:[],additions:[]};
+ assert.deepEqual(moneyInsights([cash],[],[],[],now,future),[]);
+});
+
+test('cash-in/out fee insights exclude exchanged principal, service losses and ordinary Fees entries',()=>{
+ const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/exchanges.js');
+ const exchange=(id,kind,paid,received)=>exchangeRecords(id,exchangeDraft('cash',{kind,paid,received,receivedAccountId:'save',extraAccountId:'cash',earningsConfirmed:true},'2026-10-09','10:00:00'),record().createdAt);
+ const rows=[...exchange('in','E-bank Cash-in',20400,20000),...exchange('out','E-bank Cash-out',10000,9800),...exchange('service','Service sale',1000,900),record({id:'other-fee',category:'Fees',amount:500})];
+ const result=accountInsights([cash,saving],rows,[],now);
+ assert.ok(result.insights.some(text=>/fees totaled.*6 in October 2026/.test(text)));
+ assert.equal(result.totalMoney,98800);
+ const equal=accountInsights([cash,saving],exchange('equal','E-bank Cash-in',10000,10000),[],now);
+ assert.ok(equal.insights.every(text=>!text.includes('fees totaled')));
+});
+
+test('Home and Accounts keep one main insight plus at most four others with warnings first',()=>{
+ const accounts=[{...cash,openingBalance:-1000},{...saving,openingBalance:200000},{...cash,id:'old',name:'Old account',openingBalance:50000,archived:true}];
+ const rows=[record({category:'Meals'}),record({id:'fare',category:'Transport',amount:5000}),record({id:'income',type:'INCOME',category:'Freelance',amount:1000})];
+ const budgets=[{month:'2026-10',category:'Meals',limitAmount:10000},{month:'2026-10',category:'Transport',limitAmount:5000}];
+ const home=moneyInsights(accounts,rows,budgets,[],now), account=accountInsights(accounts,rows,budgets,now);
+ for(const messages of [home,account.insights]){assert.ok(messages.length<=5);assert.equal(new Set(messages).size,messages.length);assert.match(messages[0],/negative recorded balance/);}
+});
+
+test('overlapping daily weekly and overall budgets stay separate, with exceeded limits before near limits',()=>{
+ const budgets=[{month:'daily:2026-10-11',category:'Meals',limitAmount:12500},{month:'weekly:2026-10-05',category:'Meals',limitAmount:10000},{month:'2026-10',category:'Overall spending',limitAmount:50000},{month:'2026-10',category:'Transport',limitAmount:90000}];
+ const rows=[record({category:'Meals',transactionDate:'2026-10-11'})];
+ const result=moneyInsights([cash],rows,budgets,[],now);
+ assert.match(result[0],/20 over budget/);
+ assert.ok(result.some(text=>/96%/.test(text)));
+ // Overall remaining is 380, not the sum of the overlapping category/scope limits.
+ assert.ok(!result.some(text=>/available, below/.test(text)));
+});
+
+test('student feedback is neutral and future goals do not trigger a premature celebration',()=>{
+ const home=moneyInsights([cash],[record({amount:60000})],[],[],now);
+ assert.ok(home.some(text=>/600 in expenses.*starting money too/.test(text)));
+ assert.equal(moneyInsightReaction(home[0]),'friendly');
+ const future=record({id:'future-goal',type:'TRANSFER',category:'Transfer',destinationAccountId:'save',amount:50000,transactionDate:'2026-10-12'});
+ const goal={id:'goal',name:'Laptop',accountId:'save',targetAmount:50000,createdAt:record().createdAt,updatedAt:record().updatedAt};
+ assert.deepEqual(moneyInsights([cash,saving],[future],[],[goal],now),[]);
+});
+
+test('account feedback identifies excluded funds, archived money and the largest holding without advice to spend',()=>{
+ const accounts=[{...cash,openingBalance:0},{...saving,openingBalance:600000},{...cash,id:'old',name:'Old bank',openingBalance:200000,includedInAvailable:false,archived:true}];
+ const result=accountInsights(accounts,[],[],now);
+ assert.match(result.insights[0],/excluded from Available Money.*Edit account/);
+ assert.ok(result.insights.some(text=>/Old bank is archived.*2,000.*Total Money/.test(text)));
+ assert.ok(result.insights.some(text=>/Savings holds.*6,000.*8,000/.test(text)));
+ assert.ok(result.insights.every(text=>!/too much|go spend|afford|get a job/.test(text)));
 });

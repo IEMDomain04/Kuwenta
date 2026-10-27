@@ -42,6 +42,9 @@ export default function HomeScreen() {
     transactions,
     budgets,
     goals,
+    debts,
+    debtPayments,
+    debtAdditions,
     month,
     busy,
     homeVisualizations,
@@ -117,13 +120,14 @@ export default function HomeScreen() {
         budgets,
         goals,
         new Date(insightDate + "T00:00:00+08:00"),
+        { debts, payments: debtPayments, additions: debtAdditions },
       );
     } catch {
       return [
         "Insights are unavailable. Review your records in Accounts and History.",
       ];
     }
-  }, [accounts, transactions, budgets, goals, insightDate]);
+  }, [accounts, transactions, budgets, goals, debts, debtPayments, debtAdditions, insightDate]);
   const insightMessage = insights[0] ?? message;
   // Expressions describe the displayed insight; they never change financial records.
   const reaction = moneyInsightReaction(insightMessage);
