@@ -1,15 +1,18 @@
-import type { Account, Debt, DebtPayment, Transaction } from './types';
+import type { Account, Debt, DebtAddition, DebtPayment, Transaction } from './types';
 import { isValidDate, isValidTime, isUtcTimestamp } from './dates';
 
 
-export function debtProgress(debt: Debt, payments: readonly DebtPayment[]) {
+export function debtProgress(debt: Debt, payments: readonly DebtPayment[], additions: readonly DebtAddition[] = []) {
+  const added = additions.filter(row => row.debtId === debt.id).reduce((sum, row) => sum + BigInt(row.amount), 0n);
+  const total = BigInt(debt.amount) + added;
   const paid = payments.filter(row => row.debtId === debt.id).reduce((sum, row) => sum + BigInt(row.amount), 0n);
-  if (paid < 0n || paid > BigInt(debt.amount)) throw new Error('Repayments cannot exceed the original debt.');
-  return { paid: Number(paid), remaining: debt.amount - Number(paid), settled: paid === BigInt(debt.amount) };
+  if (total > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Debt total exceeds the supported range.');
+  if (paid < 0n || paid > total) throw new Error('Repayments cannot exceed the total borrowed amount.');
+  return { added: Number(added), totalBorrowed: Number(total), paid: Number(paid), remaining: Number(total - paid), settled: paid === total };
 }
-export function debtTotals(debts: readonly Debt[], payments: readonly DebtPayment[]) {
+export function debtTotals(debts: readonly Debt[], payments: readonly DebtPayment[], additions: readonly DebtAddition[] = []) {
   let owe = 0n, owed = 0n;
-  for (const debt of debts) { const remaining = BigInt(debtProgress(debt, payments).remaining); if (debt.kind === 'owe') owe += remaining; else owed += remaining; }
+  for (const debt of debts) { const remaining = BigInt(debtProgress(debt, payments, additions).remaining); if (debt.kind === 'owe') owe += remaining; else owed += remaining; }
   if (owe > BigInt(Number.MAX_SAFE_INTEGER) || owed > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Debt total exceeds the supported range.');
   return { owe: Number(owe), owed: Number(owed) };
 }
@@ -22,6 +25,9 @@ export function debtMovement(debt: Debt, payment?: DebtPayment): Transaction {
     transactionDate: row.transactionDate, transactionTime: row.transactionTime, notes: row.notes,
     createdAt: row.createdAt, updatedAt: payment ? row.createdAt : debt.updatedAt };
 }
+export function debtAdditionMovement(debt: Debt, addition: DebtAddition): Transaction {
+  return debtMovement({ ...debt, ...addition, existing: addition.existing, updatedAt: addition.createdAt });
+}
 function validateEntry(row: Pick<Debt, 'id' | 'amount' | 'accountId' | 'transactionDate' | 'transactionTime' | 'createdAt' | 'notes'>, accounts: readonly Account[], requiresAccount = true) {
   if (typeof row.id !== 'string' || !row.id.trim()) throw new Error('Debt record ID is required.');
   if (!Number.isSafeInteger(row.amount) || row.amount <= 0) throw new Error('Enter an amount greater than zero.');
@@ -29,7 +35,7 @@ function validateEntry(row: Pick<Debt, 'id' | 'amount' | 'accountId' | 'transact
   if (!isValidDate(row.transactionDate) || !isValidTime(row.transactionTime) || !isUtcTimestamp(row.createdAt)) throw new Error('Choose a valid date and time.');
   if (row.notes !== undefined && typeof row.notes !== 'string') throw new Error('Enter a valid note.');
 }
-export function validateDebtRecords(debts: readonly Debt[], payments: readonly DebtPayment[], accounts: readonly Account[], transactions: readonly Transaction[]) {
+export function validateDebtRecords(debts: readonly Debt[], payments: readonly DebtPayment[], accounts: readonly Account[], transactions: readonly Transaction[], additions: readonly DebtAddition[] = []) {
   const ids = new Set<string>();
   const movementById = new Map(transactions.map(row => [row.id, row]));
   function checkMovement(debt: Debt, payment?: DebtPayment) {
@@ -53,6 +59,15 @@ export function validateDebtRecords(debts: readonly Debt[], payments: readonly D
     if (debt.dueDate !== undefined && (!isValidDate(debt.dueDate) || debt.dueDate < debt.transactionDate)) throw new Error('Due date must be on or after the loan date.');
     checkMovement(debt); byId.set(debt.id, debt);
   }
+  for (const addition of additions) {
+    const debt = byId.get(addition.debtId);
+    if (!debt) throw new Error('Additional borrowing references an unknown debt.');
+    if (addition.existing !== undefined && typeof addition.existing !== 'boolean') throw new Error('Choose how to record this borrowing.');
+    if (addition.existing && addition.accountId !== undefined) throw new Error('An existing borrowing does not need an account.');
+    validateEntry(addition, accounts, !addition.existing);
+    if (addition.transactionDate + addition.transactionTime < debt.transactionDate + debt.transactionTime) throw new Error('Additional borrowing cannot be before the original debt.');
+    checkMovement({ ...debt, ...addition, existing: addition.existing, updatedAt: addition.createdAt });
+  }
   for (const payment of payments) {
     validateEntry(payment, accounts);
     const debt = byId.get(payment.debtId);
@@ -60,5 +75,17 @@ export function validateDebtRecords(debts: readonly Debt[], payments: readonly D
     if (payment.transactionDate + payment.transactionTime < debt.transactionDate + debt.transactionTime) throw new Error('Repayment cannot be before the loan.');
     checkMovement(debt, payment);
   }
-  debtTotals(debts, payments);
+  debtTotals(debts, payments, additions);
+  // Borrowing must already exist at the time of each repayment.
+  for (const debt of debts) {
+    const events = [
+      ...additions.filter(row => row.debtId === debt.id).map(row => ({ at: row.transactionDate + row.transactionTime, amount: row.amount, payment: false })),
+      ...payments.filter(row => row.debtId === debt.id).map(row => ({ at: row.transactionDate + row.transactionTime, amount: row.amount, payment: true })),
+    ].sort((a,b) => a.at.localeCompare(b.at) || Number(a.payment) - Number(b.payment));
+    let remaining = BigInt(debt.amount);
+    for (const event of events) {
+      remaining += BigInt(event.amount) * (event.payment ? -1n : 1n);
+      if (remaining < 0n) throw new Error('Repayment exceeds the amount borrowed on that date.');
+    }
+  }
 }

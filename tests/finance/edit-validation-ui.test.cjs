@@ -5,9 +5,9 @@ const ts = require('typescript');
 const vm = require('node:vm');
 const { cash, record } = require('./fixtures.cjs');
 const settle = () => new Promise(resolve => setImmediate(resolve));
-function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], debts = [], debtPayments = [], onSubmit = () => {}, deleteFailure = false, refreshRecords } = {}) {
+function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], debts = [], debtPayments = [], debtAdditions = [], onSubmit = () => {}, deleteFailure = false, refreshRecords } = {}) {
   const hooks = []; let cursor = 0; const saved = [], prompts = [], notices = [], removed = [], navigation = [], effects = [], refreshed = [];
-  const finance = { debts, debtPayments, addDebt: async debt => saved.push(debt), payDebt: async payment => saved.push(payment), removeDebt: async (...args) => removed.push(args), saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
+  const finance = { debts, debtPayments, debtAdditions, addDebtAmount: async addition => saved.push(addition), correctDebtAmount: async (...args) => saved.push(args), removeDebtAddition: async id => removed.push(id), addDebt: async debt => saved.push(debt), payDebt: async payment => saved.push(payment), removeDebt: async (...args) => removed.push(args), saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
   finance.refresh = async () => { refreshed.push(true); refreshRecords?.(finance); };
   const state = initial => { const index = cursor++; if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial; return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }]; };
   const jsx = (type, props) => ({ type, props });
@@ -525,4 +525,35 @@ test('new and edited exchange previews retain account history and match saved ex
     assert.equal(calculateAccountSummary(accounts[1], records, '2026-10').balance, 600000 - paid);
     assert.equal(calculateAccountSummary(accounts[0], records, '2026-10').balance, 100000 + received);
   }
+});
+
+const editableDebt={id:'loan',name:'Ana',kind:'owed',amount:50000,accountId:'cash',transactionDate:'2020-01-01',transactionTime:'00:00:00',createdAt:'2020-01-01T00:00:00.000Z',updatedAt:'2020-01-01T00:00:00.000Z'};
+
+test('additional borrowing uses the existing debt form and saves only the added amount once',async()=>{
+ const h=harness('screens/debt-screen.tsx',{params:{id:'loan'},debts:[editableDebt],debtPayments:[{id:'paid',debtId:'loan',amount:20000,transactionDate:'2020-01-02',transactionTime:'10:00:00',accountId:'cash'}]});
+ h.render().button('Add borrowed amount').props.onPress();
+ assert.equal(h.render().input('Repayment amount'),undefined);
+ h.render().input('Additional borrowed amount').props.onValueChange('150');h.render().find('SelectionSheet').props.onSelect('cash');
+ const save=h.render().button('Save borrowing');save.props.onPress();save.props.onPress();await settle();
+ assert.equal(h.saved.length,1);assert.equal(h.saved[0].amount,15000);assert.equal(h.saved[0].debtId,'loan');assert.equal(h.saved[0].accountId,'cash');
+});
+
+test('settled debt allows tracking earlier additional borrowing without an account',async()=>{
+ const h=harness('screens/debt-screen.tsx',{params:{id:'loan'},debts:[editableDebt],debtPayments:[{id:'paid',debtId:'loan',amount:50000,transactionDate:'2020-01-02',transactionTime:'10:00:00',accountId:'cash'}]});
+ assert.equal(h.render().button('Save repayment'),undefined);h.render().button('Add borrowed amount').props.onPress();
+ h.render().nodes.find(node=>node.type==='SelectionSheet'&&node.props.title==='When did this happen?').props.onSelect('existing');
+ h.render().input('Additional borrowed amount').props.onValueChange('150');assert.equal(h.render().button('Debt account'),undefined);
+ h.render().button('Save borrowing').props.onPress();await settle();assert.equal(h.saved.length,1);assert.equal(h.saved[0].existing,true);assert.equal(h.saved[0].accountId,undefined);
+});
+
+test('original amount correction confirms old and new amounts and cancellation keeps history intact',async()=>{
+ const h=harness('screens/debt-screen.tsx',{params:{id:'loan'},debts:[editableDebt],debtPayments:[{id:'paid',debtId:'loan',amount:20000,transactionDate:'2020-01-02',transactionTime:'10:00:00',accountId:'cash'}]});
+ h.render().button('Edit original amount').props.onPress();assert.equal(h.render().input('Original amount').props.value,'500.00');
+ assert.equal(h.render().find('TransactionDateTime'),undefined);assert.equal(h.render().button('Debt account'),undefined);
+ h.render().input('Original amount').props.onValueChange('100');h.render().button('Save correction').props.onPress();assert.equal(h.prompts.length,0);
+ h.render().input('Original amount').props.onValueChange('600');h.render().button('Save correction').props.onPress();
+ assert.match(h.prompts[0][3].change.before,/500.00/);assert.match(h.prompts[0][3].change.after,/600.00/);
+ h.prompts[0][2].find(button=>button.style==='cancel').onPress();assert.equal(h.saved.length,0);
+ h.render().button('Save correction').props.onPress();const confirm=h.prompts[1][2].find(button=>button.text==='Confirm');confirm.onPress();confirm.onPress();await settle();
+ assert.equal(h.saved.length,1);assert.deepEqual(h.saved[0],['loan',60000,50000]);
 });

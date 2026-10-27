@@ -56,7 +56,7 @@ test('initialization creates Cash exactly once and preserves records/opening bal
   await createTransaction(db, 'expense', expense());
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync('SELECT count(*) AS total FROM accounts')).total, 1);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
   assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
@@ -176,9 +176,9 @@ test('migration failure rolls back schema and version; newer schema is rejected'
   assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'accounts'"), null);
   fail = false;
   await initializeDatabase(db);
-  await db.execAsync('PRAGMA user_version = 17');
+  await db.execAsync('PRAGMA user_version = 18');
   await assert.rejects(initializeDatabase(db), /newer version/);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
 });
 
 test('a failure after an edit write rolls back the original transaction', async (t) => {
@@ -382,7 +382,7 @@ test('version 1 migration preserves Cash amounts, IDs and timestamps and is repe
   await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.deepEqual(await listTransactions(db), before);
   assert.ok(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"));
@@ -521,7 +521,7 @@ test('version 3 table migration preserves records and rolls back failures', asyn
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
   db.execAsync = exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
 });
 
@@ -609,7 +609,7 @@ test('version 4 migration preserves existing adjustment and expense records', as
   await adjustAccountBalance(db, 'adjustment-kept', 'cash', 100, -12000);
   await db.execAsync('PRAGMA user_version = 3');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
   assert.equal((await getTransaction(db, 'adjustment-kept')).adjustmentDirection, 'increase');
   assert.equal((await getTransaction(db, 'expense-kept')).amount, 12000);
 });
@@ -806,7 +806,7 @@ test('preferences migration preserves financial records and is repeatable', asyn
   await db.execAsync('DROP TABLE preferences; PRAGMA user_version = 5');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
   assert.equal((await getTransaction(db, 'keep-six')).amount, 12000);
 });
 
@@ -1033,7 +1033,7 @@ test('budget schema migration preserves records and rolls back errors', async (t
   assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
   assert.equal((await listTransactions(db)).length, 1);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
 });
 
 
@@ -1213,7 +1213,7 @@ test('version 9 account color migration preserves existing records and rolls bac
   db.execAsync = exec;
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.equal((await getCashAccount(db)).color, undefined);
 });
@@ -1328,7 +1328,7 @@ test('version 10 palette upgrade preserves foreign keys and rolls back an interr
   assert.ok(!(await db.getAllAsync('PRAGMA table_info(accounts)')).some(row=>row.name==='previousColor'));
   db.execAsync=exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,16);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);
   const bank=(await listAccounts(db)).find(row=>row.id==='bank');
   assert.equal(bank.color,'teal');
   assert.equal(calculateAccountSummary(bank,await listTransactions(db),'2026-10').balance,38000);
@@ -1356,7 +1356,7 @@ test('icon migration preserves monthly records and rolls back on failure; all pe
  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,11);
  assert.deepEqual(await listBudgets(db),[monthly]);
  db.execAsync=exec;await migrateDatabase(db);
- assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,16);
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);
  const cash=await getCashAccount(db);await saveAccount(db,{...cash,icon:'gcash'},false);
  for(const month of ['daily:2026-10-13','weekly:2026-10-12']){
   await saveBudget(db,{...monthly,month},true);
@@ -1673,7 +1673,7 @@ test('version 15 debt migration preserves existing activity and rolls back an in
  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,14);
  assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'debts'"),null);
  db.execAsync=exec;await initializeDatabase(db);
- assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,16);assert.deepEqual(await listTransactions(db),before);
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);assert.deepEqual(await listTransactions(db),before);
 });
 
 
@@ -1753,7 +1753,7 @@ test('version 16 preserves old linked debts and repayments and rolls back an int
  await assert.rejects(initializeDatabase(db),/interrupted/);
  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,15);assert.deepEqual(await listTransactions(db),rows);
  db.execAsync=exec;await initializeDatabase(db);
- assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,16);assert.deepEqual(await listTransactions(db),rows);
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);assert.deepEqual(await listTransactions(db),rows);
  assert.equal((await debtStore.listDebts(db))[0].existing,undefined);
  assert.equal(debtMath.debtTotals(await debtStore.listDebts(db),await debtStore.listDebtPayments(db)).owed,30000);
  assert.deepEqual(await db.getAllAsync('PRAGMA foreign_key_check'),[]);
@@ -1783,4 +1783,93 @@ test('service exchange preserves recorded history when saving, editing and delet
   assert.equal(await balance('bank'), 600000);
   assert.equal(await balance('cash'), cashBefore);
   assert.ok(await getTransaction(db, 'earlier-expense'));
+});
+
+const sampleAddition = (overrides={}) => ({id:'addition',debtId:'loan',amount:15000,accountId:'cash',transactionDate:'2026-10-21',transactionTime:'10:00:00',createdAt:'2026-10-21T02:00:00.000Z',...overrides});
+
+test('additional borrowing preserves repayments and only moves the new amount in either direction',async t=>{
+ for(const kind of ['owe','owed']) {
+  const db=await setup(t);await updateOpeningBalance(db,100000);
+  await debtStore.createDebt(db,sampleDebt({kind}));await debtStore.recordDebtPayment(db,samplePayment());
+  const before=await listTransactions(db), balance=calculateAccountSummary(await getCashAccount(db),before,'2026-10').balance;
+  await debtStore.recordDebtAddition(db,sampleAddition());await debtStore.recordDebtAddition(db,sampleAddition());
+  const rows=await listTransactions(db),progress=debtMath.debtProgress((await debtStore.listDebts(db))[0],await debtStore.listDebtPayments(db),await debtStore.listDebtAdditions(db));
+  assert.equal(progress.remaining,45000);assert.equal(progress.paid,20000);assert.equal(progress.totalBorrowed,65000);
+  assert.equal(rows.length,3);assert.deepEqual(rows.filter(row=>row.id!=='addition'),before);
+  const summary=calculateAccountSummary(await getCashAccount(db),rows,'2026-10');
+  assert.equal(summary.balance,balance+(kind==='owe'?15000:-15000));assert.equal(summary.monthlyIncome,0);assert.equal(summary.monthlyExpenses,0);
+  await debtStore.removeDebtAddition(db,'addition');assert.deepEqual(await listTransactions(db),before);
+ }
+});
+
+test('tracking-only additions reopen settled debts without moving money and can then be repaid',async t=>{
+ const db=await setup(t);await debtStore.createDebt(db,sampleDebt({existing:true,accountId:undefined}));
+ await debtStore.recordDebtPayment(db,samplePayment({amount:50000}));
+ const before=await listTransactions(db);
+ await debtStore.recordDebtAddition(db,sampleAddition({existing:true,accountId:undefined}));
+ assert.deepEqual(await listTransactions(db),before);
+ assert.equal(debtMath.debtProgress(sampleDebt(),await debtStore.listDebtPayments(db),await debtStore.listDebtAdditions(db)).remaining,15000);
+ await debtStore.recordDebtPayment(db,samplePayment({id:'last',amount:15000,transactionDate:'2026-10-22'}));
+ assert.equal(debtMath.debtTotals(await debtStore.listDebts(db),await debtStore.listDebtPayments(db),await debtStore.listDebtAdditions(db)).owed,0);
+ await assert.rejects(debtStore.removeDebtAddition(db,'addition'),/exceed/);
+ await debtStore.removeDebtRecord(db,'loan');assert.deepEqual(await listTransactions(db),[]);assert.deepEqual(await debtStore.listDebtAdditions(db),[]);
+});
+
+test('original amount correction updates only the initial movement and rejects stale or underpaid history',async t=>{
+ const db=await setup(t);await debtStore.createDebt(db,sampleDebt());await debtStore.recordDebtPayment(db,samplePayment());await debtStore.recordDebtAddition(db,sampleAddition());
+ const repayments=await debtStore.listDebtPayments(db), additions=await debtStore.listDebtAdditions(db);
+ await debtStore.correctDebtAmount(db,'loan',60000,50000);
+ assert.equal((await debtStore.listDebts(db))[0].amount,60000);assert.equal((await getTransaction(db,'loan')).amount,60000);
+ assert.deepEqual(await debtStore.listDebtPayments(db),repayments);assert.deepEqual(await debtStore.listDebtAdditions(db),additions);
+ const before=await listTransactions(db);
+ await assert.rejects(debtStore.correctDebtAmount(db,'loan',70000,50000),/changed/);
+ await assert.rejects(debtStore.correctDebtAmount(db,'loan',10000,60000),/on that date/);
+ await assert.rejects(debtStore.correctDebtAmount(db,'loan',0,60000),/greater than zero/);
+ assert.deepEqual(await listTransactions(db),before);
+ const tracked=sampleDebt({id:'old',existing:true,accountId:undefined});await debtStore.createDebt(db,tracked);
+ await debtStore.correctDebtAmount(db,'old',45000,50000);assert.deepEqual(await listTransactions(db),before);
+});
+
+test('addition validation, linked movement guards and overflow roll back without changing records',async t=>{
+ const db=await setup(t);const {saveAccountDetails,deleteAccount}=require('../../.expo/finance-tests/storage/accounts.js');
+ await saveAccountDetails(db,{...await getCashAccount(db),id:'bank',name:'Bank'},true);
+ await debtStore.createDebt(db,sampleDebt({existing:true,accountId:undefined}));
+ for(const addition of [sampleAddition({amount:0}),sampleAddition({amount:Number.MAX_SAFE_INTEGER}),sampleAddition({existing:true}),sampleAddition({transactionDate:'2026-10-18'}),sampleAddition({debtId:'missing'}),sampleAddition({id:'loan'})]) await assert.rejects(debtStore.recordDebtAddition(db,addition));
+ assert.deepEqual(await listTransactions(db),[]);assert.deepEqual(await debtStore.listDebtAdditions(db),[]);
+ await debtStore.recordDebtAddition(db,sampleAddition({accountId:'bank'}));
+ await assert.rejects(deleteTransaction(db,'addition'),/Debts/);
+ const {updateExternalTransfer}=require('../../.expo/finance-tests/storage/transactions.js');
+ await assert.rejects(updateExternalTransfer(db,'addition',{...await getTransaction(db,'addition'),amount:1}),/Debts/);
+ await assert.rejects(deleteAccount(db,'bank'),/debt records/);
+ await assert.rejects(debtStore.recordDebtAddition(db,sampleAddition({accountId:'bank',amount:1})),/already/);
+ await debtStore.removeDebtRecord(db,'loan');assert.deepEqual(await listTransactions(db),[]);
+});
+
+test('additional borrowing JSON and Excel backups restore complete history and reject broken links',async t=>{
+ const db=await setup(t);await debtStore.createDebt(db,sampleDebt());await debtStore.recordDebtPayment(db,samplePayment());
+ await debtStore.recordDebtAddition(db,sampleAddition());await debtStore.recordDebtAddition(db,sampleAddition({id:'tracked',existing:true,accountId:undefined}));
+ const {parseBackup}=require('../../.expo/finance-tests/backup.js');
+ const {readBackupJson,restoreBackup,resetFinancialData}=require('../../.expo/finance-tests/storage/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const backup=parseBackup(await readBackupJson(db)), excel=parseExcelBackup(createExcelBackup(backup));
+ assert.equal(backup.version,14);assert.deepEqual(excel,backup);
+ for(const payload of [backup,excel]) {
+  await resetFinancialData(db);assert.deepEqual(await debtStore.listDebtAdditions(db),[]);
+  await restoreBackup(db,payload);assert.deepEqual(JSON.parse(JSON.stringify(await debtStore.listDebtAdditions(db))),backup.debtAdditions);
+  assert.equal(debtMath.debtTotals(await debtStore.listDebts(db),await debtStore.listDebtPayments(db),await debtStore.listDebtAdditions(db)).owed,60000);
+ }
+ const before=await listTransactions(db);
+ for(const payload of [{...backup,version:13},{...backup,debtAdditions:undefined},{...backup,transactions:backup.transactions.filter(row=>row.id!=='addition')},{...backup,debtAdditions:[{...backup.debtAdditions[0],debtId:'missing'}]}])await assert.rejects(restoreBackup(db,payload));
+ assert.deepEqual(await listTransactions(db),before);
+});
+
+test('version 17 migration preserves existing debt history and rolls back on interruption',async t=>{
+ const db=await setup(t);await debtStore.createDebt(db,sampleDebt());await debtStore.recordDebtPayment(db,samplePayment());
+ const before=await listTransactions(db);await db.execAsync('DROP TABLE debt_additions; PRAGMA user_version = 16');
+ const exec=db.execAsync;db.execAsync=async sql=>{await exec(sql);if(sql.includes('CREATE TABLE IF NOT EXISTS debt_additions'))throw new Error('interrupted upgrade');};
+ await assert.rejects(initializeDatabase(db),/interrupted/);assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,16);
+ assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name='debt_additions'"),null);
+ db.execAsync=exec;await initializeDatabase(db);assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);
+ assert.deepEqual(await listTransactions(db),before);assert.equal((await debtStore.listDebtPayments(db)).length,1);
+ assert.deepEqual(await db.getAllAsync('PRAGMA foreign_key_check'),[]);
 });

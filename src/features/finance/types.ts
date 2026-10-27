@@ -72,6 +72,19 @@ export type Debt = {
   transactionDate: string; transactionTime: string; dueDate?: string; notes?: string;
   createdAt: string; updatedAt: string;
 };
+/** A later borrowing, kept separate from the original amount and repayments. */
+export type DebtAddition = {
+  id: string;
+  debtId: string;
+  accountId?: string;
+  existing?: boolean;
+  amount: number;
+  transactionDate: string;
+  transactionTime: string;
+  notes?: string;
+  createdAt: string;
+};
+
 export type DebtPayment = {
   id: string; debtId: string; accountId: string; amount: number;
   transactionDate: string; transactionTime: string; notes?: string; createdAt: string;

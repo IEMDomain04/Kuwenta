@@ -87,7 +87,7 @@ export async function deleteTransaction(db: FinanceDatabase, id: string): Promis
   validateId(id);
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const original = await getTransaction(transaction, id);
-    if (await transaction.getFirstAsync('SELECT id FROM debts WHERE id = ? UNION ALL SELECT id FROM debt_payments WHERE id = ?',id,id)) throw new Error('Manage this movement in Plans > Debts.');
+    if (await transaction.getFirstAsync('SELECT id FROM debts WHERE id = ? UNION ALL SELECT id FROM debt_payments WHERE id = ? UNION ALL SELECT id FROM debt_additions WHERE id = ?',id,id,id)) throw new Error('Manage this movement in Plans > Debts.');
     if (!original) return;
     await transaction.runAsync('DELETE FROM transactions WHERE id = ?', original.exchangeParentId ?? id);
     calculateFinanceSummary(await listAccounts(transaction), await listTransactions(transaction), original.transactionDate.slice(0, 7));
@@ -160,7 +160,7 @@ export async function updateExternalTransfer(db: FinanceDatabase, id: string, re
   validateManualRecord(record);
   await db.withExclusiveTransactionAsync(async transaction => {
     const original = await getTransaction(transaction, id);
-    if (await transaction.getFirstAsync('SELECT id FROM debts WHERE id = ? UNION ALL SELECT id FROM debt_payments WHERE id = ?',id,id)) throw new Error('Manage this movement in Plans > Debts.');
+    if (await transaction.getFirstAsync('SELECT id FROM debts WHERE id = ? UNION ALL SELECT id FROM debt_payments WHERE id = ? UNION ALL SELECT id FROM debt_additions WHERE id = ?',id,id,id)) throw new Error('Manage this movement in Plans > Debts.');
     if (!original || original.type !== 'EXTERNAL') throw new Error('This external movement is no longer available.');
     if ((await getAccount(transaction, original.accountId)).archived) throw new Error('Unarchive the original account before editing this movement.');
     if ((await getAccount(transaction, record.accountId)).archived) throw new Error('Choose an active account.');

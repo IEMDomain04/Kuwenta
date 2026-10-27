@@ -3,7 +3,7 @@ import { calculateAccountSummary } from '../calculations';
 import type { Account, Transaction } from '../types';
 import type { FinanceDatabase } from './database';
 
-const VERSION = 16;
+const VERSION = 17;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -159,6 +159,18 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       ALTER TABLE debt_payments_new RENAME TO debt_payments;
       CREATE INDEX debt_payments_debt ON debt_payments(debtId);
       PRAGMA user_version = 16;
+    `);
+    if (version < 17) await transaction.execAsync(`
+      CREATE TABLE IF NOT EXISTS debt_additions (
+        id TEXT PRIMARY KEY NOT NULL,
+        debtId TEXT NOT NULL REFERENCES debts(id) ON DELETE RESTRICT,
+        accountId TEXT REFERENCES accounts(id) ON DELETE RESTRICT,
+        existing INTEGER NOT NULL DEFAULT 0 CHECK(existing IN (0,1)),
+        amount INTEGER NOT NULL CHECK(typeof(amount) = 'integer' AND amount BETWEEN 1 AND 9007199254740991),
+        transactionDate TEXT NOT NULL, transactionTime TEXT NOT NULL, notes TEXT, createdAt TEXT NOT NULL,
+        CHECK((existing = 0 AND accountId IS NOT NULL) OR (existing = 1 AND accountId IS NULL)));
+      CREATE INDEX IF NOT EXISTS debt_additions_debt ON debt_additions(debtId);
+      PRAGMA user_version = 17;
     `);
   });
 }

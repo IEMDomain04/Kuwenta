@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ts=require('typescript');
 const vm=require('node:vm');
-function harness(hidden=false){
+function harness(hidden=false, additions=[]){
  let settled=false;
  const debts=[{id:'a',name:'Anna',kind:'owe',amount:10000},{id:'b',name:'Ben',kind:'owed',amount:20000},{id:'c',name:'Chris',kind:'owed',amount:5000}];
  const jsx=(type,props)=>({type,props});
@@ -16,7 +16,7 @@ function harness(hidden=false){
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
   if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
   if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({formatAmount:(amount)=>hidden?'hidden':require('../../.expo/finance-tests/money.js').formatMoney(amount)})};
-  if(name==='../provider')return{useFinance:()=>({debts,debtPayments:[{debtId:'c',amount:5000}],busy:false})};
+  if(name==='../provider')return{useFinance:()=>({debts,debtAdditions:additions,debtPayments:[{debtId:'c',amount:5000}],busy:false})};
   if(name==='../debts'||name==='../dates')return require('../../.expo/finance-tests/'+name.slice(3)+'.js');
   if(name==='./ui')return{ActionButton:'Button'};
   if(name==='../components/ui')return{FinanceScreen:'Screen',AddTransactionButton:'Add'};
@@ -48,4 +48,11 @@ test('Plans keeps debts below Savings and Goals and privacy masks each group tot
  const all=nodes(h.render());
  assert.ok(all.filter(node=>node.props.children==='hidden').length>=4);
  for(const node of all)if(typeof node.props.children==='string')assert.ok(!node.props.children.includes(String.fromCodePoint(8369)));
+});
+
+test('dashboard includes added borrowing and reopens a previously settled debt',()=>{
+ const h=harness(false,[{debtId:'c',amount:15000}]);
+ const all=nodes(h.render());
+ assert.ok(all.some(node=>node.props.children==='Chris'));
+ assert.ok(all.some(node=>node.props.children===require('../../.expo/finance-tests/money.js').formatMoney(35000)));
 });

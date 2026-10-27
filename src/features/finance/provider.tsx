@@ -1,6 +1,6 @@
-import { listDebts, listDebtPayments, createDebt, recordDebtPayment, removeDebtRecord } from './storage/debts';
+import { listDebts, listDebtPayments, createDebt, recordDebtPayment, removeDebtRecord, listDebtAdditions, recordDebtAddition, correctDebtAmount, removeDebtAddition } from './storage/debts';
 import { validateDebtRecords } from './debts';
-import type { Debt, DebtPayment } from './types';
+import type { Debt, DebtPayment, DebtAddition } from './types';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import type { AccountBalanceChange } from './storage/accounts';
 import { loadHomeVisualizations, saveHomeVisualizations as saveHomeVisualizationsRecord, type HomeVisualization } from './home-visualizations';
@@ -32,8 +32,11 @@ import { saveAccountWithBalance, createExternalTransfer, updateExternalTransfer,
 import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
-type Snapshot = { debts: Debt[]; debtPayments: DebtPayment[]; homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
+type Snapshot = { debtAdditions: DebtAddition[]; debts: Debt[]; debtPayments: DebtPayment[]; homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
+  addDebtAmount: (addition: DebtAddition) => Promise<void>;
+  correctDebtAmount: (id: string, amount: number, expectedAmount: number) => Promise<void>;
+  removeDebtAddition: (id: string) => Promise<void>;
   addDebt: (debt: Debt) => Promise<void>;
   payDebt: (payment: DebtPayment) => Promise<void>;
   removeDebt: (id: string, repayment?: boolean) => Promise<void>;
@@ -117,8 +120,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const homeVisualizations = await loadHomeVisualizations(connection);
       const goals = await listGoals(connection);
       const budgets = await listBudgets(connection);
-      const debts = await listDebts(connection), debtPayments = await listDebtPayments(connection);
-      validateDebtRecords(debts, debtPayments, accounts, transactions);
+      const debts = await listDebts(connection), debtPayments = await listDebtPayments(connection), debtAdditions = await listDebtAdditions(connection);
+      validateDebtRecords(debts, debtPayments, accounts, transactions, debtAdditions);
       const month = philippineDateTime().transactionDate.slice(0, 7);
       const summary = calculateFinanceSummary(accounts, transactions, month);
       void syncNotifications(budgets, transactions, baseline).catch(cause => console.warn('Could not sync Kuwenta notifications:', cause));
@@ -126,7 +129,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       catch (cause) { console.warn('Could not update Kuwenta widgets:', cause); }
       loadedMonth = month;
       if (active) {
-        const next = { debts, debtPayments, homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
+        const next = { debts, debtPayments, debtAdditions, homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
         loadedSnapshot.current = next; setSnapshot(next); setError(''); setCanRecover(false); recoveryAllowed = false;
       }
     }
@@ -170,6 +173,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         }
         finally { locked = false; if (active) setBusy(false); }
       },
+      addDebtAmount: addition => write(db => recordDebtAddition(db,addition), 'Borrowed amount added.'),
+      correctDebtAmount: (id,amount,expected) => write(db => correctDebtAmount(db,id,amount,expected), 'Original amount updated.'),
+      removeDebtAddition: id => write(db => removeDebtAddition(db,id), 'Borrowing deleted.'),
       addDebt: debt => write(db => createDebt(db,debt), 'Debt recorded.'),
       payDebt: payment => write(db => recordDebtPayment(db,payment), 'Repayment recorded.'),
       removeDebt: (id,repayment) => write(db => removeDebtRecord(db,id,repayment), repayment ? 'Repayment deleted.' : 'Debt deleted.'),
@@ -193,7 +199,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         // A validated, fully loaded snapshot avoids opening another SQLite transaction.
         const data = loadedSnapshot.current;
         if (!data) throw new Error('Please wait for records to finish loading.');
-        return serializeBackup(data.accounts, data.transactions, new Date().toISOString(), data.goals, data.budgets, data.debts, data.debtPayments);
+        return serializeBackup(data.accounts, data.transactions, new Date().toISOString(), data.goals, data.budgets, data.debts, data.debtPayments, data.debtAdditions);
       },
       saveAccount: (account, creating, balanceChange) => write((db) => balanceChange && !creating ? saveAccountWithBalance(db, account, balanceChange) : saveAccountRecords(db, account, creating), creating ? 'Account added.' : 'Account updated.'),
       saveOpeningBalance: (amount) => write((db) => updateOpeningBalance(db, amount), 'Opening balance saved.'),
@@ -234,6 +240,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const noticeColor = notice?.tone === 'expense' || notice?.tone === 'error' ? theme.error : notice?.tone === 'info' ? theme.secondary : theme.income;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
+    addDebtAmount: addition => actions.current?.addDebtAmount(addition) ?? unavailable(),
+    correctDebtAmount: (id,amount,expected) => actions.current?.correctDebtAmount(id,amount,expected) ?? unavailable(),
+    removeDebtAddition: id => actions.current?.removeDebtAddition(id) ?? unavailable(),
     addDebt: debt => actions.current?.addDebt(debt) ?? unavailable(),
     payDebt: payment => actions.current?.payDebt(payment) ?? unavailable(),
     removeDebt: (id,repayment) => actions.current?.removeDebt(id,repayment) ?? unavailable(),

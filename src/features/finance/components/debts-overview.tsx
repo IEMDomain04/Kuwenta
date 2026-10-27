@@ -11,13 +11,13 @@ import { philippineDateTime, readableTransactionDate } from '../dates';
 import { ActionButton } from './ui';
 
 export function DebtsOverview() {
-  const { debts, debtPayments, busy } = useFinance();
+  const { debts, debtPayments, debtAdditions, busy } = useFinance();
   const theme = useTheme();
   const { formatAmount } = useAmountVisibility();
   const [showSettled, setShowSettled] = useState(false);
-  const totals = debtTotals(debts, debtPayments);
+  const totals = debtTotals(debts, debtPayments, debtAdditions);
   const today = philippineDateTime().transactionDate;
-  const rows = debts.map(debt => ({ debt, ...debtProgress(debt,debtPayments) }));
+  const rows = debts.map(debt => ({ debt, ...debtProgress(debt,debtPayments,debtAdditions) }));
   return <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 12 }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Ionicons name="people-outline" size={18} color={theme.accent} /><ThemedText type="smallBold" style={{ flex: 1 }}>Debts</ThemedText>
