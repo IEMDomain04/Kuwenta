@@ -114,3 +114,14 @@ The eye button beside the Home greeting hides or reveals financial amounts acros
 Plans displays Debts below Savings and Goals, with separate I owe and Owed to me sections and outstanding totals. The When did this happen? dropdown after the person's name offers Just now or Already happened. Just now records the actual account movement. Already happened tracks the amount still owed without an initial money movement or account selection; correct inaccurate account balances separately. Actual repayments always update the selected account, reducing the debt until settled, without entering income, expense or budget totals. Interest and fees stay separate normal transactions. Deleting a debt reverses only the money movements actually recorded for it. Debt details provides Add borrowed amount for later borrowing, keeping the original entry and repayments intact. Edit original amount corrects a mistaken first entry and updates only its linked account movement after confirmation. Additions also support Already happened without moving money. Invalid corrections or deletions that would leave repayments above the amount borrowed at that date are rejected. Schema 17 preserves existing records and stores additions separately. JSON backup version 14 and Excel workbook version 6 include added borrowing; earlier backups remain supported. Privacy masking also applies to debt summaries.
 
 New debt forms use Notes for agreed repayment dates instead of a separate due-date field. Due dates from existing records and imported backups remain readable and preserved.
+
+
+## Build an APK with GitHub Actions
+
+The manually triggered **Build Kuwenta APK** workflow compiles on a standard GitHub Ubuntu runner. It uses `eas build --local` with the existing `preview` profile, so compilation does not consume EAS cloud build credits. Expo authentication remains necessary to download the existing signing credentials and increment the remotely managed Android version code.
+
+One-time setup: create an Expo personal access token at https://expo.dev/accounts/iemdomain04/settings/access-tokens and add it as the repository Actions secret `EXPO_TOKEN`. Never commit the token, keystore, or `credentials.json`.
+
+Open **Actions > Build Kuwenta APK > Run workflow**, use the workflow from `main`, and leave **Branch or commit to build** as `staging` for the latest staged changes (or enter `main` for a release from main). After success, download the **kuwenta-apk** artifact and extract `kuwenta.apk`. Artifacts expire after seven days. Install as an update rather than uninstalling the current app. Keep an exported backup before updating.
+
+The workflow runs TypeScript and finance regression checks, uses actions pinned to commit revisions, and exposes the Expo token only to authentication/build steps. GitHub's own usage and storage allowances still apply. No phone database or exported financial backup is required for building.
