@@ -1,22 +1,19 @@
+import { FinanceNotice, type FinanceNoticeData } from './components/finance-notice';
 import { listDebts, listDebtPayments, createDebt, recordDebtPayment, removeDebtRecord, listDebtAdditions, recordDebtAddition, correctDebtAmount, removeDebtAddition } from './storage/debts';
 import { validateDebtRecords } from './debts';
 import type { Debt, DebtPayment, DebtAddition } from './types';
-import { useAmountVisibility } from '@/hooks/amount-visibility';
 import type { AccountBalanceChange } from './storage/accounts';
 import { loadHomeVisualizations, saveHomeVisualizations as saveHomeVisualizationsRecord, type HomeVisualization } from './home-visualizations';
 import { Image } from 'expo-image';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { syncWidgets } from './widgets';
 import { syncNotifications, observeNotificationTaps } from './notifications';
 import { formatMoney } from './money';
 import { router, useRootNavigationState } from 'expo-router';
 import { listBudgets, saveBudgetOrder as saveBudgetOrderRecord, saveBudget as saveBudgetRecord, deleteBudget, copyPreviousBudgets } from './storage/budgets';
 import { CashSetup } from './components/cash-setup';
-import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, AppState, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppState, KeyboardAvoidingView, Platform } from 'react-native';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -70,17 +67,6 @@ const Context = createContext<FinanceState | null>(null);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const theme = useTheme();
-  const { conceal } = useAmountVisibility();
-  const dark = useColorScheme() === 'dark';
-  const [opaqueNotice, setOpaqueNotice] = useState(true);
-  useEffect(() => {
-    let active = true;
-    const check = Platform.OS === 'ios' ? AccessibilityInfo.isReduceTransparencyEnabled() : AccessibilityInfo.isHighTextContrastEnabled();
-    void check.then(value => { if (active) setOpaqueNotice(value); }).catch(() => {});
-    const subscription = Platform.OS === 'ios' ? AccessibilityInfo.addEventListener('reduceTransparencyChanged', setOpaqueNotice) : undefined;
-    return () => { active = false; subscription?.remove(); };
-  }, []);
-  const insets = useSafeAreaInsets();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const loadedSnapshot = useRef<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,7 +80,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }, [snapshot, selectedMonth]);
   const [error, setError] = useState('');
   const [canRecover, setCanRecover] = useState(false);
-  const [notice, setNotice] = useState<{ message: string; detail?: string; expiresAt?: number; tone?: 'success' | 'info' | 'income' | 'expense' | 'error' } | null>(null);
+  const [notice, setNotice] = useState<FinanceNoticeData | null>(null);
   const actions = useRef<Actions | null>(null);
   useEffect(() => {
     if (!notice) return;
@@ -237,7 +223,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   </FinanceScreen></KeyboardAvoidingView>;
   if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? Promise.reject(new Error('App is closing.'))} />;
   if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
-  const noticeColor = notice?.tone === 'expense' || notice?.tone === 'error' ? theme.error : notice?.tone === 'info' ? theme.secondary : theme.income;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
     addDebtAmount: addition => actions.current?.addDebtAmount(addition) ?? unavailable(),
@@ -277,18 +262,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} /></ThemedView> : null}
     {children}
     <NotificationTapObserver />
-    {notice ? <View pointerEvents="box-none" style={{ position: 'absolute', top: insets.top + 80, left: Math.max(16, insets.left), right: Math.max(16, insets.right), zIndex: 1000, alignItems: 'center' }}>
-      <View style={{ width: '100%', maxWidth: 300, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: opaqueNotice ? theme.backgroundElement : dark ? 'rgba(17,36,27,0.92)' : 'rgba(240,250,244,0.92)', borderWidth: 1, borderColor: dark ? 'rgba(255,255,255,0.24)' : 'rgba(6,99,62,0.25)', elevation: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: noticeColor + '25', justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name={notice.tone === 'error' ? 'alert-circle-outline' : notice.tone === 'income' ? 'arrow-up' : notice.tone === 'expense' ? 'arrow-down' : 'checkmark'} size={16} color={noticeColor} />
-        </View>
-        <View style={{ flex: 1, gap: 2 }} accessibilityLiveRegion="polite">
-          <ThemedText type="smallBold" style={{ color: theme.text, fontSize: 12 }}>{conceal(notice.message)}</ThemedText>
-          {notice.detail ? <ThemedText type="small" numberOfLines={2} style={{ color: theme.textSecondary, fontSize: 11 }}>{conceal(notice.detail)}</ThemedText> : null}
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notice" onPress={() => setNotice(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={16} color={theme.textSecondary} /></Pressable>
-      </View>
-    </View> : null}
+    <FinanceNotice notice={notice} onDismiss={() => setNotice(null)} />
   </ThemedView></Context.Provider>;
 }
 export function useFinance(): FinanceState {
