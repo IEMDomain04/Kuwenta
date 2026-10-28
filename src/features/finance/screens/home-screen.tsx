@@ -50,7 +50,7 @@ export default function HomeScreen() {
     homeVisualizations,
   } = useFinance();
   const theme = useTheme();
-  const { formatAmount: formatMoney, conceal } = useAmountVisibility();
+  const { hidden: amountsHidden, formatAmount: formatMoney, conceal } = useAmountVisibility();
   const { height, fontScale } = useWindowDimensions();
   const [draggingBudget, setDraggingBudget] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -152,7 +152,7 @@ export default function HomeScreen() {
         style={styles.insight}
       >
         <Image
-          source={mascotImages[reaction]}
+          source={amountsHidden ? require("../../../../assets/images/mascot/covering-eyes.png") : mascotImages[reaction]}
           contentFit="contain"
           accessible={false}
           style={styles.mascot}

@@ -17,7 +17,7 @@ import { FinanceScreen, AddTransactionButton } from '../components/ui';
 export default function AccountsScreen() {
   const { accounts, transactions, budgets, debts, debtPayments, debtAdditions, busy } = useFinance();
   const theme = useTheme();
-  const { formatAmount: formatMoney, conceal } = useAmountVisibility();
+  const { hidden: amountsHidden, formatAmount: formatMoney, conceal } = useAmountVisibility();
   const { height } = useWindowDimensions();
   const [dragging, setDragging] = useState(false);
   const [details, setDetails] = useState<'money' | 'insights' | null>(null);
@@ -36,7 +36,7 @@ export default function AccountsScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel="Explain Total and Available Money" onPress={() => setDetails('money')} style={({ pressed }) => ({ position: 'absolute', top: -8, left: -8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
             <Ionicons name="help-circle-outline" size={16} color={theme.accent} />
           </Pressable>
-          <Image source={money?.hasNegativeAccount ? require('../../../../assets/images/mascot/concerned.png') : require('../../../../assets/images/mascot/friendly.png')} contentFit="contain" accessible={false} style={{ width: 80, height: 94 }} />
+          <Image source={amountsHidden ? require('../../../../assets/images/mascot/covering-eyes.png') : money?.hasNegativeAccount ? require('../../../../assets/images/mascot/concerned.png') : require('../../../../assets/images/mascot/friendly.png')} contentFit="contain" accessible={false} style={{ width: 80, height: 94 }} />
         </View>
         <View style={{ flex: 1, minWidth: 0, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: theme.accent, backgroundColor: theme.backgroundElement, gap: 4 }}>
           <View style={{ position: 'absolute', left: -5, top: '50%', marginTop: 9, width: 10, height: 10, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: theme.accent, backgroundColor: theme.backgroundElement, transform: [{ rotate: '45deg' }] }} />
