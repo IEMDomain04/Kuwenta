@@ -6,7 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
 import { AccountManager } from '../components/account-manager';
-import { ActionButton, FinanceScreen, BackButton, TransactionRow } from '../components/ui';
+import { ActionButton, FinanceScreen, BackButton, TransactionRow, IconButton } from '../components/ui';
 import { calculateAccountSummary } from '../calculations';
 import { formatTransactionDateTime } from '../dates';
 import { formatMoney } from '../money';
@@ -69,7 +69,7 @@ export default function AccountScreen() {
     ], { icon: 'archive-outline', rows: [{ label: 'Account', value: account.name }] });
   }
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <FinanceScreen title={!accountId ? 'Add account' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (pending.current) return; if (mode !== 'details') setMode('details'); else leave(); }} />}>
+    <FinanceScreen title={!accountId ? 'Add account' : mode === 'edit' ? 'Edit account' : 'Account details'} tabScreen={false} headerAccessory={account ? <IconButton icon="trash-outline" destructive label="Delete account" disabled={locked || Boolean(deletionReason)} onPress={remove} /> : undefined} headerLeading={<BackButton disabled={locked} onPress={() => { if (pending.current) return; if (mode !== 'details') setMode('details'); else leave(); }} />}>
       {!accountId ? <AccountManager initialPurpose={purpose === "savings" ? "savings" : "spending"} onClose={leave} />
         : !account ? <><ThemedText>This account is no longer available.</ThemedText><ActionButton label="Back" onPress={leave} /></>
         : mode === 'edit' ? <AccountManager accountId={accountId} onClose={() => setMode('details')} />
@@ -123,10 +123,9 @@ export default function AccountScreen() {
                   </View>
                   {[
                     { disabled: false, label: account.archived ? 'Unarchive account' : 'Archive account', icon: 'archive-outline' as const, action: () => { setOptionsOpen(false); archive(); } },
-                    { label: 'Delete account', disabled: Boolean(deletionReason), icon: 'trash-outline' as const, action: () => { setOptionsOpen(false); remove(); } },
                   ].map((option) => <Pressable key={option.label} accessibilityRole="button" accessibilityState={{ disabled: locked || option.disabled }} disabled={locked || option.disabled} onPress={option.action} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, opacity: locked || option.disabled ? 0.45 : 1 }}>
-                    <Ionicons name={option.icon} size={18} color={option.icon === 'trash-outline' ? theme.expense : theme.accent} />
-                    <ThemedText type="small" style={{ color: option.icon === 'trash-outline' ? theme.expense : theme.text }}>{option.label}</ThemedText>
+                    <Ionicons name={option.icon} size={18} color={theme.accent} />
+                    <ThemedText type="small" style={{ color: theme.text }}>{option.label}</ThemedText>
                   </Pressable>)}
                   {deletionReason ? <ThemedText type="small" themeColor="textSecondary">{deletionReason}</ThemedText> : null}
                 </View>

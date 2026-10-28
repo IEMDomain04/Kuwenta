@@ -229,25 +229,6 @@ export default function BudgetsScreen() {
                   setRejected(false);
                 }}
               />
-              <IconButton
-                icon="trash-outline"
-                destructive
-                label={"Delete " + row.category + " budget"}
-                disabled={locked}
-                onPress={() =>
-                  confirm(
-                    "Delete budget?",
-                    "Remove " +
-                      row.category +
-                      " budget for " +
-                      budgetPeriodLabel(row.month) +
-                      "? Your expenses are kept.",
-                    () => finance.removeBudget(row.month, row.category),
-                    true,
-                    { rows: [{ label: 'Category', value: row.category }, { label: 'Period', value: budgetPeriodLabel(row.month) }, { label: 'Limit', value: formatMoney(row.limitAmount) }] },
-                  )
-                }
-              />
             </View>
           }
         />
@@ -271,6 +252,22 @@ export default function BudgetsScreen() {
         headerAccessory={
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
 
+            {editor?.original ? <IconButton
+              icon="trash-outline"
+              destructive
+              label={"Delete " + editor.original.category + " budget"}
+              disabled={locked}
+              onPress={() => {
+                const original = editor.original!;
+                confirm(
+                  "Delete budget?",
+                  "Remove " + original.category + " budget for " + budgetPeriodLabel(original.month) + "? Your expenses are kept.",
+                  () => finance.removeBudget(original.month, original.category),
+                  true,
+                  { rows: [{ label: 'Category', value: original.category }, { label: 'Period', value: budgetPeriodLabel(original.month) }, { label: 'Limit', value: formatMoney(original.limitAmount) }] },
+                );
+              }}
+            /> : null}
             {!editor ? (
               <ActionButton
                 compact

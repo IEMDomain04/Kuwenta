@@ -93,7 +93,7 @@ export default function GoalScreen() {
   const inputStyle = { borderColor: theme.border, borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 12, color: theme.text };
   if (id && !original) return <FinanceScreen title="Goal unavailable" tabScreen={false}><ThemedText>This goal no longer exists.</ThemedText><ActionButton label="Back" onPress={leave} /></FinanceScreen>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <FinanceScreen title={original ? 'Edit savings goal' : 'Add savings goal'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) leave(); }} />}>
+    <FinanceScreen title={original ? 'Edit savings goal' : 'Add savings goal'} tabScreen={false} headerAccessory={original ? <IconButton icon="trash-outline" destructive label="Delete goal" disabled={locked} onPress={remove} /> : undefined} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) leave(); }} />}>
       <ThemedText type="smallBold">Goal name</ThemedText>
       <TextInput ref={nameInput} selectionColor={theme.accent} cursorColor={theme.accent} selectionHandleColor={theme.accent} underlineColorAndroid="transparent" accessibilityLabel="Goal name" value={name} onChangeText={value => { setName(value); setFieldErrors({}); }} editable={!locked} placeholder="Emergency fund" placeholderTextColor={theme.textSecondary} style={[inputStyle, { borderColor: fieldErrors.name ? theme.error : theme.border }]} />
       <FieldError message={fieldErrors.name} />
@@ -120,7 +120,6 @@ export default function GoalScreen() {
 
       <ActionButton primary label={working ? 'Saving...' : original ? 'Save changes' : 'Save goal'} disabled={locked || rejected} onPress={review} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) leave(); }} />
-      {original && <IconButton icon="trash-outline" destructive label="Delete goal" disabled={locked} onPress={remove} />}
     </FinanceScreen>
   </KeyboardAvoidingView>;
 }

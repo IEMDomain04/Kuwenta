@@ -138,7 +138,7 @@ export default function DebtScreen() {
     ],{icon:'trash-outline',rows:[{label:'Person',value:debt.name},{label:payment ? 'Repayment' : 'Original debt',value:formatMoney(payment?.amount ?? debt.amount)}]});
   }
   return <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <FinanceScreen title={id ? 'Debt details' : 'Add debt'} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={()=>{if(!pending.current)leave();}} />}>
+    <FinanceScreen title={id ? 'Debt details' : 'Add debt'} tabScreen={false} headerAccessory={debt ? <IconButton icon="trash-outline" destructive label="Delete debt" disabled={locked} onPress={()=>remove()} /> : undefined} headerLeading={<BackButton disabled={locked} onPress={()=>{if(!pending.current)leave();}} />}>
       {id && !debt ? <ThemedText>This debt is no longer available.</ThemedText> : <>
         {debt ? <View style={{padding:14,borderRadius:16,backgroundColor:theme.backgroundElement,gap:8}}>
           <ThemedText type="smallBold">{debt.name} | {debt.kind === 'owe' ? 'I owe' : 'Owed to me'}</ThemedText>
@@ -188,7 +188,6 @@ export default function DebtScreen() {
           </View><IconButton icon="trash-outline" label="Delete borrowing" destructive disabled={locked} onPress={()=>removeAddition(addition)} /></View>)}
           <ThemedText type="smallBold">Repayment history</ThemedText>
           {!payments.length ? <ThemedText type="small" themeColor="textSecondary">No repayments yet.</ThemedText> : payments.map(payment=><View key={payment.id} style={{padding:12,borderRadius:12,backgroundColor:theme.backgroundElement,flexDirection:'row',alignItems:'center',gap:8}}><View style={{flex:1,gap:4}}><ThemedText type="smallBold">{formatAmount(payment.amount)} | {finance.accounts.find(row=>row.id===payment.accountId)?.name}</ThemedText><ThemedText type="small">{formatTransactionDateTime(payment.transactionDate,payment.transactionTime)}</ThemedText>{payment.notes ? <ThemedText type="small">{payment.notes}</ThemedText> : null}</View><IconButton icon="trash-outline" label="Delete repayment" destructive disabled={locked} onPress={()=>remove(payment)} /></View>)}
-          <Pressable accessibilityRole="button" accessibilityLabel="Delete debt" disabled={locked} onPress={()=>remove()} style={{padding:14,borderRadius:12,alignItems:'center',backgroundColor:theme.errorSurface}}><ThemedText type="smallBold" themeColor="error">Delete debt</ThemedText></Pressable>
         </View> : null}
       </>}
       <SelectionSheet visible={picker && movesMoney && !correction} title="Choose account" selected={accountId} disabled={locked} options={finance.accounts.filter(row=>!row.archived).map(row=>({value:row.id,label:row.name,leading:<AccountIcon account={row} color={theme.textSecondary} />}))} onClose={()=>setPicker(false)} onSelect={value=>{setAccountId(value);clearErrors();}} />

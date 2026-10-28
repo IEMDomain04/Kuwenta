@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
-import { ActionButton, BackButton, FinanceScreen } from '../components/ui';
+import { ActionButton, BackButton, FinanceScreen, IconButton } from '../components/ui';
 import { SelectionSheet } from '../components/selection-sheet';
 import { MoneyField } from '../components/money-field';
 import { TransactionDateTime } from '../components/transaction-date-time';
@@ -164,7 +164,7 @@ export default function TransferScreen() {
   }
   const input = { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, color: theme.text, fontSize: 12 };
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <FinanceScreen title={editing ? "Edit external movement" : "Transfer"} tabScreen={false} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } }} />}>
+    <FinanceScreen title={editing ? "Edit external movement" : "Transfer"} tabScreen={false} headerAccessory={original ? <IconButton icon="trash-outline" destructive label="Delete movement" disabled={locked} onPress={remove} /> : undefined} headerLeading={<BackButton disabled={locked} onPress={() => { if (!pending.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } }} />}>
       {editing && !original ? <ThemedText>{finance.busy || checkedId !== id ? 'Loading external movement...' : 'This external movement is no longer available.'}</ThemedText> : <View style={{ padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 10 }}>
       {editing ? <>
         {originalAccount?.archived ? <ThemedText type="small">Unarchive this account to edit the movement. You can still delete it.</ThemedText> : null}
@@ -188,7 +188,6 @@ export default function TransferScreen() {
 
       <ActionButton primary label={saving ? 'Saving...' : editing ? 'Save changes' : 'Save transfer'} disabled={formLocked || rejected} onPress={save} />
       <ActionButton label="Cancel" disabled={locked} onPress={() => { if (!pending.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } }} />
-      {editing ? <Pressable accessibilityRole="button" accessibilityLabel="Delete movement" disabled={locked} onPress={remove} style={{ padding: 12, borderRadius: 12, backgroundColor: theme.errorSurface, alignItems: 'center', opacity: locked ? 0.5 : 1 }}><ThemedText type="smallBold" themeColor="error">Delete movement</ThemedText></Pressable> : null}
       </View>}
       <SelectionSheet visible={Boolean(picker) && (!editing || Boolean(original))} title={picker === 'from' ? 'From' : 'To'} selected={external === (picker === 'from' ? 'increase' : 'decrease') ? 'external' : picker === 'from' ? accountId : destinationId} disabled={formLocked} options={[...finance.accounts.filter((row) => !row.archived).map((row) => ({ value: row.id, label: row.name, leading: <AccountIcon account={row} color={theme.textSecondary} /> })), { value: 'external', label: picker === 'from' ? 'External source' : 'External destination' }]} onClose={() => setPicker(null)} onSelect={(value) => {
         setFieldErrors({}); setError('');

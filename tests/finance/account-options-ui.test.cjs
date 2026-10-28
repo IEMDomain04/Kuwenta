@@ -39,7 +39,7 @@ function harness({ id = 'bank', archived = false, movements = [] } = {}) {
     if (name === '../provider') return { useFinance: () => finance };
     if (name === '../components/account-manager') return { AccountManager: 'AccountManager' };
     if (name === '../components/money-field') return { MoneyField: 'MoneyField' };
-    if (name === '../components/ui') return { ActionButton: 'Button', FinanceScreen: 'Screen', BackButton: 'BackButton', TransactionRow: 'TransactionRow' };
+    if (name === '../components/ui') return { IconButton: 'IconButton', ActionButton: 'Button', FinanceScreen: 'Screen', BackButton: 'BackButton', TransactionRow: 'TransactionRow' };
     if (['../calculations', '../dates', '../inputs', '../money'].includes(name)) return require('../../.expo/finance-tests/' + name.slice(3) + '.js');
     throw new Error('Unexpected dependency: ' + name);
   } };
@@ -49,13 +49,15 @@ function harness({ id = 'bank', archived = false, movements = [] } = {}) {
     function walk(node) {
       if (Array.isArray(node)) return node.forEach(walk);
       if (!node || !node.props) return;
-      nodes.push(node); walk(node.props.children);
+      nodes.push(node); walk(node.props.children); walk(node.props.headerAccessory);
     }
     walk(sandbox.exports.default());
     return nodes;
   }
   function option(label) { return render().find(node => node.type === 'Text' && node.props.children === label); }
   function pressOption(label) {
+    const headerButton = render().find(node => node.type === 'IconButton' && node.props.label === label);
+    if (headerButton) return headerButton.props;
     const text = option(label);
     const button = render().find(node => node.type === 'Pressable' && Array.isArray(node.props.children) && node.props.children.some(child => child?.type === 'Text' && child.props.children === text.props.children));
     return button.props;
@@ -115,4 +117,17 @@ test('external movement rows open their dedicated editor from account details', 
   const row = h.render().find(node => node.props.accessibilityLabel === 'Edit external movement with Friend');
   assert.equal(row.props.accessibilityRole, 'button'); row.props.onPress();
   assert.equal(h.opened[0].pathname, '/transfer'); assert.equal(h.opened[0].params.id, movement.id);
+});
+
+
+test('account trash stays in the header for details and editing, while options retain archive only', () => {
+  const h = harness();
+  function header() { return h.render().find(node => node.type === 'Screen').props.headerAccessory; }
+  assert.equal(header().props.label, 'Delete account');
+  assert.equal(header().props.destructive, true);
+  assert.equal(h.render().filter(node => node.props.label === 'Delete account').length, 1);
+  assert.ok(!h.render().some(node => node.type === 'Text' && node.props.children === 'Delete account'));
+  h.render().find(node => node.props.label === 'Edit account').props.onPress();
+  assert.equal(header().props.label, 'Delete account');
+  assert.equal(harness({ id: '' }).render().find(node => node.type === 'Screen').props.headerAccessory, undefined);
 });

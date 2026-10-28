@@ -7,7 +7,7 @@ const { cash, record } = require('./fixtures.cjs');
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], debts = [], debtPayments = [], debtAdditions = [], onSubmit = () => {}, deleteFailure = false, refreshRecords } = {}) {
   const hooks = []; let cursor = 0; const saved = [], prompts = [], notices = [], removed = [], navigation = [], effects = [], refreshed = [];
-  const finance = { debts, debtPayments, debtAdditions, addDebtAmount: async addition => saved.push(addition), correctDebtAmount: async (...args) => saved.push(args), removeDebtAddition: async id => removed.push(id), addDebt: async debt => saved.push(debt), payDebt: async payment => saved.push(payment), removeDebt: async (...args) => removed.push(args), saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
+  const finance = { removeBudget: async (...args) => removed.push(args), removeGoal: async id => removed.push(id), debts, debtPayments, debtAdditions, addDebtAmount: async addition => saved.push(addition), correctDebtAmount: async (...args) => saved.push(args), removeDebtAddition: async id => removed.push(id), addDebt: async debt => saved.push(debt), payDebt: async payment => saved.push(payment), removeDebt: async (...args) => removed.push(args), saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
   finance.refresh = async () => { refreshed.push(true); refreshRecords?.(finance); };
   const state = initial => { const index = cursor++; if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial; return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }]; };
   const jsx = (type, props) => ({ type, props });
@@ -569,4 +569,48 @@ test('editing legacy income shows one current category choice and keeps the amou
   h.render().button(current).props.onPress();h.render().button('Save changes').props.onPress();
   assert.equal(saved.category,current);assert.equal(saved.amount,50000);assert.equal(original.category,old);
  }
+});
+
+
+test('saved transaction, goal, debt and external-movement trash actions live only in the editor header', () => {
+  const goal = { id: 'goal', name: 'Laptop', accountId: 'cash', targetAmount: 500000, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' };
+  const debt = { id: 'debt', name: 'Friend', kind: 'owed', amount: 10000, existing: true, transactionDate: '2026-10-01', transactionTime: '12:00:00', createdAt: '2026-10-01T04:00:00.000Z', updatedAt: '2026-10-01T04:00:00.000Z' };
+  const external = record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase' });
+  for (const [file, options, label] of [
+    ['transaction', { params: { id: 'expense-1' }, transactions: [record()] }, 'Delete transaction'],
+    ['goal', { params: { id: goal.id }, goals: [goal] }, 'Delete goal'],
+    ['debt', { params: { id: debt.id }, debts: [debt] }, 'Delete debt'],
+    ['transfer', { params: { id: external.id }, transactions: [external] }, 'Delete movement'],
+  ]) {
+    const path = 'screens/' + file + '-screen.tsx';
+    const rendered = harness(path, options).render();
+    const trash = rendered.find('Screen').props.headerAccessory;
+    assert.equal(trash.props.label, label);
+    assert.equal(trash.props.destructive, true);
+    assert.equal(rendered.nodes.filter(node => node.props.label === label || node.props.accessibilityLabel === label).length, 1);
+    assert.equal(harness(path).render().button(label), undefined);
+    assert.equal(harness(path, { params: { id: 'missing' } }).render().button(label), undefined);
+  }
+});
+
+test('budget editor header deletes the saved budget, even when an unsaved period change is present', async () => {
+  const budget = { month: '2026-10', category: 'Meals', limitAmount: 10000 };
+  const h = harness('screens/budgets-screen.tsx', { budgets: [budget] });
+  assert.equal(h.render().button('Delete Meals budget'), undefined);
+  h.render().button('Edit Meals budget').props.onPress();
+  let rendered = h.render();
+  const accessory = rendered.find('Screen').props.headerAccessory;
+  assert.ok(accessory.props.children.some(node => node?.props?.label === 'Delete Meals budget'));
+  assert.equal(rendered.nodes.filter(node => node.props.label === 'Delete Meals budget').length, 1);
+  rendered.find('BudgetPeriodPicker').props.onPeriodChange('weekly');
+  h.render().button('Delete Meals budget').props.onPress();
+  assert.equal(h.prompts[0][0], 'Delete budget?');
+  assert.ok(h.prompts[0][1].includes('expenses are kept'));
+  h.prompts[0][2].find(button => button.style === 'cancel').onPress();
+  assert.equal(h.removed.length, 0);
+  h.render().button('Delete Meals budget').props.onPress();
+  h.prompts[1][2].find(button => button.style === 'destructive').onPress();
+  await settle();
+  assert.deepEqual(h.removed, [['2026-10', 'Meals']]);
+  assert.equal(harness('screens/budgets-screen.tsx').render().button('Delete Meals budget'), undefined);
 });
