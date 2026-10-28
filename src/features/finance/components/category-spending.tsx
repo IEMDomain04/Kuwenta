@@ -49,7 +49,6 @@ export function CategorySpending({ transactions, start, end, period }: { transac
       <ThemedText type="small" themeColor="textSecondary">{period === 'day' ? 'Today' : period === 'week' ? 'This week' : 'This month'}</ThemedText>
     </View>
     {total ? <>
-      <ThemedText type="small" themeColor="textSecondary">Share of shown categories (up to 10)</ThemedText>
       <View onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ height: 184, borderRadius: 12, overflow: 'hidden' }}>
         {blocks.map(block => {
           const color = categoryVisual(block.category, false, dark).color;
