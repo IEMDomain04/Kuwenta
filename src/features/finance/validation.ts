@@ -2,7 +2,7 @@ import { validateExchange } from './exchanges';
 import { isAccountIcon } from './account-icons';
 import { ACCOUNT_CARD_COLORS } from './account-colors';
 import { isUtcTimestamp, isValidDate, isValidTime } from './dates';
-import { CATEGORIES, LEGACY_EXPENSE_CATEGORIES, type Account, type Transaction, type TransactionDraft, type SavingsGoal } from './types';
+import { CATEGORIES, LEGACY_INCOME_CATEGORIES, LEGACY_EXPENSE_CATEGORIES, type Account, type Transaction, type TransactionDraft, type SavingsGoal } from './types';
 
 export function validateAccount(account: Account): void {
   if (!account.name?.trim()) throw new Error('Enter an account name.');
@@ -25,7 +25,7 @@ export function validateTransactionFields(draft: TransactionDraft): void {
   if (draft.type === 'TRANSFER') {
     if (draft.category !== 'Transfer' || typeof draft.destinationAccountId !== 'string' || !draft.destinationAccountId.trim() || draft.destinationAccountId === draft.accountId) throw new Error('Choose two different accounts for the transfer.');
   } else if (draft.destinationAccountId !== undefined) throw new Error('Only transfers can have a destination account.');
-  if (draft.type !== 'TRANSFER' && !(CATEGORIES[draft.type] as readonly string[]).includes(draft.category) && !(draft.type === 'EXPENSE' && LEGACY_EXPENSE_CATEGORIES.includes(draft.category))) throw new Error('Choose a category for this transaction type.');
+  if (draft.type !== 'TRANSFER' && !(CATEGORIES[draft.type] as readonly string[]).includes(draft.category) && !(draft.type === 'EXPENSE' && LEGACY_EXPENSE_CATEGORIES.includes(draft.category)) && !(draft.type === 'INCOME' && LEGACY_INCOME_CATEGORIES.includes(draft.category))) throw new Error('Choose a category for this transaction type.');
   if (draft.exchange !== undefined) validateExchange(draft);
   if (!isValidDate(draft.transactionDate)) throw new Error('Enter a valid Philippine date as YYYY-MM-DD.');
   if (!isValidTime(draft.transactionTime)) throw new Error('Enter a valid time as HH:mm:ss.');

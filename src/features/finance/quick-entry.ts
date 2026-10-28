@@ -28,9 +28,10 @@ const expenseKeywords: [string, RegExp][] = [
   ['Subscriptions', /\b(subscription|netflix|spotify)\b/i],
 ];
 const incomeKeywords: [string, RegExp][] = [
+  ['Savings Interest', /\b(savings interest|bank interest|interest credited)\b/i],
   ['Part-time Work', /\b(part[ -]?time|sideline)\b/i],
   ['Salary', /\b(salary|sahod|sweldo)\b/i], ['Allowance', /\b(allowance|baon)\b/i],
-  ['Freelance', /\b(freelance)\b/i], ['Gifts', /\b(gift|regalo)\b/i], ['Business', /\b(business)\b/i],
+  ['Freelance', /\b(freelance)\b/i], ['Business', /\b(business)\b/i],
 ];
 /** Pure, bounded phrase parsing. It never saves records or calls a service. */
 export function parseQuickEntry(text: string, accounts: readonly Account[], now = new Date(), context?: string, lastUsed?: string): { draft: TransactionDraft; warnings: string[] } {
@@ -84,10 +85,14 @@ export function parseQuickEntry(text: string, accounts: readonly Account[], now 
   const amount = parseMoney(amountText.replace(/,/g, ''));
   const description = (phrase.slice(0, numbers[0].index) + phrase.slice(numbers[0].index! + amountText.length)).replace(/\b(php|pesos|peso)\b/gi, '').replace(/\u20b1/g, '').replace(/\s+/g, ' ').trim();
   if (transfer) return { draft: { type: 'TRANSFER', accountId, destinationAccountId, category: 'Transfer', amount, transactionDate, transactionTime: defaults.transactionTime, notes: description || undefined }, warnings: [] };
+  const gift = /\b(gifts?|regalo|pangregalo)\b/i.test(description);
+  const explicitIncome = /\b(income|received|earned|kita|natanggap|nakatanggap)\b/i.test(description);
+  const explicitExpense = /\b(expense|spent|paid|bought|buy|gave|give|gastos|bayad|bumili|binili|ibinigay|nagregalo|pangregalo)\b/i.test(description)
+    || gift && /\b(?:gifts?|regalo)\s+(?:for|para)\b/i.test(description);
+  if (gift && !explicitIncome && !explicitExpense) throw new Error('Was this a gift you received or bought? Use "Received gift 500" or "Bought gift 500".');
   const incomes = incomeKeywords.filter(([, pattern]) => pattern.test(description));
-  const expenses = expenseKeywords.filter(([, pattern]) => pattern.test(description));
-  const explicitIncome = /\b(income|received|earned|kita|natanggap)\b/i.test(description);
-  const explicitExpense = /\b(expense|spent|paid|gastos|bayad)\b/i.test(description);
+  if (gift && explicitIncome) incomes.push(['Gifts', /gift/i]);
+  const expenses = gift && explicitExpense ? [['Gifts', /gift/i] as [string, RegExp]] : expenseKeywords.filter(([, pattern]) => pattern.test(description));
   if ((explicitIncome || incomes.length) && (explicitExpense || expenses.length)) throw new Error('Income or expense is unclear. Use the regular form or simplify the phrase.');
   const type = explicitIncome || incomes.length ? 'INCOME' : 'EXPENSE';
   const matches = type === 'INCOME' ? incomes : expenses;

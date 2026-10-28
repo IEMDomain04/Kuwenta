@@ -11,7 +11,7 @@ import { useRef, useState } from 'react';
 import { Keyboard, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import { CATEGORIES, type Transaction, type TransactionDraft, type ManualTransactionType } from '../types';
+import { CATEGORIES, incomeCategory, type Transaction, type TransactionDraft, type ManualTransactionType } from '../types';
 import { philippineDateTime, isValidDate, isValidTime } from '../dates';
 import { moneyInput, parseMoney, formatMoney } from '../money';
 import { formatEditableMoney } from '../inputs';
@@ -39,7 +39,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
   const [type, setType] = useState<ManualTransactionType>(original?.exchange ? 'EXPENSE' : original?.type === 'TRANSFER' ? 'TRANSFER' : original?.type === 'INCOME' ? 'INCOME' : original ? 'EXPENSE' : initialDraft?.type ?? initialType);
   const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.exchange?.paid ?? original.amount))! : initialDraft ? formatEditableMoney(moneyInput(initialDraft.amount))! : '');
   const amountFontSize = amountWidth > 0 ? Math.max(20, Math.min(30, Math.floor(amountWidth / ((Math.max(amount.length, 1) + 1) * 0.65 * fontScale)))) : 30;
-  const [category, setCategory] = useState(original?.exchange ? exchangeLabel(original.exchange.kind) : original?.category ?? initialDraft?.category ?? (initialType === 'TRANSFER' ? 'Transfer' : CATEGORIES[initialType][0]));
+  const [category, setCategory] = useState(original?.exchange ? exchangeLabel(original.exchange.kind) : (original?.type === 'INCOME' ? incomeCategory(original.category) : original?.category) ?? initialDraft?.category ?? (initialType === 'TRANSFER' ? 'Transfer' : CATEGORIES[initialType][0]));
   const [date, setDate] = useState(original?.transactionDate ?? initialDraft?.transactionDate ?? defaults.transactionDate);
   const [time, setTime] = useState(original?.transactionTime ?? initialDraft?.transactionTime ?? defaults.transactionTime);
   const [notes, setNotes] = useState(original?.notes ?? initialDraft?.notes ?? '');
@@ -251,7 +251,7 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
             </View>
             <ScrollView style={{ maxHeight: height * 0.55 }} keyboardShouldPersistTaps="handled">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {(type === 'TRANSFER' ? [] : [...(original?.exchange ? CATEGORIES.EXPENSE.filter(value=>exchangeKind(value)) : CATEGORIES[type]), ...(original?.type === type && !(CATEGORIES[type] as readonly string[]).includes(original.category) ? [original.category] : [])]).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: value === category, disabled }} disabled={disabled}
+                {(type === 'TRANSFER' ? [] : [...(original?.exchange ? CATEGORIES.EXPENSE.filter(value=>exchangeKind(value)) : CATEGORIES[type]), ...(original?.type === type && !(CATEGORIES[type] as readonly string[]).includes(type === 'INCOME' ? incomeCategory(original.category) : original.category) ? [original.category] : [])]).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: value === category, disabled }} disabled={disabled}
                   onPress={() => chooseCategory(value)} style={({ pressed }) => ({ width: '31%', minHeight: 80, padding: 8, borderRadius: 12, borderWidth: 1.5, borderColor: value === category ? theme.accent : theme.border, backgroundColor: value === category ? theme.backgroundSelected : theme.backgroundElement, alignItems: 'center', justifyContent: 'center', gap: 5, opacity: pressed || disabled ? 0.5 : 1 })}>
                   <CategoryIcon category={value} income={type === 'INCOME'} />
                   <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ width: '100%', fontSize: 12, lineHeight: 17, textAlign: 'center' }}>{value}</ThemedText>

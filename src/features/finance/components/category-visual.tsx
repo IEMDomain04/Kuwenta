@@ -39,6 +39,7 @@ const visuals: Record<string, { color: string; icon: React.ComponentProps<typeof
   Entertainment: { color: '#8571C6', icon: 'film' },
   Health: { color: '#D66A82', icon: 'heart' },
   Education: { color: '#558BB3', icon: 'book' },
+  Gifts: { color: '#965076', icon: 'gift' },
   Family: { color: '#CC8154', icon: 'home' },
   Subscriptions: { color: '#5C8B9A', icon: 'phone-portrait' },
   Other: { color: '#7D929D', icon: 'ellipsis-horizontal' },

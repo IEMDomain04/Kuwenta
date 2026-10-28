@@ -1,58 +1,86 @@
-import { useAmountVisibility } from '@/hooks/amount-visibility';
+import { HIDDEN_AMOUNT, useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
-import Svg, { Circle, Line } from 'react-native-svg';
+import { Pressable, View, useWindowDimensions } from 'react-native';
+import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dashboardCategories } from '../dashboard';
+import { formatTransactionDateTime } from '../dates';
+import { spendingBlocks } from '../spending-blocks';
 import type { Transaction } from '../types';
+import { categoryVisual } from './category-visual';
 import { ActionButton } from './ui';
+
+function blockTextColor(color: string) {
+  const channels = color.slice(1).match(/../g)!.map(channel => {
+    const value = parseInt(channel, 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722 > 0.179 ? '#000000' : '#FFFFFF';
+}
 
 export function CategorySpending({ transactions, start, end, period }: { transactions: readonly Transaction[]; start: string; end: string; period: string }) {
   const theme = useTheme();
-  const { hidden: amountsHidden, formatAmount: formatMoney } = useAmountVisibility();
+  const dark = useColorScheme() === 'dark';
+  const { fontScale } = useWindowDimensions();
+  const { hidden: amountsHidden, formatAmount: formatMoney, conceal } = useAmountVisibility();
+  const [width, setWidth] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const [selection, setSelection] = useState<{ category: string; start: string; end: string } | null>(null);
+  const [recordLimit, setRecordLimit] = useState(10);
   const { total, rows } = useMemo(() => dashboardCategories(transactions, start, end), [transactions, start, end]);
-  const colors = [theme.accent, theme.budget, theme.secondary, theme.warning, theme.expense, theme.textSecondary];
-  const slices = rows.slice(0, 5);
-  if (rows.length > 5) slices.push({ category: 'Other categories', amount: rows.slice(5).reduce((sum, row) => sum + row.amount, 0) });
-  let offset = 0;
-  const circumference = 2 * Math.PI * 40;
+  const blocks = useMemo(() => spendingBlocks(rows, width, 184), [rows, width]);
+  const selected = selection?.start === start && selection.end === end ? rows.find(row => row.category === selection.category) : undefined;
+  const records = useMemo(() => selected ? transactions.filter(row => row.type === 'EXPENSE' && row.category === selected.category && row.transactionDate >= start && row.transactionDate <= end)
+    .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.transactionTime.localeCompare(a.transactionTime)) : [], [transactions, selected, start, end]);
+  function choose(category: string) {
+    setSelection(selected?.category === category ? null : { category, start, end });
+    setRecordLimit(10);
+    if (rows.findIndex(row => row.category === category) >= 5) setExpanded(true);
+  }
+  function share(amount: number) { return amountsHidden ? HIDDEN_AMOUNT : (amount / total * 100).toFixed(1) + '%'; }
   return <View style={{ padding: 14, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 12 }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <ThemedText type="smallBold" style={{ flex: 1 }}>Spending by category</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">{period === 'day' ? 'Today' : period === 'week' ? 'This week' : 'This month'}</ThemedText>
     </View>
     {total ? <>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
-        <View accessible accessibilityLabel={'Total expenses: ' + formatMoney(total, true)} style={{ width: 112, height: 112 }}>
-          <Svg width={112} height={112} viewBox="0 0 100 100" accessible={false}>
-            {slices.map((slice, index) => {
-              const length = slice.amount / total * circumference;
-              const previous = offset; offset += length;
-              return <Circle key={slice.category} cx={50} cy={50} r={40} fill="none" stroke={colors[index]} strokeWidth={14} strokeDasharray={[length, circumference - length]} strokeDashoffset={-previous} rotation={-90} origin="50,50" />;
-            })}
-            {slices.length > 1 ? slices.map((slice, index) => {
-              const preceding = slices.slice(0, index).reduce((sum, row) => sum + row.amount, 0);
-              const angle = preceding / total * 2 * Math.PI - Math.PI / 2;
-              return <Line key={slice.category} x1={50 + 33 * Math.cos(angle)} y1={50 + 33 * Math.sin(angle)} x2={50 + 47 * Math.cos(angle)} y2={50 + 47 * Math.sin(angle)} stroke={theme.backgroundElement} strokeWidth={1} />;
-            }) : null}
-            <Circle cx={50} cy={50} r={47} fill="none" stroke={theme.textSecondary} strokeWidth={2} />
-            <Circle cx={50} cy={50} r={47} fill="none" stroke={theme.backgroundElement} strokeWidth={1} />
-            <Circle cx={50} cy={50} r={33} fill="none" stroke={theme.textSecondary} strokeWidth={2} />
-            <Circle cx={50} cy={50} r={33} fill="none" stroke={theme.backgroundElement} strokeWidth={1} />
-          </Svg>
-        </View>
-        <View style={{ flex: 1, minWidth: 140, gap: 7 }}>
-          {(expanded ? rows : slices).map((row, index) => <View key={row.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors[Math.min(index, 5)] }} />
-            <ThemedText type="small" numberOfLines={1} style={{ flex: 1, fontSize: 11 }}>{row.category}</ThemedText>
-            <ThemedText type="small" style={{ fontSize: 11 }}>{formatMoney(row.amount, true)} / {amountsHidden ? '\u2022\u2022\u2022\u2022' : (row.amount / total * 100).toFixed(1) + '%'}</ThemedText>
-          </View>)}
-        </View>
+      <View onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ height: 184, borderRadius: 12, overflow: 'hidden' }}>
+        {blocks.map(block => {
+          const color = categoryVisual(block.category, false, dark).color;
+          const readable = block.width >= 76 * fontScale && block.height >= 52 * fontScale;
+          return <Pressable key={block.category} accessibilityRole="button" accessibilityLabel={block.category + ', ' + formatMoney(block.amount, true) + ', ' + share(block.amount) + ' of spending'} accessibilityState={{ selected: selected?.category === block.category, expanded: selected?.category === block.category }}
+            onPress={() => choose(block.category)} style={({ pressed }) => ({ position: 'absolute', left: block.x, top: block.y, width: block.width, height: block.height, padding: readable ? 8 : 0, justifyContent: 'center', overflow: 'hidden', backgroundColor: color, opacity: pressed ? 0.7 : 1, borderWidth: selected?.category === block.category ? 2 : 1, borderColor: selected?.category === block.category ? theme.text : theme.backgroundElement })}>
+            {readable ? <><ThemedText type="smallBold" numberOfLines={2} style={{ color: blockTextColor(color), fontSize: 11, lineHeight: 15 }}>{block.category}</ThemedText><ThemedText type="small" numberOfLines={1} style={{ color: blockTextColor(color), fontSize: 11, lineHeight: 15 }}>{formatMoney(block.amount, true)}</ThemedText></> : null}
+          </Pressable>;
+        })}
       </View>
-      <ThemedText type="smallBold">Total expenses: {formatMoney(total, true)}</ThemedText>
-      {rows.length > 5 ? <ActionButton compact label={expanded ? 'Show less' : 'View all categories'} onPress={() => setExpanded(value => !value)} /> : null}
+      <View>
+        {(expanded ? rows : rows.slice(0, 5)).map(row => <View key={row.category}>
+          <Pressable accessibilityRole="button" accessibilityLabel={row.category + ', ' + formatMoney(row.amount, true) + ', ' + share(row.amount) + ' of spending'} accessibilityState={{ selected: selected?.category === row.category, expanded: selected?.category === row.category }} onPress={() => choose(row.category)}
+            style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: selected?.category === row.category ? theme.backgroundSelected : 'transparent', opacity: pressed ? 0.7 : 1 })}>
+            <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: categoryVisual(row.category, false, dark).color }} />
+            <ThemedText type="small" style={{ flex: 1 }}>{row.category}</ThemedText>
+            <View style={{ alignItems: 'flex-end', flexShrink: 1 }}><ThemedText type="smallBold">{formatMoney(row.amount, true)}</ThemedText><ThemedText type="small" themeColor="textSecondary">{share(row.amount)}</ThemedText></View>
+          </Pressable>
+          {selected?.category === row.category ? <View style={{ gap: 8, padding: 12, borderRadius: 12, backgroundColor: theme.background }}>
+            {records.slice(0, recordLimit).map(record => <Pressable key={record.id} accessibilityRole="button" accessibilityLabel={'View ' + record.category + ', ' + conceal(record.notes?.trim() || record.category) + ', ' + formatMoney(record.amount, true) + ', ' + formatTransactionDateTime(record.transactionDate, record.transactionTime)} onPress={() => router.push({ pathname: '/transaction', params: { id: record.exchangeParentId ?? record.id } })}
+              style={({ pressed }) => ({ minHeight: 44, paddingVertical: 8, gap: 2, opacity: pressed ? 0.7 : 1 })}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                <ThemedText type="smallBold" numberOfLines={2} style={{ flex: 1 }}>{conceal(record.notes?.trim() || record.category)}</ThemedText>
+                <ThemedText type="smallBold" style={{ flexShrink: 1, textAlign: 'right', fontVariant: ['tabular-nums'] }}>{formatMoney(record.amount, true)}</ThemedText>
+              </View>
+              <ThemedText type="small" themeColor="textSecondary">{formatTransactionDateTime(record.transactionDate, record.transactionTime)}</ThemedText>
+            </Pressable>)}
+            {records.length > recordLimit ? <ActionButton compact label="Show more transactions" onPress={() => setRecordLimit(value => value + 10)} /> : null}
+          </View> : null}
+        </View>)}
+      </View>
+      {rows.length > 5 ? <ActionButton compact label={expanded ? 'Show less' : 'View all categories'} onPress={() => {
+        setExpanded(value => !value);
+        if (expanded && selected && rows.findIndex(row => row.category === selected.category) >= 5) setSelection(null);
+      }} /> : null}
     </> : <ThemedText type="small" themeColor="textSecondary">No expenses recorded for this period.</ThemedText>}
   </View>;
 }

@@ -557,3 +557,16 @@ test('original amount correction confirms old and new amounts and cancellation k
  h.render().button('Save correction').props.onPress();const confirm=h.prompts[1][2].find(button=>button.text==='Confirm');confirm.onPress();confirm.onPress();await settle();
  assert.equal(h.saved.length,1);assert.deepEqual(h.saved[0],['loan',60000,50000]);
 });
+
+
+test('editing legacy income shows one current category choice and keeps the amount',()=>{
+ for(const [old,current] of [['Gift','Gifts'],['Other','Other Income']]) {
+  const original=record({type:'INCOME',category:old,amount:50000});let saved;
+  const h=harness('components/transaction-form.tsx',{params:{original,type:'INCOME'},onSubmit:row=>{saved=row;}});
+  h.render().button('Category: '+current+'. Change category.').props.onPress();
+  assert.equal(h.render().nodes.filter(node=>node.props.accessibilityLabel===current).length,1);
+  assert.equal(h.render().button(old),undefined);
+  h.render().button(current).props.onPress();h.render().button('Save changes').props.onPress();
+  assert.equal(saved.category,current);assert.equal(saved.amount,50000);assert.equal(original.category,old);
+ }
+});

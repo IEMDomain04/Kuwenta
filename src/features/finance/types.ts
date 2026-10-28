@@ -15,11 +15,16 @@ export type Account = {
 };
 
 export const CATEGORIES = {
-  INCOME: ['Allowance', 'Service sale', 'Salary', 'Part-time Work', 'Freelance', 'Gifts', 'Other Income', 'Gift', 'Business', 'Other'],
-  EXPENSE: ['Meals', 'Snacks', 'Drinks', 'Transport', 'Café', 'Groceries', 'Personal Care', 'Cleaning Supplies', 'Mobile Load', 'Mobile Data', 'Games', 'Entertainment', 'Tech', 'Accessories', 'School Supplies', 'Personal Items', 'Shopping', 'Bills', 'Fees', 'Health', 'Education', 'Family', 'Subscriptions', 'Cash-in (E-bank)', 'Cash-out (E-bank)', 'Service exchange', 'Other'],
+  INCOME: ['Allowance', 'Salary', 'Part-time Work', 'Freelance', 'Business', 'Service sale', 'Savings Interest', 'Gifts', 'Other Income'],
+  EXPENSE: ['Meals', 'Snacks', 'Drinks', 'Transport', 'Café', 'Groceries', 'Personal Care', 'Cleaning Supplies', 'Mobile Load', 'Mobile Data', 'Games', 'Entertainment', 'Tech', 'Accessories', 'School Supplies', 'Personal Items', 'Shopping', 'Bills', 'Fees', 'Health', 'Education', 'Family', 'Subscriptions', 'Gifts', 'Cash-in (E-bank)', 'Cash-out (E-bank)', 'Service exchange', 'Other'],
 } as const;
 
 /** Accepted for existing records and backups, but hidden from new-entry pickers. */
+export const LEGACY_INCOME_CATEGORIES: readonly string[] = ['Gift', 'Other'];
+/** Display retired income labels consistently without rewriting saved records. */
+export function incomeCategory(category: string): string {
+  return category === 'Gift' ? 'Gifts' : category === 'Other' ? 'Other Income' : category;
+}
 export const LEGACY_EXPENSE_CATEGORIES: readonly string[] = ['Service sale', 'E-bank Cash-in', 'E-bank Cash-out', 'Food', 'Transportation', 'Snacks & Drinks', 'Mobile Load & Data', 'Games & Entertainment', 'Tech & Accessories', 'School & Personal Items'];
 
 export type ManualTransactionType = keyof typeof CATEGORIES | 'TRANSFER';

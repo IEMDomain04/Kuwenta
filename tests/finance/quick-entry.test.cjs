@@ -84,7 +84,7 @@ test('student expenses and income map to categories and remain valid review draf
  for (const [phrase, category] of [
   ['Chips 30','Snacks'], ['Coffee 80','Café'], ['Keyboard 1000','Tech'],
   ['Bag 500','Personal Items'], ['Games 100','Games'], ['Cash-out fee 15','Fees'],
-  ['Part-time 500','Part-time Work'], ['Freelance 2000','Freelance'], ['Gift 500','Gifts'], ['Received 100','Other Income']
+  ['Part-time 500','Part-time Work'], ['Freelance 2000','Freelance'], ['Received gift 500','Gifts'], ['Received 100','Other Income']
  ]) {
   const {draft} = parse(phrase);
   assert.equal(draft.category, category, phrase);
@@ -137,4 +137,53 @@ test('updated categories survive backup round trips without changing amounts', (
  const records = CATEGORIES.EXPENSE.map((category, index) => record({ id: 'category-' + index, category, amount: 100 }));
  const restored = parseBackup(serializeBackup(cash, records, '2026-10-12T00:00:00.000Z'));
  assert.deepEqual(restored.transactions, records);
+});
+
+
+test('gift direction is explicit and purchased items given as gifts stay Gifts expenses', () => {
+ const {validateDraft}=require('../../.expo/finance-tests/validation.js');
+ for(const phrase of ['Received gift 500','Natanggap regalo 500','Nakatanggap ng regalo 500','Income gift 500']) {
+  const result=parse(phrase);assert.equal(result.draft.type,'INCOME');assert.equal(result.draft.category,'Gifts');assert.deepEqual(result.warnings,[]);validateDraft(result.draft,cash);
+ }
+ for(const phrase of ['Bought gift 500','Paid for gift 500','Gift for mom 500','Bumili ng regalo 500','Regalo para kay mama 500','Bought a bag as a gift 500']) {
+  const result=parse(phrase);assert.equal(result.draft.type,'EXPENSE');assert.equal(result.draft.category,'Gifts');validateDraft(result.draft,cash);
+ }
+ for(const phrase of ['Gift 500','Gifts 500','Regalo 500'])assert.throws(()=>parse(phrase),/received or bought/);
+ assert.throws(()=>parse('Received and bought gift 500'),/unclear/);
+});
+
+test('income choices have no duplicate gift or other labels, while saved legacy income still validates',()=>{
+ const {CATEGORIES,LEGACY_INCOME_CATEGORIES,incomeCategory}=require('../../.expo/finance-tests/types.js');
+ const {validateManualRecord}=require('../../.expo/finance-tests/validation.js');
+ const {record}=require('./fixtures.cjs');
+ assert.ok(CATEGORIES.INCOME.includes('Gifts'));assert.ok(CATEGORIES.INCOME.includes('Other Income'));assert.ok(CATEGORIES.EXPENSE.includes('Gifts'));
+ assert.equal(new Set(CATEGORIES.INCOME).size,CATEGORIES.INCOME.length);
+ for(const category of LEGACY_INCOME_CATEGORIES){assert.ok(!CATEGORIES.INCOME.includes(category));validateManualRecord(record({type:'INCOME',category}));}
+ assert.equal(incomeCategory('Gift'),'Gifts');assert.equal(incomeCategory('Other'),'Other Income');
+ for(const category of ['Allowance','Salary','Part-time Work','Freelance','Business','Service sale'])assert.ok(CATEGORIES.INCOME.includes(category));
+});
+
+test('new Gifts expense and legacy income survive JSON and Excel without rewriting stored categories',()=>{
+ const {serializeBackup,parseBackup}=require('../../.expo/finance-tests/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {record}=require('./fixtures.cjs');
+ const {budgetReport}=require('../../.expo/finance-tests/budgets.js');
+ const rows=[record({id:'savings-interest',type:'INCOME',category:'Savings Interest',amount:125}),record({id:'gift-spent',type:'EXPENSE',category:'Gifts',amount:50000}),record({id:'gift-received',type:'INCOME',category:'Gift',amount:100000}),record({id:'legacy-other',type:'INCOME',category:'Other',amount:500})];
+ const budgets=[{month:'2026-10',category:'Gifts',limitAmount:60000}];
+ const backup=parseBackup(serializeBackup(cash,rows,'2026-10-12T00:00:00.000Z',[],budgets));
+ const excel=parseExcelBackup(createExcelBackup(backup));assert.deepEqual(excel,backup);assert.deepEqual(excel.transactions,rows);
+ assert.equal(budgetReport(excel.budgets,excel.transactions,'2026-10').rows[0].remaining,10000);
+});
+
+test('savings interest prepares an income draft with the actual credited amount', () => {
+  const { validateDraft } = require('../../.expo/finance-tests/validation.js');
+  for (const phrase of ['Savings interest 1.25 from Bank 2', 'Bank interest 1.25 using Bank 2', 'Interest credited 1.25 from Bank 2']) {
+    const { draft, warnings } = parse(phrase);
+    assert.equal(draft.type, 'INCOME');
+    assert.equal(draft.category, 'Savings Interest');
+    assert.equal(draft.amount, 125);
+    assert.equal(draft.accountId, 'bank');
+    assert.deepEqual(warnings, []);
+    validateDraft(draft, bank);
+  }
 });
