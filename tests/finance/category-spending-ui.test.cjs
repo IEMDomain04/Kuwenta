@@ -100,3 +100,26 @@ test('small hidden categories reveal their row and paginate transactions on sele
   tree = nodes(api.render(many));
   assert.equal(tree.filter(node => node.props.accessibilityLabel?.startsWith('View Tiny,')).length, 0);
 });
+
+
+test('category visual caps blocks and expanded rows at ten, initially showing five', () => {
+  const api = mount();
+  const limited = { ...props, transactions: Array.from({ length: 12 }, (_, i) => record({ id: 'limit-' + i, category: 'Limit ' + i, amount: (12 - i) * 100 })) };
+  const before = JSON.stringify(limited.transactions);
+  let tree = nodes(api.render(limited));
+  tree.find(node => node.props.onLayout).props.onLayout({ nativeEvent: { layout: { width: 320 } } });
+  tree = nodes(api.render(limited));
+  function blocks(tree) { return tree.filter(node => typeof node.props.style === 'function' && node.props.style({}).position === 'absolute'); }
+  function rows(tree) { return tree.filter(node => node.type === 'Pressable' && typeof node.props.style === 'function' && node.props.style({}).minHeight === 44 && node.props.accessibilityLabel?.startsWith('Limit ')); }
+  assert.equal(blocks(tree).length, 10);
+  assert.equal(rows(tree).length, 5);
+  assert.ok(blocks(tree).find(node => node.props.accessibilityLabel.startsWith('Limit 0,')).props.accessibilityLabel.includes('16.0% of shown categories'));
+  tree.find(node => node.props.label === 'Others').props.onPress();
+  tree = nodes(api.render(limited));
+  assert.equal(rows(tree).length, 10);
+  assert.equal(blocks(tree).length, 10);
+  for (const excluded of ['Limit 10,', 'Limit 11,']) assert.ok(!tree.some(node => node.props.accessibilityLabel?.startsWith(excluded)));
+  tree.find(node => node.props.label === 'Show less').props.onPress();
+  assert.equal(rows(nodes(api.render(limited))).length, 5);
+  assert.equal(JSON.stringify(limited.transactions), before);
+});
