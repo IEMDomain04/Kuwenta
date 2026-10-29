@@ -89,7 +89,7 @@ export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: {
     {showBalances ? <AccountBalances /> : null}
     {!showSummary && (showCategories || showTrend || showComparison) ? periodPicker : null}
     {showCategories && report ? <CategorySpending key={period + report.start + report.end} transactions={transactions} start={report.start} end={report.end} period={period} /> : null}
-    {showTrend ? <SpendingTrend days={trendDays} period={period} /> : null}
+    {showTrend ? <SpendingTrend key={period + month + (trendDays[0]?.date ?? "")} days={trendDays} period={period} transactions={transactions} now={now} /> : null}
     {showComparison && report ? <IncomeExpenseChart income={report.income} expenses={report.expenses} /> : null}
   </View>;
 }
