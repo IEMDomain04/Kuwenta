@@ -9,6 +9,7 @@ export const OVERALL_BUDGET = 'Overall spending';
 export const BUDGET_CATEGORIES: readonly string[] = [OVERALL_BUDGET, ...CATEGORIES.EXPENSE.filter(category => category !== 'Cash-in (E-bank)' && category !== 'Cash-out (E-bank)' && category !== 'Service exchange')];
 
 export function validateBudget(budget: Budget): void {
+  if (budget.repeat !== undefined && typeof budget.repeat !== 'boolean') throw new Error('Invalid budget renewal setting.');
   if (!isBudgetPeriodKey(budget.month)) throw new Error('Choose a valid budget period.');
   if (budget.category !== OVERALL_BUDGET && !(CATEGORIES.EXPENSE as readonly string[]).includes(budget.category) && !LEGACY_EXPENSE_CATEGORIES.includes(budget.category)) throw new Error('Choose an expense category.');
   if (!Number.isSafeInteger(budget.limitAmount) || budget.limitAmount <= 0) throw new Error('Budget limit must be positive integer centavos.');
@@ -75,15 +76,15 @@ export function mergeBudgetOrder(all: readonly string[], visible: readonly strin
 
 
 /** Separate dated allowances: overlapping periods must never share a grand total. */
-export function budgetGroups(budgets: readonly Budget[], transactions: readonly Transaction[], period: 'all' | import('./budget-periods').BudgetPeriod = 'all') {
+export function budgetGroups(budgets: readonly Budget[], transactions: readonly Transaction[], period: 'all' | import('./budget-periods').BudgetPeriod = 'all', today?: string, includeHistory = false) {
   const ranks = { daily: 0, weekly: 1, monthly: 2 };
   const byScope = new Map<string, Budget[]>();
   for (const budget of budgets) {
     const rows = byScope.get(budget.month) ?? [];
     rows.push(budget); byScope.set(budget.month, rows);
   }
-  const scopes = [...byScope.keys()].map(scope => ({ scope, ...budgetPeriodRange(scope) })).filter(range => period === 'all' || range.period === period);
-  scopes.sort((a, b) => ranks[a.period] - ranks[b.period] || b.start.localeCompare(a.start));
+  const scopes = [...byScope.keys()].map(scope => ({ scope, ...budgetPeriodRange(scope) })).filter(range => (period === 'all' || range.period === period) && (!today || includeHistory || range.start <= today && range.end >= today));
+  scopes.sort((a, b) => (today ? Number(!(a.start <= today && a.end >= today)) - Number(!(b.start <= today && b.end >= today)) : 0) || ranks[a.period] - ranks[b.period] || b.start.localeCompare(a.start));
   return scopes.map(range => {
     const report = budgetReport(byScope.get(range.scope)!, transactions, range.scope);
     return { ...range, ...report, positiveRemaining: report.positiveRemaining };

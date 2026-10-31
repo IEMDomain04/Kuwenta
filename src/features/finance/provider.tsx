@@ -9,7 +9,7 @@ import { syncWidgets } from './widgets';
 import { syncNotifications, observeNotificationTaps } from './notifications';
 import { formatMoney } from './money';
 import { router, useRootNavigationState } from 'expo-router';
-import { listBudgets, saveBudgetOrder as saveBudgetOrderRecord, saveBudget as saveBudgetRecord, deleteBudget, copyPreviousBudgets } from './storage/budgets';
+import { renewBudgets, saveBudgetOrder as saveBudgetOrderRecord, saveBudget as saveBudgetRecord, deleteBudget, copyPreviousBudgets } from './storage/budgets';
 import { CashSetup } from './components/cash-setup';
 import { useTheme } from '@/hooks/use-theme';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -29,7 +29,7 @@ import { saveAccountWithBalance, createExternalTransfer, updateExternalTransfer,
 import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './types';
 import { FinanceScreen, ActionButton } from './components/ui';
 
-type Snapshot = { debtAdditions: DebtAddition[]; debts: Debt[]; debtPayments: DebtPayment[]; homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
+type Snapshot = { currentDate: string; debtAdditions: DebtAddition[]; debts: Debt[]; debtPayments: DebtPayment[]; homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
   addDebtAmount: (addition: DebtAddition) => Promise<void>;
   correctDebtAmount: (id: string, amount: number, expectedAmount: number) => Promise<void>;
@@ -93,7 +93,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     let locked = false;
     let running: Promise<unknown> = Promise.resolve();
     let recoveryAllowed = false;
-    let loadedMonth = '';
+    let loadedDate = '';
     async function load(baseline = false) {
       connection ??= await openFinanceDatabase();
       const accounts = await listAccounts(connection);
@@ -105,17 +105,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const needsCashSetup = (await connection.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'cashSetupComplete'"))?.value === '0';
       const homeVisualizations = await loadHomeVisualizations(connection);
       const goals = await listGoals(connection);
-      const budgets = await listBudgets(connection);
+      const currentDate = philippineDateTime().transactionDate;
+      const budgets = await renewBudgets(connection, currentDate);
       const debts = await listDebts(connection), debtPayments = await listDebtPayments(connection), debtAdditions = await listDebtAdditions(connection);
       validateDebtRecords(debts, debtPayments, accounts, transactions, debtAdditions);
-      const month = philippineDateTime().transactionDate.slice(0, 7);
+      const month = currentDate.slice(0, 7);
       const summary = calculateFinanceSummary(accounts, transactions, month);
       void syncNotifications(budgets, transactions, baseline).catch(cause => console.warn('Could not sync Kuwenta notifications:', cause));
       try { await syncWidgets(summary.balance, calculateCurrentMoney(accounts, transactions).availableMoney, needsCashSetup); }
       catch (cause) { console.warn('Could not update Kuwenta widgets:', cause); }
-      loadedMonth = month;
+      loadedDate = currentDate;
       if (active) {
-        const next = { debts, debtPayments, debtAdditions, homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
+        const next = { currentDate, debts, debtPayments, debtAdditions, homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
         loadedSnapshot.current = next; setSnapshot(next); setError(''); setCanRecover(false); recoveryAllowed = false;
       }
     }
@@ -199,17 +200,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     };
     void refresh();
     let timer: ReturnType<typeof setInterval> | undefined;
-    function stopMonthTimer() { if (timer) clearInterval(timer); timer = undefined; }
-    function startMonthTimer() {
-      stopMonthTimer();
-      timer = setInterval(() => { if (loadedMonth !== philippineDateTime().transactionDate.slice(0, 7)) void refresh(); }, 60_000);
+    function stopDateTimer() { if (timer) clearInterval(timer); timer = undefined; }
+    function startDateTimer() {
+      stopDateTimer();
+      timer = setInterval(() => { if (loadedDate !== philippineDateTime().transactionDate) void refresh(); }, 60_000);
     }
-    if (AppState.currentState === 'active') startMonthTimer();
+    if (AppState.currentState === 'active') startDateTimer();
     const subscription = AppState.addEventListener('change', state => {
-      if (state === 'active') { void refresh(); startMonthTimer(); } else stopMonthTimer();
+      if (state === 'active') { void refresh(); startDateTimer(); } else stopDateTimer();
     });
     return () => {
-      active = false; subscription.remove(); stopMonthTimer(); actions.current = null;
+      active = false; subscription.remove(); stopDateTimer(); actions.current = null;
       void running.finally(async () => { await connection?.closeAsync(); }).catch(() => {});
     };
   }, []);

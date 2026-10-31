@@ -8,7 +8,7 @@ import { validateAccount, validateManualRecord, validateGoal } from './validatio
 
 export type FinanceBackup = {
   format: 'kuwenta-finance';
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
   currency: 'PHP';
   timezone: 'Asia/Manila';
   exportedAt: string;
@@ -41,7 +41,7 @@ function strings(row: Record<string, unknown>, keys: readonly string[]): void {
 /** Validate the complete payload before a future restore writes anything. */
 function validateBackup(value: unknown): FinanceBackup {
   const root = object(value, ['format', 'version', 'currency', 'timezone', 'exportedAt', 'accounts', 'transactions', 'goals', 'budgets', 'debts', 'debtPayments', 'debtAdditions']);
-  if (root.format !== 'kuwenta-finance' || (root.version !== 1 && root.version !== 2 && root.version !== 3 && root.version !== 4 && root.version !== 5 && root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14)) {
+  if (root.format !== 'kuwenta-finance' || (root.version !== 1 && root.version !== 2 && root.version !== 3 && root.version !== 4 && root.version !== 5 && root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15)) {
     throw new Error('Unsupported backup format or version.');
   }
   if (root.currency !== 'PHP' || root.timezone !== 'Asia/Manila') {
@@ -59,8 +59,8 @@ function validateBackup(value: unknown): FinanceBackup {
     strings(row, ['id', 'name', 'currency', 'purpose']);
     const account = { ...row } as Account;
     validateAccount(account);
-    if (account.icon !== undefined && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14) throw new Error('Account icons require backup version 9.');
-    if (account.color !== undefined && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14) throw new Error('Account colors require backup version 8.');
+    if (account.icon !== undefined && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15) throw new Error('Account icons require backup version 9.');
+    if (account.color !== undefined && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15) throw new Error('Account colors require backup version 8.');
     if (accountIds.has(account.id)) throw new Error('Backup contains duplicate account IDs.');
     accountIds.add(account.id);
     return account;
@@ -76,9 +76,9 @@ function validateBackup(value: unknown): FinanceBackup {
     strings(row, ['id', 'type', 'accountId', 'category', 'transactionDate', 'transactionTime', 'createdAt', 'updatedAt']);
     const transaction = { ...row } as Transaction;
     validateManualRecord(transaction);
-    if ((transaction.exchange || transaction.exchangeParentId) && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14) throw new Error('Linked exchanges require backup version 10.');
-    if (transaction.type === 'EXTERNAL' && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14) throw new Error('External movements require backup version 7.');
-    if (root.version !== 5 && root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && (transaction.sourcePurpose !== undefined || transaction.destinationPurpose !== undefined)) throw new Error('Transfer purposes require backup version 5.');
+    if ((transaction.exchange || transaction.exchangeParentId) && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15) throw new Error('Linked exchanges require backup version 10.');
+    if (transaction.type === 'EXTERNAL' && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15) throw new Error('External movements require backup version 7.');
+    if (root.version !== 5 && root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15 && (transaction.sourcePurpose !== undefined || transaction.destinationPurpose !== undefined)) throw new Error('Transfer purposes require backup version 5.');
     if ((root.version === 1 || root.version === 2) && transaction.type === 'ADJUSTMENT') throw new Error('Balance adjustments require backup version 3.');
     if ((root.version === 1 || root.version === 2 || root.version === 3) && transaction.type === 'TRANSFER') throw new Error('Transfers require backup version 4.');
     if (!accountIds.has(transaction.accountId) || transaction.type === 'TRANSFER' && !accountIds.has(transaction.destinationAccountId!)) throw new Error('Backup transaction references an unknown account.');
@@ -89,7 +89,7 @@ function validateBackup(value: unknown): FinanceBackup {
 
   validateExchangeLinks(transactions);
   transactions = normalizeServiceExchanges(transactions, accounts);
-  if (root.goals !== undefined && ((root.version !== 5 && root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14) || !Array.isArray(root.goals))) throw new Error('Goals require a valid version 5 backup.');
+  if (root.goals !== undefined && ((root.version !== 5 && root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15) || !Array.isArray(root.goals))) throw new Error('Goals require a valid version 5 backup.');
   const goalIds = new Set<string>();
   const goalAccounts = new Set<string>();
   const goals = ((root.goals ?? []) as unknown[]).map((value) => {
@@ -100,25 +100,26 @@ function validateBackup(value: unknown): FinanceBackup {
     calculateGoalProgress(goal, accounts, transactions);
     return goal;
   });
-  if (root.budgets !== undefined && (root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 || !Array.isArray(root.budgets))) throw new Error('Budgets require backup version 6.');
+  if (root.budgets !== undefined && (root.version !== 6 && root.version !== 7 && root.version !== 8 && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15 || !Array.isArray(root.budgets))) throw new Error('Budgets require backup version 6.');
   const budgetKeys = new Set<string>();
   const budgets = ((root.budgets ?? []) as unknown[]).map((value) => {
-    const budget = { ...object(value, ['month', 'category', 'limitAmount']) } as Budget;
+    const budget = { ...object(value, ['month', 'category', 'limitAmount', 'repeat']) } as Budget;
     validateBudget(budget);
-    if (budget.month.includes(':') && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14) throw new Error('Daily and weekly budgets require backup version 9.');
+    if (budget.repeat !== undefined && root.version !== 15) throw new Error('Budget renewal settings require backup version 15.');
+    if (budget.month.includes(':') && root.version !== 9 && root.version !== 10 && root.version !== 11 && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15) throw new Error('Daily and weekly budgets require backup version 9.');
     const key = budget.month + ':' + budget.category;
     if (budgetKeys.has(key)) throw new Error('Duplicate category budget.');
     budgetKeys.add(key);
     return budget;
   });
   for (const month of new Set(budgets.map((row) => row.month))) budgetReport(budgets, transactions, month);
-  if ((root.debts !== undefined || root.debtPayments !== undefined) && root.version !== 12 && root.version !== 13 && root.version !== 14) throw new Error('Debt records require backup version 12.');
+  if ((root.debts !== undefined || root.debtPayments !== undefined) && root.version !== 12 && root.version !== 13 && root.version !== 14 && root.version !== 15) throw new Error('Debt records require backup version 12.');
   if (root.version >= 12 && (!Array.isArray(root.debts) || !Array.isArray(root.debtPayments))) throw new Error('Debt backup records are missing.');
   const debts = ((root.debts ?? []) as unknown[]).map(value => ({ ...object(value, ['id','name','kind','amount','accountId','existing','transactionDate','transactionTime','dueDate','notes','createdAt','updatedAt']) }) as Debt);
   const debtPayments = ((root.debtPayments ?? []) as unknown[]).map(value => ({ ...object(value, ['id','debtId','accountId','amount','transactionDate','transactionTime','notes','createdAt']) }) as DebtPayment);
-  if (root.version !== 13 && root.version !== 14 && debts.some(row => row.existing !== undefined)) throw new Error('Existing debts require backup version 13.');
-  if (root.debtAdditions !== undefined && (root.version !== 14 || !Array.isArray(root.debtAdditions))) throw new Error('Additional borrowing requires backup version 14.');
-  if (root.version === 14 && !Array.isArray(root.debtAdditions)) throw new Error('Additional borrowing records are missing.');
+  if (root.version !== 13 && root.version !== 14 && root.version !== 15 && debts.some(row => row.existing !== undefined)) throw new Error('Existing debts require backup version 13.');
+  if (root.debtAdditions !== undefined && (root.version !== 14 && root.version !== 15 || !Array.isArray(root.debtAdditions))) throw new Error('Additional borrowing requires backup version 14.');
+  if (root.version >= 14 && !Array.isArray(root.debtAdditions)) throw new Error('Additional borrowing records are missing.');
   const debtAdditions = ((root.debtAdditions ?? []) as unknown[]).map(value => ({ ...object(value, ['id','debtId','accountId','existing','amount','transactionDate','transactionTime','notes','createdAt']) }) as DebtAddition);
   validateDebtRecords(debts, debtPayments, accounts, transactions, debtAdditions);
   // Reject overflow in the resulting balance and in every reporting month's totals.
@@ -136,7 +137,7 @@ function validateBackup(value: unknown): FinanceBackup {
   return {
     format: 'kuwenta-finance', version: root.version, currency: 'PHP', timezone: 'Asia/Manila',
     ...(root.version >= 12 ? { debts, debtPayments } : {}),
-    ...(root.version === 14 ? { debtAdditions } : {}),
+    ...(root.version >= 14 ? { debtAdditions } : {}),
     exportedAt: root.exportedAt, accounts, transactions, goals: root.version >= 5 ? goals : undefined, budgets: root.version >= 6 ? budgets : undefined,
   };
 }
@@ -154,8 +155,8 @@ export function serializeBackup(
 ): string {
   const accounts: readonly Account[] = Array.isArray(account) ? account : [account as Account];
   return JSON.stringify(validateBackup({
-    format: 'kuwenta-finance', version: debtAdditions.length ? 14 : debts.some(row => row.existing !== undefined) ? 13 : debts.length || debtPayments.length ? 12 : transactions.some(row=>row.exchange || row.exchangeParentId) ? 11 : accounts.some(row => row.icon !== undefined) || budgets.some(row => row.month.includes(':')) ? 9 : accounts.some(row => row.color !== undefined) ? 8 : transactions.some((row) => row.type === 'EXTERNAL') ? 7 : 6, currency: 'PHP', timezone: 'Asia/Manila',
-    exportedAt, accounts, transactions, goals, budgets, ...(debts.length || debtPayments.length ? { debts, debtPayments } : {}), ...(debtAdditions.length ? { debtAdditions } : {}),
+    format: 'kuwenta-finance', version: budgets.some(row => row.repeat !== undefined) ? 15 : debtAdditions.length ? 14 : debts.some(row => row.existing !== undefined) ? 13 : debts.length || debtPayments.length ? 12 : transactions.some(row=>row.exchange || row.exchangeParentId) ? 11 : accounts.some(row => row.icon !== undefined) || budgets.some(row => row.month.includes(':')) ? 9 : accounts.some(row => row.color !== undefined) ? 8 : transactions.some((row) => row.type === 'EXTERNAL') ? 7 : 6, currency: 'PHP', timezone: 'Asia/Manila',
+    exportedAt, accounts, transactions, goals, budgets, ...(debts.length || debtPayments.length || budgets.some(row => row.repeat !== undefined) ? { debts, debtPayments } : {}), ...(debtAdditions.length || budgets.some(row => row.repeat !== undefined) ? { debtAdditions } : {}),
   }), null, 2);
 }
 

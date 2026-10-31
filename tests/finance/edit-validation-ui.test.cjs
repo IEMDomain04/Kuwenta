@@ -168,9 +168,11 @@ test('Daily is the default, and an existing budget can change period without res
 });
 
 
-test('editing an older budget amount preserves its dates while All shows every scope',async()=>{
+test('budget history reveals older scopes and editing preserves their dates',async()=>{
  const budgets=[{month:'2026-09',category:'Meals',limitAmount:50000},{month:'weekly:2026-09-07',category:'Drinks',limitAmount:5000},{month:'daily:2026-09-08',category:'Snacks',limitAmount:2000}];
  const h=harness('screens/budgets-screen.tsx',{budgets});
+ assert.equal(h.render().nodes.filter(node=>node.type==='BudgetList').length,0);
+ h.render().button('Budget history').props.onPress();
  assert.equal(h.render().nodes.filter(node=>node.type==='BudgetList').length,3);
  h.render().button('Edit Meals budget').props.onPress();
  assert.equal(h.render().find('BudgetPeriodPicker').props.date,'2026-09-01');

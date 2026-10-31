@@ -3,7 +3,7 @@ import { calculateAccountSummary } from '../calculations';
 import type { Account, Transaction } from '../types';
 import type { FinanceDatabase } from './database';
 
-const VERSION = 17;
+const VERSION = 18;
 const schema = `
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL CHECK(length(trim(id)) > 0),
@@ -172,5 +172,10 @@ export async function migrateDatabase(db: FinanceDatabase): Promise<void> {
       CREATE INDEX IF NOT EXISTS debt_additions_debt ON debt_additions(debtId);
       PRAGMA user_version = 17;
     `);
+    if (version < 18) {
+      const columns = await transaction.getAllAsync<{ name: string }>('PRAGMA table_info(budgets)');
+      if (!columns.some(column => column.name === 'repeat')) await transaction.execAsync('ALTER TABLE budgets ADD COLUMN repeat INTEGER CHECK(repeat IS NULL OR repeat IN (0,1));');
+      await transaction.execAsync('PRAGMA user_version = 18;');
+    }
   });
 }

@@ -1,11 +1,17 @@
-import { isBudgetPeriodKey } from '../budget-periods';
+import { budgetRenewals, budgetPredecessorToStop } from '../budget-renewal';
+import { philippineDateTime } from '../dates';
+import { budgetPeriodRange, isBudgetPeriodKey } from '../budget-periods';
 import type { Budget } from '../types';
 import { validateBudget, budgetReport } from '../budgets';
 import { adjacentMonth } from '../reporting';
 import type { FinanceDatabase } from './database';
 
 export async function listBudgets(db: FinanceDatabase): Promise<Budget[]> {
-  const rows = await db.getAllAsync<Budget>('SELECT month, category, limitAmount FROM budgets ORDER BY month, category');
+  const stored = await db.getAllAsync<Omit<Budget, 'repeat'> & { repeat: number | null }>('SELECT month, category, limitAmount, repeat FROM budgets ORDER BY month, category');
+  const rows: Budget[] = stored.map(({ repeat, ...row }) => {
+    if (repeat !== null && repeat !== 0 && repeat !== 1) throw new Error('Invalid stored budget renewal setting.');
+    return { ...row, ...(repeat === null ? {} : { repeat: repeat === 1 }) };
+  });
   rows.forEach(validateBudget);
   const preference = await db.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'budgetOrder'");
   const orders = readOrders(preference?.value);
@@ -15,9 +21,11 @@ export async function listBudgets(db: FinanceDatabase): Promise<Budget[]> {
 }
 export async function saveBudget(db: FinanceDatabase, budget: Budget, creating: boolean, original?: Pick<Budget, 'month' | 'category'>): Promise<void> {
   validateBudget(budget);
+  const today = philippineDateTime().transactionDate;
   if (original) validateBudget({ ...original, limitAmount: 1 });
   await db.withExclusiveTransactionAsync(async (transaction) => {
-    const existing = await transaction.getFirstAsync<Budget>('SELECT * FROM budgets WHERE month = ? AND category = ?', budget.month, budget.category);
+    const rows = await listBudgets(transaction);
+    const existing = rows.find(row => row.month === budget.month && row.category === budget.category);
     if (creating && existing) {
       if (existing.limitAmount === budget.limitAmount) return;
       throw new Error('This category already has a budget for that period. Edit it instead.');
@@ -27,18 +35,22 @@ export async function saveBudget(db: FinanceDatabase, budget: Budget, creating: 
       if (!await transaction.getFirstAsync('SELECT category FROM budgets WHERE month = ? AND category = ?', original.month, original.category)) throw new Error('Budget no longer exists.');
       if (existing) throw new Error('This category already has a budget for that period. Choose another period.');
     } else if (!creating && !existing) throw new Error('Budget no longer exists.');
-    const rows = await listBudgets(transaction);
     budgetReport([...rows.filter((row) => row.month !== budget.month || row.category !== budget.category), budget], [], budget.month);
     if (moving) {
-      await transaction.runAsync('UPDATE budgets SET month = ?, category = ?, limitAmount = ? WHERE month = ? AND category = ?', budget.month, budget.category, budget.limitAmount, original.month, original.category);
+      const previous = budgetPredecessorToStop(rows, original, today);
+      if (previous) await transaction.runAsync('UPDATE budgets SET repeat = 0 WHERE month = ? AND category = ?', previous.month, previous.category);
+      await transaction.runAsync('UPDATE budgets SET month = ?, category = ?, limitAmount = ?, repeat = ? WHERE month = ? AND category = ?', budget.month, budget.category, budget.limitAmount, budget.repeat === undefined ? null : Number(budget.repeat), original.month, original.category);
       return;
     }
-    await transaction.runAsync('INSERT INTO budgets(month, category, limitAmount) VALUES (?, ?, ?) ON CONFLICT(month, category) DO UPDATE SET limitAmount = excluded.limitAmount', budget.month, budget.category, budget.limitAmount);
+    const repeat = budget.repeat ?? (budgetPeriodRange(budget.month).end < today ? existing?.repeat : undefined);
+    await transaction.runAsync('INSERT INTO budgets(month, category, limitAmount, repeat) VALUES (?, ?, ?, ?) ON CONFLICT(month, category) DO UPDATE SET limitAmount = excluded.limitAmount, repeat = excluded.repeat', budget.month, budget.category, budget.limitAmount, repeat === undefined ? null : Number(repeat));
   });
 }
 export async function deleteBudget(db: FinanceDatabase, month: string, category: string): Promise<void> {
   validateBudget({ month, category, limitAmount: 1 });
   await db.withExclusiveTransactionAsync(async (transaction) => {
+    const previous = budgetPredecessorToStop(await listBudgets(transaction), { month, category }, philippineDateTime().transactionDate);
+    if (previous) await transaction.runAsync('UPDATE budgets SET repeat = 0 WHERE month = ? AND category = ?', previous.month, previous.category);
     await transaction.runAsync('DELETE FROM budgets WHERE month = ? AND category = ?', month, category);
   });
 }
@@ -72,4 +84,28 @@ export async function saveBudgetOrder(db: FinanceDatabase, month: string, catego
     orders[month] = [...categories];
     await transaction.runAsync("INSERT INTO preferences(key, value) VALUES ('budgetOrder', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", JSON.stringify(orders));
   });
+}
+
+/** Called on launch, resume and day changes. Rechecks inside the atomic write for idempotency. */
+export async function renewBudgets(db: FinanceDatabase, today: string): Promise<Budget[]> {
+  const existing = await listBudgets(db);
+  if (!budgetRenewals(existing, today).length) return existing;
+  let result = existing;
+  await db.withExclusiveTransactionAsync(async transaction => {
+    const rows = await listBudgets(transaction);
+    const additions = budgetRenewals(rows, today);
+    const all = [...rows, ...additions.map(row => row.budget)];
+    for (const scope of new Set(additions.map(row => row.budget.month))) budgetReport(all, [], scope);
+    for (const { budget } of additions) {
+      await transaction.runAsync('INSERT OR IGNORE INTO budgets(month,category,limitAmount,repeat) VALUES (?,?,?,?)', budget.month,budget.category,budget.limitAmount,budget.repeat === undefined ? null : Number(budget.repeat));
+    }
+    const preference = await transaction.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'budgetOrder'");
+    const orders = readOrders(preference?.value);
+    for (const { budget, previousScope } of additions) {
+      if (!orders[budget.month] && orders[previousScope]) orders[budget.month] = [...orders[previousScope]];
+    }
+    if (JSON.stringify(orders) !== (preference?.value ?? '{}')) await transaction.runAsync("INSERT INTO preferences(key,value) VALUES ('budgetOrder',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", JSON.stringify(orders));
+    result = await listBudgets(transaction);
+  });
+  return result;
 }

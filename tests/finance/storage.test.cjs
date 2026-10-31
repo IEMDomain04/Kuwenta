@@ -56,7 +56,7 @@ test('initialization creates Cash exactly once and preserves records/opening bal
   await createTransaction(db, 'expense', expense());
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync('SELECT count(*) AS total FROM accounts')).total, 1);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
   assert.deepEqual(calculateAccountSummary(await getCashAccount(db), await listTransactions(db), '2026-10'), {
     balance: 138000, monthlyIncome: 50000, monthlyExpenses: 12000, hasNegativeBalance: false,
   });
@@ -176,9 +176,9 @@ test('migration failure rolls back schema and version; newer schema is rejected'
   assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'accounts'"), null);
   fail = false;
   await initializeDatabase(db);
-  await db.execAsync('PRAGMA user_version = 18');
+  await db.execAsync('PRAGMA user_version = 19');
   await assert.rejects(initializeDatabase(db), /newer version/);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 19);
 });
 
 test('a failure after an edit write rolls back the original transaction', async (t) => {
@@ -382,7 +382,7 @@ test('version 1 migration preserves Cash amounts, IDs and timestamps and is repe
   await db.execAsync('DROP INDEX transactions_all_history; PRAGMA user_version = 1;');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.deepEqual(await listTransactions(db), before);
   assert.ok(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'transactions_all_history'"));
@@ -521,7 +521,7 @@ test('version 3 table migration preserves records and rolls back failures', asyn
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
   db.execAsync = exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
   assert.equal((await getTransaction(db, 'kept')).amount, 12000);
 });
 
@@ -609,7 +609,7 @@ test('version 4 migration preserves existing adjustment and expense records', as
   await adjustAccountBalance(db, 'adjustment-kept', 'cash', 100, -12000);
   await db.execAsync('PRAGMA user_version = 3');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
   assert.equal((await getTransaction(db, 'adjustment-kept')).adjustmentDirection, 'increase');
   assert.equal((await getTransaction(db, 'expense-kept')).amount, 12000);
 });
@@ -806,7 +806,7 @@ test('preferences migration preserves financial records and is repeatable', asyn
   await db.execAsync('DROP TABLE preferences; PRAGMA user_version = 5');
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
   assert.equal((await getTransaction(db, 'keep-six')).amount, 12000);
 });
 
@@ -1033,7 +1033,7 @@ test('budget schema migration preserves records and rolls back errors', async (t
   assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 7);
   assert.equal((await listTransactions(db)).length, 1);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
 });
 
 
@@ -1213,7 +1213,7 @@ test('version 9 account color migration preserves existing records and rolls bac
   db.execAsync = exec;
   await initializeDatabase(db);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 18);
   assert.equal((await getCashAccount(db)).openingBalance, 100000);
   assert.equal((await getCashAccount(db)).color, undefined);
 });
@@ -1328,7 +1328,7 @@ test('version 10 palette upgrade preserves foreign keys and rolls back an interr
   assert.ok(!(await db.getAllAsync('PRAGMA table_info(accounts)')).some(row=>row.name==='previousColor'));
   db.execAsync=exec;
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);
+  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,18);
   const bank=(await listAccounts(db)).find(row=>row.id==='bank');
   assert.equal(bank.color,'teal');
   assert.equal(calculateAccountSummary(bank,await listTransactions(db),'2026-10').balance,38000);
@@ -1356,7 +1356,7 @@ test('icon migration preserves monthly records and rolls back on failure; all pe
  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,11);
  assert.deepEqual(await listBudgets(db),[monthly]);
  db.execAsync=exec;await migrateDatabase(db);
- assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,18);
  const cash=await getCashAccount(db);await saveAccount(db,{...cash,icon:'gcash'},false);
  for(const month of ['daily:2026-10-13','weekly:2026-10-12']){
   await saveBudget(db,{...monthly,month},true);
@@ -1673,7 +1673,7 @@ test('version 15 debt migration preserves existing activity and rolls back an in
  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,14);
  assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name = 'debts'"),null);
  db.execAsync=exec;await initializeDatabase(db);
- assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);assert.deepEqual(await listTransactions(db),before);
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,18);assert.deepEqual(await listTransactions(db),before);
 });
 
 
@@ -1753,7 +1753,7 @@ test('version 16 preserves old linked debts and repayments and rolls back an int
  await assert.rejects(initializeDatabase(db),/interrupted/);
  assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,15);assert.deepEqual(await listTransactions(db),rows);
  db.execAsync=exec;await initializeDatabase(db);
- assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);assert.deepEqual(await listTransactions(db),rows);
+ assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,18);assert.deepEqual(await listTransactions(db),rows);
  assert.equal((await debtStore.listDebts(db))[0].existing,undefined);
  assert.equal(debtMath.debtTotals(await debtStore.listDebts(db),await debtStore.listDebtPayments(db)).owed,30000);
  assert.deepEqual(await db.getAllAsync('PRAGMA foreign_key_check'),[]);
@@ -1869,7 +1869,7 @@ test('version 17 migration preserves existing debt history and rolls back on int
  const exec=db.execAsync;db.execAsync=async sql=>{await exec(sql);if(sql.includes('CREATE TABLE IF NOT EXISTS debt_additions'))throw new Error('interrupted upgrade');};
  await assert.rejects(initializeDatabase(db),/interrupted/);assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,16);
  assert.equal(await db.getFirstAsync("SELECT name FROM sqlite_master WHERE name='debt_additions'"),null);
- db.execAsync=exec;await initializeDatabase(db);assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,17);
+ db.execAsync=exec;await initializeDatabase(db);assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,18);
  assert.deepEqual(await listTransactions(db),before);assert.equal((await debtStore.listDebtPayments(db)).length,1);
  assert.deepEqual(await db.getAllAsync('PRAGMA foreign_key_check'),[]);
 });
