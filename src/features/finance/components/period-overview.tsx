@@ -62,7 +62,7 @@ export function PeriodOverview({ now, visible = DEFAULT_HOME_VISUALIZATIONS }: {
           {days.map((day) => {
             // Daily totals are stored in centavos; levels stay fixed across weeks.
             const level = day.expenses === 0 ? 0 : day.expenses < 15_000 ? 1 : day.expenses < 30_000 ? 2 : day.expenses < 50_000 ? 3 : 4;
-            return <Pressable key={day.date} accessibilityRole="button" accessibilityLabel={readableTransactionDate(day.date) + ', ' + formatMoney(day.expenses) + ' spent'} accessibilityState={{ selected: selectedDate === day.date }} onPress={() => setSelectedDate(day.date)} style={{ flex: 1, minHeight: 44, justifyContent: 'center', gap: 5 }}>
+            return <Pressable key={day.date} accessibilityRole="button" accessibilityLabel={readableTransactionDate(day.date) + ', ' + formatMoney(day.expenses) + ' spent'} accessibilityState={{ selected: selectedDate === day.date }} onPress={() => setSelectedDate(current => current === day.date ? '' : day.date)} style={{ flex: 1, minHeight: 44, justifyContent: 'center', gap: 5 }}>
               <View style={{ width: '100%', flexGrow: 1, minHeight: 30, borderRadius: 4, backgroundColor: spendingColors[level], borderWidth: 1, borderColor: selectedDate === day.date ? theme.text : theme.border }} />
               <ThemedText type="small" numberOfLines={1} adjustsFontSizeToFit style={{ textAlign: 'center', fontSize: 9, lineHeight: 13, color: day.isToday ? theme.accent : theme.textSecondary, fontWeight: day.isToday ? '700' : '400' }}>{day.label}</ThemedText>
             </Pressable>;

@@ -5,11 +5,11 @@ const ts = require('typescript');
 const vm = require('node:vm');
 const source=ts.transpileModule(fs.readFileSync('src/features/finance/components/period-overview.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 function render(visible) {
-  let reportCalls=0, activityCalls=0;
+  let reportCalls=0, activityCalls=0, cursor=0; const hooks=[];
   const jsx=(type,props)=>({type,props});
   const sandbox={exports:{},require(name){
     if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:false,formatAmount:require('../../.expo/finance-tests/money.js').formatMoney,conceal:text=>text})};
-    if(name==='react')return{useState:initial=>[initial,()=>{}],useMemo:factory=>factory()};
+    if(name==='react')return{useState:initial=>{const index=cursor++;if(!(index in hooks))hooks[index]=initial;return[hooks[index],value=>hooks[index]=typeof value==='function'?value(hooks[index]):value];},useMemo:factory=>factory()};
     if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
     if(name==='react-native')return{View:'View',Pressable:'Button',useWindowDimensions:()=>({fontScale:1})};
     if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
@@ -26,9 +26,11 @@ function render(visible) {
     throw new Error(name);
   }};
   vm.runInNewContext(source,sandbox);
+  function snapshot(){cursor=0;
   const tree=sandbox.exports.PeriodOverview({now:new Date('2026-10-12T04:00:00Z'),visible});
   const nodes=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;nodes.push(node);walk(node.props.children);}walk(tree);
-  return{tree,nodes,reportCalls,activityCalls};
+  return{tree,nodes,reportCalls,activityCalls,rerender:snapshot};
+  } return snapshot();
 }
 test('every visualization combination renders only selected sections and skips hidden calculations',()=>{
   for(let mask=0;mask<64;mask++){
@@ -54,4 +56,17 @@ test('every visualization combination renders only selected sections and skips h
     if(visible.includes('balances') && visible.includes('categories'))assert.ok(h.nodes.findIndex(node=>node.type==='Balances')<h.nodes.findIndex(node=>node.type==='Chart'));
     if(mask===0)assert.equal(h.tree,null);
   }
+});
+
+
+test('spending tiles toggle details off on a second tap, switch days, and clear on week change',()=>{
+ let h=render(['activity']);
+ const tiles=()=>h.nodes.filter(node=>node.type==='Button'&&node.props.accessibilityLabel?.endsWith(' spent'));
+ const details=()=>h.nodes.filter(node=>node.props.accessibilityLiveRegion==='polite');
+ assert.equal(details().length,0);
+ tiles()[0].props.onPress();h=h.rerender();assert.equal(tiles()[0].props.accessibilityState.selected,true);assert.equal(details().length,1);
+ tiles()[0].props.onPress();h=h.rerender();assert.ok(tiles().every(tile=>!tile.props.accessibilityState.selected));assert.equal(details().length,0);
+ tiles()[0].props.onPress();h=h.rerender();tiles()[1].props.onPress();h=h.rerender();
+ assert.equal(tiles()[0].props.accessibilityState.selected,false);assert.equal(tiles()[1].props.accessibilityState.selected,true);assert.equal(details().length,1);
+ h.nodes.find(node=>node.type==='SelectionSheet').props.onSelect('-1');h=h.rerender();assert.equal(details().length,0);assert.ok(tiles().every(tile=>!tile.props.accessibilityState.selected));
 });
