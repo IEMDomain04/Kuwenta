@@ -1,6 +1,6 @@
 import { listDebts, listDebtPayments, listDebtAdditions } from './debts';
 import { listBudgets } from './budgets';
-import { parseBackup, serializeBackup, type FinanceBackup } from '../backup';
+import { parseBackup, serializeBackup, type FinanceBackup } from '../backup/backup';
 import { listAccounts } from './accounts';
 import { listGoals } from './goals';
 import { listTransactions } from './transactions';

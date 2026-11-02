@@ -1,8 +1,8 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {exchangeDraft,exchangeRecords,validateExchangeLinks}=require('../../.expo/finance-tests/exchanges.js');
+const {exchangeDraft,exchangeRecords,validateExchangeLinks}=require('../../.expo/finance-tests/domain/exchanges.js');
 const {cash}=require('./fixtures.cjs');
-const {calculateFinanceSummary}=require('../../.expo/finance-tests/calculations.js');
+const {calculateFinanceSummary}=require('../../.expo/finance-tests/domain/calculations.js');
 const accounts=[{...cash,openingBalance:500000},{...cash,id:'bank',name:'Bank',openingBalance:500000}];
 const time='2026-10-13T04:00:00.000Z';
 function rows(kind,from,to,paid,received,extra=from,confirmed=false){return exchangeRecords('exchange',exchangeDraft(from,{kind,paid,received,receivedAccountId:to,extraAccountId:extra,earningsConfirmed:confirmed},'2026-10-13','12:00:00'),time);}
@@ -35,7 +35,7 @@ test('service exchanges support earnings, losses and equal payments without repo
 });
 
 test('old service pairs normalize without changing balances, and transaction grouping and lookup retain parent IDs',()=>{
- const {normalizeServiceExchanges,groupExchangeTransactions,resolveTransactionId}=require('../../.expo/finance-tests/exchanges.js');
+ const {normalizeServiceExchanges,groupExchangeTransactions,resolveTransactionId}=require('../../.expo/finance-tests/domain/exchanges.js');
  for(const received of [10000,9500]){
   const exchange={kind:'Service sale',paid:9500,received,receivedAccountId:'cash',extraAccountId:'bank',earningsConfirmed:false};
   const draft={type:'EXPENSE',category:'Service sale',amount:9500,accountId:'bank',transactionDate:'2026-10-13',transactionTime:'12:00:00',exchange};

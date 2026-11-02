@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { adjacentMonth, filterTransactions } = require('../../.expo/finance-tests/reporting.js');
-const { calculateAccountSummary } = require('../../.expo/finance-tests/calculations.js');
-const { philippineDateTime } = require('../../.expo/finance-tests/dates.js');
+const { adjacentMonth, filterTransactions } = require('../../.expo/finance-tests/reporting/reporting.js');
+const { calculateAccountSummary } = require('../../.expo/finance-tests/domain/calculations.js');
+const { philippineDateTime } = require('../../.expo/finance-tests/domain/dates.js');
 const { cash, record } = require('./fixtures.cjs');
 test('month navigation crosses year boundaries and rejects invalid months', () => {
   assert.equal(adjacentMonth('2026-01', -1), '2025-12');
@@ -37,7 +37,7 @@ test('new entry defaults stay in Philippine today, independent of historical sel
   assert.notEqual(defaults.transactionDate.slice(0, 7), historicalMonth);
 });
 
-const { spendingByCategory } = require('../../.expo/finance-tests/reporting.js');
+const { spendingByCategory } = require('../../.expo/finance-tests/reporting/reporting.js');
 test('category breakdown matches monthly expenses and excludes income and other months', () => {
   const rows = [
     record({ id: 'a', amount: 12000 }),

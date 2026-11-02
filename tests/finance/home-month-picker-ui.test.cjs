@@ -15,11 +15,11 @@ function picker(){
   if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
   if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
-  if(name==='../provider')return{useFinance:()=>finance};
-  if(name==='./ui')return{ActionButton:'ActionButton'};
+  if(name==='../../provider')return{useFinance:()=>finance};
+  if(name==='../shared/ui')return{ActionButton:'ActionButton'};
   throw new Error(name);
  }};
- vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/home-month-picker.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,sandbox);
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/home/home-month-picker.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,sandbox);
  return{changed,render(props={}){cursor=0;const nodes=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;nodes.push(node);walk(node.props.children);}walk(sandbox.exports.HomeMonthPicker(props));effects.splice(0).forEach(effect=>effect());return nodes;}};
 }
 test('Home month selection uses local callbacks without changing the shared reporting month',()=>{

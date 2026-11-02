@@ -1,10 +1,10 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {budgetPeriodKey,budgetPeriodRange}=require('../../.expo/finance-tests/budget-periods.js');
-const {budgetReport}=require('../../.expo/finance-tests/budgets.js');
-const {budgetAlertPlan}=require('../../.expo/finance-tests/notification-plan.js');
-const {serializeBackup,parseBackup}=require('../../.expo/finance-tests/backup.js');
-const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+const {budgetPeriodKey,budgetPeriodRange}=require('../../.expo/finance-tests/domain/budget-periods.js');
+const {budgetReport}=require('../../.expo/finance-tests/domain/budgets.js');
+const {budgetAlertPlan}=require('../../.expo/finance-tests/integrations/notification-plan.js');
+const {serializeBackup,parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
+const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/backup/excel-backup.js');
 const {cash,record}=require('./fixtures.cjs');
 test('weekly boundaries span months and years; invalid and non-Monday periods are rejected',()=>{
  assert.equal(budgetPeriodKey('weekly','2026-11-01'),'weekly:2026-10-26');
@@ -47,7 +47,7 @@ test('budget alerts include only current scopes with distinct category identitie
 
 
 test('All budget groups retain every scope and never combine overlapping allowances',()=>{
- const {budgetGroups}=require('../../.expo/finance-tests/budgets.js');
+ const {budgetGroups}=require('../../.expo/finance-tests/domain/budgets.js');
  const budgets=['daily:2026-10-13','weekly:2026-10-12','2026-10','2026-09'].map(month=>({month,category:'Meals',limitAmount:10000}));
  const groups=budgetGroups(budgets,[record({category:'Meals',amount:5000,transactionDate:'2026-10-13'})]);
  assert.equal(groups.length,4);assert.equal(groups.reduce((sum,g)=>sum+g.rows.length,0),4);

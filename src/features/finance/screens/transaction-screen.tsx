@@ -1,8 +1,8 @@
-import { exchangeLabel, exchangeRecords, resolveTransactionId } from '../exchanges';
-import { useConfirmation } from '../components/confirmation';
-import { formatTransactionDateTime } from '../dates';
-import { formatMoney } from '../money';
-import { QuickEntry } from '../components/quick-entry';
+import { exchangeLabel, exchangeRecords, resolveTransactionId } from '../domain/exchanges';
+import { useConfirmation } from '../components/shared/confirmation';
+import { formatTransactionDateTime } from '../domain/dates';
+import { formatMoney } from '../domain/money';
+import { QuickEntry } from '../components/transactions/quick-entry';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
 import type { ReactNode } from 'react';
@@ -10,12 +10,12 @@ import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
-import { TransactionForm } from '../components/transaction-form';
-import { FinanceScreen, ActionButton, IconButton } from '../components/ui';
+import { TransactionForm } from '../components/transactions/transaction-form';
+import { FinanceScreen, ActionButton, IconButton } from '../components/shared/ui';
 import { useFinance } from '../provider';
-import { validateDraft } from '../validation';
-import { calculateFinanceSummary } from '../calculations';
-import type { TransactionDraft, ManualTransactionType } from '../types';
+import { validateDraft } from '../domain/validation';
+import { calculateFinanceSummary } from '../domain/calculations';
+import type { TransactionDraft, ManualTransactionType } from '../domain/types';
 
 export default function TransactionScreen({ transferOnly = false, transferChoices }: { transferOnly?: boolean; transferChoices?: ReactNode } = {}) {
   const params = useLocalSearchParams<{ quick?: string; id?: string; type?: string; accountId?: string; destinationAccountId?: string }>();

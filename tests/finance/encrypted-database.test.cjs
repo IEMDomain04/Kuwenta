@@ -25,7 +25,7 @@ function setup({ existing = false, legacy = false, key = 'a'.repeat(64), cipher 
     'expo-secure-store': { WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1, getItemAsync: async () => { keyReads++; return key; }, setItemAsync: async (_, value) => { if (failStore) throw new Error('locked'); key = value; events.push('store-key'); } },
     'expo-crypto': { getRandomBytesAsync: async size => new Uint8Array(size).fill(1) },
     './database': { initializeDatabase: async () => events.push('initialize'), DatabaseRecoveryError: class extends Error {} },
-    '../backup': { parseBackup: json => { const backup = JSON.parse(json); if (!backup.accounts) throw new Error('invalid backup'); return backup; } },
+    '../backup/backup': { parseBackup: json => { const backup = JSON.parse(json); if (!backup.accounts) throw new Error('invalid backup'); return backup; } },
     './backup': { restoreBackup: async () => events.push('restore-backup') },
     'expo-sqlite': {
       defaultDatabaseDirectory: directory,

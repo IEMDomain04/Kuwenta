@@ -1,6 +1,6 @@
-import type { Account, Transaction } from '../types';
-import { validateAccount } from '../validation';
-import { calculateAccountSummary, calculateCurrentMoney, calculateFinanceSummary, calculateSavings } from '../calculations';
+import type { Account, Transaction } from '../domain/types';
+import { validateAccount } from '../domain/validation';
+import { calculateAccountSummary, calculateCurrentMoney, calculateFinanceSummary, calculateSavings } from '../domain/calculations';
 import type { FinanceDatabase } from './database';
 
 type AccountRow = Omit<Account, 'includedInAvailable' | 'archived' | 'color' | 'icon'> & { includedInAvailable: number; archived: number; color?: Account['color'] | null; icon?: Account['icon'] | null };

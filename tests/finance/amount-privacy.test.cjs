@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const vm = require('node:vm');
-const money = require('../../.expo/finance-tests/money.js');
+const money = require('../../.expo/finance-tests/domain/money.js');
 const mask = String.fromCodePoint(8226).repeat(4);
 const peso = String.fromCodePoint(8369);
 function harness(saved = {}, failStorage = false) {
@@ -15,7 +15,7 @@ function harness(saved = {}, failStorage = false) {
     setItem(key, value) { if (failStorage) throw new Error('Storage unavailable'); storage.set(key, value); },
   }, require(name) {
     if (name === 'expo-sqlite/localStorage/install') return {};
-    if (name === '@/features/finance/money') return money;
+    if (name === '@/features/finance/domain/money') return money;
     if (name === 'react/jsx-runtime') return { jsx };
     if (name === 'react') return {
       createContext: initial => { current = initial; return { Provider: 'Provider' }; },
@@ -67,7 +67,7 @@ test('the eye button exposes the correct action and toggles the shared preferenc
     if(name === '@/hooks/use-theme') return { useTheme: () => ({}) };
     throw new Error(name);
   } };
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/amount-visibility-button.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, sandbox);
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/shared/amount-visibility-button.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, sandbox);
   const button = () => sandbox.exports.AmountVisibilityButton();
   assert.equal(button().props.accessibilityLabel, 'Hide amounts');
   button().props.onPress();
@@ -79,7 +79,7 @@ test('the eye button exposes the correct action and toggles the shared preferenc
 
 test('new debt, balance and fee insight amounts stay masked by the shared privacy setting', () => {
  const h=harness();
- const {moneyInsights,accountInsights}=require('../../.expo/finance-tests/insights.js');
+ const {moneyInsights,accountInsights}=require('../../.expo/finance-tests/reporting/insights.js');
  const {cash}=require('./fixtures.cjs');
  const bank={...cash,id:'bank',name:'MariBank',purpose:'savings',includedInAvailable:false,openingBalance:600000};
  const context={debts:[{id:'debt',name:'Ana',kind:'owed',amount:45000,existing:true,transactionDate:'2026-10-01'}],payments:[],additions:[]};

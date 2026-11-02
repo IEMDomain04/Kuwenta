@@ -26,7 +26,7 @@ function mount({ hidden = false, dark = false, reduced = false, opaque = false, 
     if (name === '@/hooks/use-theme') return { useTheme: () => theme };
     throw new Error(name);
   } };
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/finance-notice.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, sandbox);
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/shared/finance-notice.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, sandbox);
   return { render(notice) { cursor = 0; const tree = sandbox.exports.FinanceNotice({ notice, onDismiss: () => { dismissed++; } }); effects.splice(0).forEach(effect => effect()); return tree; }, animations, listeners, theme, dismissed: () => dismissed };
 }
 function nodes(tree) { const result = []; function walk(node) { if (Array.isArray(node)) return node.forEach(walk); if (!node?.props) return; result.push(node); walk(node.props.children); } walk(tree); return result; }

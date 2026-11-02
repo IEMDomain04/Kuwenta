@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const Module = require('node:module');
 const { cash, record } = require('./fixtures.cjs');
-const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
 const originalLoad = Module._load;
 let native = null, importedKey, decryptedBytes, derivations = 0;
 Module._load = function(name, ...args) {
@@ -22,7 +22,7 @@ Module._load = function(name, ...args) {
   return originalLoad.call(this, name, ...args);
 };
 after(() => { Module._load = originalLoad; });
-const { decryptBackup, parseEncryptedBackup, validateBackupPassword } = require('../../.expo/finance-tests/encrypted-backup.js');
+const { decryptBackup, parseEncryptedBackup, validateBackupPassword } = require('../../.expo/finance-tests/backup/encrypted-backup.js');
 const password = 'A long test passphrase';
 const json = serializeBackup(cash, [record({ notes: 'Meals' })], '2026-10-09T06:35:00.000Z');
 function protectedFile(plaintext = json, entered = password) {

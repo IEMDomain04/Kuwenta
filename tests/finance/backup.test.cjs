@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup.js');
-const { calculateAccountSummary } = require('../../.expo/finance-tests/calculations.js');
+const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup/backup.js');
+const { calculateAccountSummary } = require('../../.expo/finance-tests/domain/calculations.js');
 const { cash, record } = require('./fixtures.cjs');
 const exportedAt = '2026-10-09T06:35:00.000Z';
 function payload() {

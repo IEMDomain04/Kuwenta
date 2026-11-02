@@ -29,7 +29,7 @@ function harness({ id = 'bank', archived = false, movements = [] } = {}) {
   const sandbox = { exports: {}, require(name) {
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect() {} };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
-    if (name === '../components/confirmation') return { useConfirmation: () => ({ alert: (title, message, buttons, options) => { confirmation = { title, message, buttons, options }; } }) };
+    if (name === '../components/shared/confirmation') return { useConfirmation: () => ({ alert: (title, message, buttons, options) => { confirmation = { title, message, buttons, options }; } }) };
     if (name.endsWith('/field-error')) return { FieldError: 'FieldError' };
     if (name === 'react-native') return { View: 'View', Modal: 'Modal', Pressable: 'Pressable', TextInput: 'Input', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'android' } };
     if (name === 'expo-router') return { useLocalSearchParams: () => ({ id }), router: { canGoBack: () => true, back() {}, push(value) { opened.push(value); }, replace() {} } };
@@ -37,10 +37,10 @@ function harness({ id = 'bank', archived = false, movements = [] } = {}) {
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: '#06633E', border: '#73877A' }) };
     if (name === '../provider') return { useFinance: () => finance };
-    if (name === '../components/account-manager') return { AccountManager: 'AccountManager' };
-    if (name === '../components/money-field') return { MoneyField: 'MoneyField' };
-    if (name === '../components/ui') return { IconButton: 'IconButton', ActionButton: 'Button', FinanceScreen: 'Screen', BackButton: 'BackButton', TransactionRow: 'TransactionRow' };
-    if (['../calculations', '../dates', '../inputs', '../money'].includes(name)) return require('../../.expo/finance-tests/' + name.slice(3) + '.js');
+    if (name === '../components/accounts/account-manager') return { AccountManager: 'AccountManager' };
+    if (name === '../components/shared/money-field') return { MoneyField: 'MoneyField' };
+    if (name === '../components/shared/ui') return { IconButton: 'IconButton', ActionButton: 'Button', FinanceScreen: 'Screen', BackButton: 'BackButton', TransactionRow: 'TransactionRow' };
+    if (['../domain/calculations', '../domain/dates', '../domain/inputs', '../domain/money'].includes(name)) return require('../../.expo/finance-tests/' + name.replace(/^(?:\.\.?\/)+/, '') + '.js');
     throw new Error('Unexpected dependency: ' + name);
   } };
   vm.runInNewContext(source, sandbox);

@@ -1,5 +1,5 @@
 import { AmountVisibilityProvider } from '@/hooks/amount-visibility';
-import { ConfirmationProvider } from '@/features/finance/components/confirmation';
+import { ConfirmationProvider } from '@/features/finance/components/shared/confirmation';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';

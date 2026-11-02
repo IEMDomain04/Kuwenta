@@ -16,12 +16,12 @@ test('Android time picker uses AM/PM and keeps stored wall time and seconds inta
     if (name==='@/components/themed-text') return {ThemedText:'Text'};
     if (name==='@/hooks/use-theme') return {useTheme:()=>({})};
     if (name==='@/hooks/use-color-scheme') return {useColorScheme:()=> 'light'};
-    if (name==='./field-error') return {FieldError:'FieldError'};
-    if (name==='./ui') return {ActionButton:'ActionButton'};
-    if (name==='../dates') return require('../../.expo/finance-tests/dates.js');
+    if (name==='../shared/field-error') return {FieldError:'FieldError'};
+    if (name==='../shared/ui') return {ActionButton:'ActionButton'};
+    if (name==='../../domain/dates') return require('../../.expo/finance-tests/domain/dates.js');
     throw new Error(name);
   }};
-  const source=ts.transpileModule(fs.readFileSync('src/features/finance/components/transaction-date-time.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  const source=ts.transpileModule(fs.readFileSync('src/features/finance/components/transactions/transaction-date-time.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   vm.runInNewContext(source,sandbox);
   const tree=sandbox.exports.TransactionDateTime({date:'2026-10-10',time:'14:35:37',disabled:false,onDateChange(){},onTimeChange:value=>changed.push(value)});
   const nodes=[]; function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;nodes.push(node);walk(node.props.children);}walk(tree);

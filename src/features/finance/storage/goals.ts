@@ -1,6 +1,6 @@
-import type { Account, SavingsGoal } from '../types';
-import { validateGoal, validateAccount } from '../validation';
-import { calculateGoalProgress } from '../calculations';
+import type { Account, SavingsGoal } from '../domain/types';
+import { validateGoal, validateAccount } from '../domain/validation';
+import { calculateGoalProgress } from '../domain/calculations';
 import { listAccounts } from './accounts';
 import { listTransactions } from './transactions';
 import type { FinanceDatabase } from './database';

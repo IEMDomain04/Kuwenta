@@ -1,9 +1,9 @@
-import { budgetRenewals, budgetPredecessorToStop } from '../budget-renewal';
-import { philippineDateTime } from '../dates';
-import { budgetPeriodRange, isBudgetPeriodKey } from '../budget-periods';
-import type { Budget } from '../types';
-import { validateBudget, budgetReport } from '../budgets';
-import { adjacentMonth } from '../reporting';
+import { budgetRenewals, budgetPredecessorToStop } from '../domain/budget-renewal';
+import { philippineDateTime } from '../domain/dates';
+import { budgetPeriodRange, isBudgetPeriodKey } from '../domain/budget-periods';
+import type { Budget } from '../domain/types';
+import { validateBudget, budgetReport } from '../domain/budgets';
+import { adjacentMonth } from '../reporting/reporting';
 import type { FinanceDatabase } from './database';
 
 export async function listBudgets(db: FinanceDatabase): Promise<Budget[]> {

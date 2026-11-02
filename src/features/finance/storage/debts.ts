@@ -1,6 +1,6 @@
-import type { Debt, DebtAddition, DebtPayment, Transaction } from '../types';
-import { calculateFinanceSummary } from '../calculations';
-import { debtMovement, debtAdditionMovement, validateDebtRecords } from '../debts';
+import type { Debt, DebtAddition, DebtPayment, Transaction } from '../domain/types';
+import { calculateFinanceSummary } from '../domain/calculations';
+import { debtMovement, debtAdditionMovement, validateDebtRecords } from '../domain/debts';
 import type { FinanceDatabase } from './database';
 import { listAccounts } from './accounts';
 import { listTransactions } from './transactions';

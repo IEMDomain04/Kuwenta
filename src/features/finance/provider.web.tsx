@@ -1,6 +1,6 @@
 ﻿import type { ReactNode } from 'react';
 import { ThemedText } from '@/components/themed-text';
-import { FinanceScreen } from './components/ui';
+import { FinanceScreen } from './components/shared/ui';
 import type { FinanceState } from './provider';
 
 // Avoid bundling native SQLite into the unsupported web preview.

@@ -1,6 +1,6 @@
 ﻿const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { acceptsMoneyInput, dateInput, timeInput } = require('../../.expo/finance-tests/inputs.js');
+const { acceptsMoneyInput, dateInput, timeInput } = require('../../.expo/finance-tests/domain/inputs.js');
 test('money input rejects mixed paste and extra precision while allowing partial editing', () => {
   for (const value of ['', '0', '.', '120.', '120.50']) assert.equal(acceptsMoneyInput(value), true);
   for (const value of ['12abc34', '1,000', '1.234', '1..2', '1e3', '-12', '+12', ' 12 ']) assert.equal(acceptsMoneyInput(value), false);
@@ -24,7 +24,7 @@ test('time input formats digits and rejects letters without stripping them', () 
 });
 
 test('live money formatting preserves partial decimals and exact digit strings', () => {
-  const { formatEditableMoney } = require('../../.expo/finance-tests/inputs.js');
+  const { formatEditableMoney } = require('../../.expo/finance-tests/domain/inputs.js');
   for (const [value, expected] of [
     ['1000', '1,000'], ['12345.67', '12,345.67'], ['1000.', '1,000.'],
     ['1000.5', '1,000.5'], ['', ''], ['.', '.'], ['-1000.50', '-1,000.50'],
@@ -35,7 +35,7 @@ test('live money formatting preserves partial decimals and exact digit strings',
 });
 
 test('money edits preserve caret position across grouping, paste, range replacement and deletion', () => {
-  const { editMoneyInput } = require('../../.expo/finance-tests/inputs.js');
+  const { editMoneyInput } = require('../../.expo/finance-tests/domain/inputs.js');
   assert.deepEqual(editMoneyInput('', '1000', { start: 0, end: 0 }), { value: '1,000', cursor: 5 });
   assert.deepEqual(editMoneyInput('1,000', '1,0000', { start: 5, end: 5 }), { value: '10,000', cursor: 6 });
   assert.deepEqual(editMoneyInput('1,000', '19,000', { start: 1, end: 1 }), { value: '19,000', cursor: 3 });
@@ -48,8 +48,8 @@ test('money edits preserve caret position across grouping, paste, range replacem
 });
 
 test('formatted amounts still parse as exact centavos after removing display separators', () => {
-  const { formatEditableMoney } = require('../../.expo/finance-tests/inputs.js');
-  const { parseMoney } = require('../../.expo/finance-tests/money.js');
+  const { formatEditableMoney } = require('../../.expo/finance-tests/domain/inputs.js');
+  const { parseMoney } = require('../../.expo/finance-tests/domain/money.js');
   assert.equal(parseMoney(formatEditableMoney('12345.67').replace(/,/g, '')), 1234567);
   assert.equal(parseMoney(formatEditableMoney('-1000.50', true).replace(/,/g, ''), { allowNegative: true }), -100050);
   assert.equal(parseMoney(formatEditableMoney('90071992547409.91').replace(/,/g, '')), Number.MAX_SAFE_INTEGER);

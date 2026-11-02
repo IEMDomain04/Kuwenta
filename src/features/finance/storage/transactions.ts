@@ -1,9 +1,9 @@
-import { exchangeRecords, validateExchangeLinks } from '../exchanges';
-import { philippineDateTime } from '../dates';
-import type { Account, Transaction, TransactionDraft } from '../types';
-import { validateDraft, validateManualRecord } from '../validation';
+import { exchangeRecords, validateExchangeLinks } from '../domain/exchanges';
+import { philippineDateTime } from '../domain/dates';
+import type { Account, Transaction, TransactionDraft } from '../domain/types';
+import { validateDraft, validateManualRecord } from '../domain/validation';
 import { getAccount, listAccounts, saveAccountDetails, type AccountBalanceChange } from './accounts';
-import { calculateFinanceSummary, calculateAccountSummary } from '../calculations';
+import { calculateFinanceSummary, calculateAccountSummary } from '../domain/calculations';
 import type { FinanceDatabase } from './database';
 
 type TransactionRow = Omit<Transaction, 'notes' | 'destinationAccountId' | 'adjustmentDirection' | 'sourcePurpose' | 'destinationPurpose' | 'externalName' | 'exchange' | 'exchangeParentId'> & {

@@ -1,9 +1,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { cash, record } = require('./fixtures.cjs');
-const { calculateSavings, calculateGoalProgress } = require('../../.expo/finance-tests/calculations.js');
-const { validateGoal, validateManualRecord } = require('../../.expo/finance-tests/validation.js');
-const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup.js');
+const { calculateSavings, calculateGoalProgress } = require('../../.expo/finance-tests/domain/calculations.js');
+const { validateGoal, validateManualRecord } = require('../../.expo/finance-tests/domain/validation.js');
+const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup/backup.js');
 const savings = { ...cash, id: 'save', name: 'Savings', openingBalance: 10000, purpose: 'savings', includedInAvailable: false };
 const second = { ...savings, id: 'second', name: 'Second', openingBalance: 0 };
 const goal = { id: 'goal', name: 'Emergency fund', accountId: 'save', targetAmount: 50000, targetDate: '2027-01-01', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' };
@@ -58,7 +58,7 @@ test('goals and purpose snapshots round trip; malformed or duplicated goals reje
 
 
 test('cash exchanges show separate positive savings movements and keep fees and income separate',()=>{
- const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/exchanges.js');
+ const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/domain/exchanges.js');
  const bank={...savings,openingBalance:300000};
  const out=exchangeRecords('out',exchangeDraft('save',{kind:'E-bank Cash-out',paid:104000,received:100000,receivedAccountId:'cash',extraAccountId:'save',earningsConfirmed:true},'2026-10-13','12:00:00'),'2026-10-13T04:00:00.000Z');
  out[0].sourcePurpose='savings';out[0].destinationPurpose='spending';

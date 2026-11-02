@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const vm = require('node:vm');
-const money = require('../../.expo/finance-tests/money.js');
+const money = require('../../.expo/finance-tests/domain/money.js');
 const cash = { id: 'cash', name: 'Cash', currency: 'PHP', openingBalance: 100000, purpose: 'spending', includedInAvailable: true, archived: false };
 function render(accounts, transactions = [], dark = false, hidden = false) {
   const jsx = (type, props) => ({ type, props });
@@ -14,15 +14,15 @@ function render(accounts, transactions = [], dark = false, hidden = false) {
     if (name === 'react-native') return { View: 'View' };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-color-scheme') return { useColorScheme: () => dark ? 'dark' : 'light' };
-    if (name === '../account-colors') return require('../../.expo/finance-tests/account-colors.js');
+    if (name === '../../domain/account-colors') return require('../../.expo/finance-tests/domain/account-colors.js');
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: 'green', secondary: 'blue', expense: 'red' }) };
-    if (name === '../provider') return { useFinance: () => ({ accounts, transactions }) };
+    if (name === '../../provider') return { useFinance: () => ({ accounts, transactions }) };
     if (name === './account-icon') return { AccountIcon: 'Icon' };
-    if (name === '../money') return money;
-    if (name === '../calculations') return require('../../.expo/finance-tests/calculations.js');
+    if (name === '../../domain/money') return money;
+    if (name === '../../domain/calculations') return require('../../.expo/finance-tests/domain/calculations.js');
     throw new Error(name);
   } };
-  const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/account-balances.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/accounts/account-balances.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   vm.runInNewContext(source, sandbox);
   const nodes = [];
   function walk(node) { if (Array.isArray(node)) return node.forEach(walk); if (!node?.props) return; nodes.push(node); walk(node.props.children); }
@@ -48,7 +48,7 @@ test('balance visualization works before transactions and handles zero balances'
 
 
 test('balance bars match all account card presets in light and dark appearance',()=>{
- const {ACCOUNT_CARD_COLORS,accountCardColor}=require('../../.expo/finance-tests/account-colors.js');
+ const {ACCOUNT_CARD_COLORS,accountCardColor}=require('../../.expo/finance-tests/domain/account-colors.js');
  for(const dark of [false,true])for(const color of Object.keys(ACCOUNT_CARD_COLORS)){
   const account={...cash,color,openingBalance:-5000};const nodes=render([account],[],dark);
   const bar=nodes.find(node=>node.props.style?.height===10 && node.props.style?.width==='100%');

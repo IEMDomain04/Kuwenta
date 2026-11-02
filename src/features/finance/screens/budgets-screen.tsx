@@ -1,10 +1,10 @@
 import { useAmountVisibility } from '@/hooks/amount-visibility';
-import { BudgetPeriodPicker } from '../components/budget-period-picker';
-import { budgetPeriodKey, budgetPeriodLabel, budgetPeriodRange, isBudgetPeriodKey, type BudgetPeriod } from '../budget-periods';
-import { philippineDateTime } from '../dates';
-import { BudgetList } from '../components/budget-list';
-import { FieldError } from '../components/field-error';
-import { type ConfirmationOptions, useConfirmation } from '../components/confirmation';
+import { BudgetPeriodPicker } from '../components/budgets/budget-period-picker';
+import { budgetPeriodKey, budgetPeriodLabel, budgetPeriodRange, isBudgetPeriodKey, type BudgetPeriod } from '../domain/budget-periods';
+import { philippineDateTime } from '../domain/dates';
+import { BudgetList } from '../components/budgets/budget-list';
+import { FieldError } from '../components/shared/field-error';
+import { type ConfirmationOptions, useConfirmation } from '../components/shared/confirmation';
 import { ThemedText } from "@/components/themed-text";
 import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
@@ -19,22 +19,22 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { OVERALL_BUDGET, mergeBudgetOrder, BUDGET_CATEGORIES, budgetGroups, budgetReport, validateBudget } from "../budgets";
-import { calculateCurrentMoney } from "../calculations";
-import { BudgetUsage } from "../components/budget-usage";
-import { CategoryIcon, categoryVisual } from "../components/category-visual";
-import { MoneyField } from "../components/money-field";
-import { SelectionSheet } from "../components/selection-sheet";
+import { OVERALL_BUDGET, mergeBudgetOrder, BUDGET_CATEGORIES, budgetGroups, budgetReport, validateBudget } from "../domain/budgets";
+import { calculateCurrentMoney } from "../domain/calculations";
+import { BudgetUsage } from "../components/budgets/budget-usage";
+import { CategoryIcon, categoryVisual } from "../components/shared/category-visual";
+import { MoneyField } from "../components/shared/money-field";
+import { SelectionSheet } from "../components/shared/selection-sheet";
 import {
   ActionButton,
   BackButton,
   FinanceScreen,
   IconButton,
-} from "../components/ui";
-import { formatEditableMoney } from "../inputs";
-import { formatMoney, moneyInput, parseMoney } from "../money";
+} from "../components/shared/ui";
+import { formatEditableMoney } from "../domain/inputs";
+import { formatMoney, moneyInput, parseMoney } from "../domain/money";
 import { useFinance } from "../provider";
-import { CATEGORIES, type Budget } from "../types";
+import { CATEGORIES, type Budget } from "../domain/types";
 
 export default function BudgetsScreen() {
   const params = useLocalSearchParams<{ add?: string; category?: string; scope?: string; history?: string }>();

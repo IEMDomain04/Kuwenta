@@ -8,11 +8,11 @@ import { router } from 'expo-router';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import { accountInsights } from '../insights';
-import { philippineDateTime } from '../dates';
+import { accountInsights } from '../reporting/insights';
+import { philippineDateTime } from '../domain/dates';
 import { useFinance } from '../provider';
-import { AccountsOverview } from '../components/accounts-overview';
-import { FinanceScreen, AddTransactionButton } from '../components/ui';
+import { AccountsOverview } from '../components/accounts/accounts-overview';
+import { FinanceScreen, AddTransactionButton } from '../components/shared/ui';
 
 export default function AccountsScreen() {
   const { accounts, transactions, budgets, debts, debtPayments, debtAdditions, busy } = useFinance();

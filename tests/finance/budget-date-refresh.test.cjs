@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const ts = require('typescript');
-const dates = require('../../.expo/finance-tests/dates.js');
+const dates = require('../../.expo/finance-tests/domain/dates.js');
 const { cash } = require('./fixtures.cjs');
 const settle = () => new Promise(resolve=>setImmediate(resolve));
 
@@ -24,12 +24,12 @@ test('provider renews on startup, at Philippine midnight while open, and on resu
   './storage/transactions':{listTransactions:async()=>[]},
   './storage/goals':{listGoals:async()=>[]},
   './storage/debts':{listDebts:async()=>[],listDebtPayments:async()=>[],listDebtAdditions:async()=>[]},
-  './debts':{validateDebtRecords(){}},
-  './home-visualizations':{loadHomeVisualizations:async()=>[]},
-  './calculations':{calculateFinanceSummary:()=>({balance:0,monthlyIncome:0,monthlyExpenses:0}),calculateCurrentMoney:()=>({availableMoney:0})},
-  './dates':{...dates,philippineDateTime:()=>dates.philippineDateTime(new Date(now))},
-  './widgets':{syncWidgets:async()=>{}},
-  './notifications':{syncNotifications:async()=>{}},
+  './domain/debts':{validateDebtRecords(){}},
+  './reporting/home-visualizations':{loadHomeVisualizations:async()=>[]},
+  './domain/calculations':{calculateFinanceSummary:()=>({balance:0,monthlyIncome:0,monthlyExpenses:0}),calculateCurrentMoney:()=>({availableMoney:0})},
+  './domain/dates':{...dates,philippineDateTime:()=>dates.philippineDateTime(new Date(now))},
+  './integrations/widgets':{syncWidgets:async()=>{}},
+  './integrations/notifications':{syncNotifications:async()=>{}},
  };
  const exports={};
  const source=ts.transpileModule(fs.readFileSync('src/features/finance/provider.tsx','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;

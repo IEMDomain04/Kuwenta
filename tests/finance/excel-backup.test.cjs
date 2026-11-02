@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const XLSX = require('xlsx');
-const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
-const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/backup/excel-backup.js');
+const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
 const { cash, record } = require('./fixtures.cjs');
 const stamp = '2026-10-12T00:00:00.000Z';
 const savings = { ...cash, id: 'save', name: 'Laptop savings', purpose: 'savings', includedInAvailable: false, openingBalance: 0, color: 'teal' };

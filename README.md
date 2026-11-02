@@ -13,6 +13,8 @@ A local PHP money tracker built with Expo 57, React Native, Expo Router, and SQL
 - Onboarding, password-free backup export/restore, and full reset in Settings.
 - Quick Entry recognizes supported transaction phrases and opens a draft for review before saving.
 
+See the [folder guide](docs/folder-structure.md) for code locations and responsibilities.
+
 ## Development
 
 ```sh

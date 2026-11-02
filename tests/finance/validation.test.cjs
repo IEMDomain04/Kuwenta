@@ -1,6 +1,6 @@
 ﻿const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { validateDraft, validateAccount, validateManualRecord } = require('../../.expo/finance-tests/validation.js');
+const { validateDraft, validateAccount, validateManualRecord } = require('../../.expo/finance-tests/domain/validation.js');
 const { cash, record } = require('./fixtures.cjs');
 
 test('valid backdated entry with no notes is accepted', () => {

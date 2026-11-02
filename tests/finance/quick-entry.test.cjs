@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseQuickEntry } = require('../../.expo/finance-tests/quick-entry.js');
+const { parseQuickEntry } = require('../../.expo/finance-tests/domain/quick-entry.js');
 const { cash } = require('./fixtures.cjs');
 const now = new Date('2026-10-10T16:30:25.000Z');
 const bank = { ...cash, id: 'bank', name: 'Bank 2' };
@@ -80,7 +80,7 @@ test('incomplete, invalid or external transfers require clarification instead of
 });
 
 test('student expenses and income map to categories and remain valid review drafts', () => {
- const { validateDraft } = require('../../.expo/finance-tests/validation.js');
+ const { validateDraft } = require('../../.expo/finance-tests/domain/validation.js');
  for (const [phrase, category] of [
   ['Chips 30','Snacks'], ['Coffee 80','Café'], ['Keyboard 1000','Tech'],
   ['Bag 500','Personal Items'], ['Games 100','Games'], ['Cash-out fee 15','Fees'],
@@ -94,7 +94,7 @@ test('student expenses and income map to categories and remain valid review draf
 
 
 test('separate everyday expense categories produce valid review drafts', () => {
- const { validateDraft } = require('../../.expo/finance-tests/validation.js');
+ const { validateDraft } = require('../../.expo/finance-tests/domain/validation.js');
  for (const [phrase, category] of [
   ['Groceries 1500', 'Groceries'], ['Toothbrush 40', 'Personal Care'], ['Toothpaste 70', 'Personal Care'],
   ['Shampoo 90', 'Personal Care'], ['Detergent 80', 'Cleaning Supplies'], ['Dish soap 50', 'Cleaning Supplies'],
@@ -110,11 +110,11 @@ test('separate everyday expense categories produce valid review drafts', () => {
 });
 
 test('retired categories stay valid for saved records and budgets', () => {
- const { CATEGORIES, LEGACY_EXPENSE_CATEGORIES } = require('../../.expo/finance-tests/types.js');
- const { validateManualRecord } = require('../../.expo/finance-tests/validation.js');
- const { validateBudget, budgetReport } = require('../../.expo/finance-tests/budgets.js');
+ const { CATEGORIES, LEGACY_EXPENSE_CATEGORIES } = require('../../.expo/finance-tests/domain/types.js');
+ const { validateManualRecord } = require('../../.expo/finance-tests/domain/validation.js');
+ const { validateBudget, budgetReport } = require('../../.expo/finance-tests/domain/budgets.js');
  const { record } = require('./fixtures.cjs');
- const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+ const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
  assert.equal(new Set(CATEGORIES.EXPENSE).size, CATEGORIES.EXPENSE.length);
  assert.equal(CATEGORIES.EXPENSE.some(category => category.includes('&')), false);
  for (const category of LEGACY_EXPENSE_CATEGORIES) {
@@ -131,8 +131,8 @@ test('retired categories stay valid for saved records and budgets', () => {
 
 
 test('updated categories survive backup round trips without changing amounts', () => {
- const { CATEGORIES } = require('../../.expo/finance-tests/types.js');
- const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+ const { CATEGORIES } = require('../../.expo/finance-tests/domain/types.js');
+ const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
  const { record } = require('./fixtures.cjs');
  const records = CATEGORIES.EXPENSE.map((category, index) => record({ id: 'category-' + index, category, amount: 100 }));
  const restored = parseBackup(serializeBackup(cash, records, '2026-10-12T00:00:00.000Z'));
@@ -141,7 +141,7 @@ test('updated categories survive backup round trips without changing amounts', (
 
 
 test('gift direction is explicit and purchased items given as gifts stay Gifts expenses', () => {
- const {validateDraft}=require('../../.expo/finance-tests/validation.js');
+ const {validateDraft}=require('../../.expo/finance-tests/domain/validation.js');
  for(const phrase of ['Received gift 500','Natanggap regalo 500','Nakatanggap ng regalo 500','Income gift 500']) {
   const result=parse(phrase);assert.equal(result.draft.type,'INCOME');assert.equal(result.draft.category,'Gifts');assert.deepEqual(result.warnings,[]);validateDraft(result.draft,cash);
  }
@@ -153,8 +153,8 @@ test('gift direction is explicit and purchased items given as gifts stay Gifts e
 });
 
 test('income choices have no duplicate gift or other labels, while saved legacy income still validates',()=>{
- const {CATEGORIES,LEGACY_INCOME_CATEGORIES,incomeCategory}=require('../../.expo/finance-tests/types.js');
- const {validateManualRecord}=require('../../.expo/finance-tests/validation.js');
+ const {CATEGORIES,LEGACY_INCOME_CATEGORIES,incomeCategory}=require('../../.expo/finance-tests/domain/types.js');
+ const {validateManualRecord}=require('../../.expo/finance-tests/domain/validation.js');
  const {record}=require('./fixtures.cjs');
  assert.ok(CATEGORIES.INCOME.includes('Gifts'));assert.ok(CATEGORIES.INCOME.includes('Other Income'));assert.ok(CATEGORIES.EXPENSE.includes('Gifts'));
  assert.equal(new Set(CATEGORIES.INCOME).size,CATEGORIES.INCOME.length);
@@ -164,10 +164,10 @@ test('income choices have no duplicate gift or other labels, while saved legacy 
 });
 
 test('new Gifts expense and legacy income survive JSON and Excel without rewriting stored categories',()=>{
- const {serializeBackup,parseBackup}=require('../../.expo/finance-tests/backup.js');
- const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {serializeBackup,parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/backup/excel-backup.js');
  const {record}=require('./fixtures.cjs');
- const {budgetReport}=require('../../.expo/finance-tests/budgets.js');
+ const {budgetReport}=require('../../.expo/finance-tests/domain/budgets.js');
  const rows=[record({id:'savings-interest',type:'INCOME',category:'Savings Interest',amount:125}),record({id:'gift-spent',type:'EXPENSE',category:'Gifts',amount:50000}),record({id:'gift-received',type:'INCOME',category:'Gift',amount:100000}),record({id:'legacy-other',type:'INCOME',category:'Other',amount:500})];
  const budgets=[{month:'2026-10',category:'Gifts',limitAmount:60000}];
  const backup=parseBackup(serializeBackup(cash,rows,'2026-10-12T00:00:00.000Z',[],budgets));
@@ -176,7 +176,7 @@ test('new Gifts expense and legacy income survive JSON and Excel without rewriti
 });
 
 test('savings interest prepares an income draft with the actual credited amount', () => {
-  const { validateDraft } = require('../../.expo/finance-tests/validation.js');
+  const { validateDraft } = require('../../.expo/finance-tests/domain/validation.js');
   for (const phrase of ['Savings interest 1.25 from Bank 2', 'Bank interest 1.25 using Bank 2', 'Interest credited 1.25 from Bank 2']) {
     const { draft, warnings } = parse(phrase);
     assert.equal(draft.type, 'INCOME');

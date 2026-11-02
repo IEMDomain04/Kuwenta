@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { calculateAccountSummary } = require('../../.expo/finance-tests/calculations.js');
+const { calculateAccountSummary } = require('../../.expo/finance-tests/domain/calculations.js');
 const { cash, record } = require('./fixtures.cjs');
 const income = record({ id: 'income-1', type: 'INCOME', amount: 50000, category: 'Salary' });
 
@@ -46,7 +46,7 @@ test('invalid month, duplicate IDs, future types and overflow fail visibly', () 
 });
 
 test('current money includes spending openings and savings without counting either as income', () => {
-  const { calculateCurrentMoney, calculateFinanceSummary } = require('../../.expo/finance-tests/calculations.js');
+  const { calculateCurrentMoney, calculateFinanceSummary } = require('../../.expo/finance-tests/domain/calculations.js');
   const accounts = [
     { ...cash, openingBalance: 0 },
     { ...cash, id: 'bank', name: 'Bank', openingBalance: 1000000 },
@@ -58,7 +58,7 @@ test('current money includes spending openings and savings without counting eith
     { totalMoney: 1500000, availableMoney: 0, hasNegativeAccount: false });
 });
 test('current money includes archived balances and recalculates edits, deletions and inclusion flags', () => {
-  const { calculateCurrentMoney } = require('../../.expo/finance-tests/calculations.js');
+  const { calculateCurrentMoney } = require('../../.expo/finance-tests/domain/calculations.js');
   const accounts = [{ ...cash, openingBalance: 0 }, { ...cash, id: 'bank', name: 'Bank', archived: true, openingBalance: 1000000 }];
   const expense = record({ accountId: 'bank', transactionDate: '2026-09-30', amount: 12345 });
   assert.equal(calculateCurrentMoney(accounts, [expense]).availableMoney, 987655);
@@ -70,7 +70,7 @@ test('current money includes archived balances and recalculates edits, deletions
   assert.equal(negative.totalMoney, 987654);
 });
 test('current money rejects unsafe aggregate sums and unknown or duplicate account records', () => {
-  const { calculateCurrentMoney } = require('../../.expo/finance-tests/calculations.js');
+  const { calculateCurrentMoney } = require('../../.expo/finance-tests/domain/calculations.js');
   assert.throws(() => calculateCurrentMoney([{ ...cash, openingBalance: Number.MAX_SAFE_INTEGER }, { ...cash, id: 'bank', openingBalance: 1 }], []), /supported range/);
   assert.throws(() => calculateCurrentMoney([{ ...cash, openingBalance: Number.MIN_SAFE_INTEGER }, { ...cash, id: 'bank', openingBalance: -1 }], []), /supported range/);
   assert.throws(() => calculateCurrentMoney([cash], [record({ accountId: 'missing' })]), /unknown account/);

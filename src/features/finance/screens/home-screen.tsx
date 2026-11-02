@@ -1,4 +1,4 @@
-import { AmountVisibilityButton } from '../components/amount-visibility-button';
+import { AmountVisibilityButton } from '../components/shared/amount-visibility-button';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { ThemedText } from "@/components/themed-text";
 import { useTheme } from "@/hooks/use-theme";
@@ -17,14 +17,14 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BudgetOverview } from "../components/budget-overview";
-import { CategoryIcon } from "../components/category-visual";
-import { PeriodOverview } from "../components/period-overview";
-import { AddTransactionButton, FinanceScreen } from "../components/ui";
-import { dashboardGreeting, dashboardReport } from "../dashboard";
-import { formatTransactionDateTime, philippineDateTime } from "../dates";
-import { exchangeLabel, exchangeSummary } from "../exchanges";
-import { moneyInsightReaction, moneyInsights } from "../insights";
+import { BudgetOverview } from "../components/budgets/budget-overview";
+import { CategoryIcon } from "../components/shared/category-visual";
+import { PeriodOverview } from "../components/home/period-overview";
+import { AddTransactionButton, FinanceScreen } from "../components/shared/ui";
+import { dashboardGreeting, dashboardReport } from "../reporting/dashboard";
+import { formatTransactionDateTime, philippineDateTime } from "../domain/dates";
+import { exchangeLabel, exchangeSummary } from "../domain/exchanges";
+import { moneyInsightReaction, moneyInsights } from "../reporting/insights";
 import { useFinance } from "../provider";
 
 const mascotImages = {

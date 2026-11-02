@@ -1,21 +1,21 @@
-import { AccountIcon } from '../components/account-icon';
-import { FieldError } from '../components/field-error';
-import { useConfirmation } from '../components/confirmation';
+import { AccountIcon } from '../components/accounts/account-icon';
+import { FieldError } from '../components/shared/field-error';
+import { useConfirmation } from '../components/shared/confirmation';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
-import { ActionButton, BackButton, FinanceScreen, IconButton } from '../components/ui';
-import { SelectionSheet } from '../components/selection-sheet';
-import { MoneyField } from '../components/money-field';
-import { TransactionDateTime } from '../components/transaction-date-time';
-import { isValidDate, isValidTime, philippineDateTime } from '../dates';
-import { calculateAccountSummary, calculateFinanceSummary } from '../calculations';
-import { formatMoney, moneyInput, parseMoney } from '../money';
+import { ActionButton, BackButton, FinanceScreen, IconButton } from '../components/shared/ui';
+import { SelectionSheet } from '../components/shared/selection-sheet';
+import { MoneyField } from '../components/shared/money-field';
+import { TransactionDateTime } from '../components/transactions/transaction-date-time';
+import { isValidDate, isValidTime, philippineDateTime } from '../domain/dates';
+import { calculateAccountSummary, calculateFinanceSummary } from '../domain/calculations';
+import { formatMoney, moneyInput, parseMoney } from '../domain/money';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
-import { validateDraft } from '../validation';
+import { validateDraft } from '../domain/validation';
 
 export default function TransferScreen() {
   const params = useLocalSearchParams<{ id?: string; accountId?: string; destinationAccountId?: string }>();

@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { budgetReport, validateBudget } = require('../../.expo/finance-tests/budgets.js');
-const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup.js');
+const { budgetReport, validateBudget } = require('../../.expo/finance-tests/domain/budgets.js');
+const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup/backup.js');
 const { cash, record } = require('./fixtures.cjs');
 const budget = { month: '2026-10', category: 'Food', limitAmount: 500000 };
 
@@ -40,7 +40,7 @@ test('budget payloads round trip, reject malformed data and support all older ve
   }
 });
 
-const { budgetFeedback } = require('../../.expo/finance-tests/budgets.js');
+const { budgetFeedback } = require('../../.expo/finance-tests/domain/budgets.js');
 test('budget feedback distinguishes allowances from available cash and other months', () => {
   const row = budgetReport([budget], [], budget.month).rows[0];
   assert.match(budgetFeedback(row, 30000, row.remaining, true).details.join(' '), /but spending accounts/);
@@ -64,7 +64,7 @@ test('budget feedback covers near-limit, reached and overspent categories with e
 
 
 test('rearranging the Home budget preview preserves hidden categories and validates stale entries', () => {
-  const { mergeBudgetOrder } = require('../../.expo/finance-tests/budgets.js');
+  const { mergeBudgetOrder } = require('../../.expo/finance-tests/domain/budgets.js');
   assert.deepEqual(mergeBudgetOrder(['Meals','Snacks','Groceries','Bills','Games'], ['Groceries','Meals','Snacks']), ['Groceries','Meals','Snacks','Bills','Games']);
   assert.deepEqual(mergeBudgetOrder(['Meals','Snacks','Bills'], ['Bills','Meals']), ['Bills','Snacks','Meals']);
   assert.throws(() => mergeBudgetOrder(['Meals','Snacks'], ['Meals','Meals']));
@@ -73,7 +73,7 @@ test('rearranging the Home budget preview preserves hidden categories and valida
 
 
 test('overall budgets count all expenses and fees, excluding income and balance movements', () => {
-  const { OVERALL_BUDGET } = require('../../.expo/finance-tests/budgets.js');
+  const { OVERALL_BUDGET } = require('../../.expo/finance-tests/domain/budgets.js');
   const overall = { ...budget, category: OVERALL_BUDGET, limitAmount: 50000 };
   const rows = [record({ category: 'Meals', amount: 12000 }), record({ id: 'bus', category: 'Transport', amount: 3000 }), record({ id: 'fee', category: 'Fees', amount: 4000 }), record({ id: 'income', type: 'INCOME', category: 'Salary', amount: 50000 }), record({ id: 'transfer', type: 'TRANSFER', destinationAccountId: 'bank', category: 'Transfer', amount: 20000 }), record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', adjustmentDirection: 'increase', externalName: 'Friend', amount: 10000 }), record({ id: 'adjustment', type: 'ADJUSTMENT', category: 'Balance adjustment', adjustmentDirection: 'increase', amount: 10000 }), record({ id: 'old', transactionDate: '2026-09-30', amount: 5000 })];
   const report = budgetReport([overall, { ...budget, category: 'Meals', limitAmount: 15000 }], rows, budget.month);
@@ -90,8 +90,8 @@ test('overall budgets count all expenses and fees, excluding income and balance 
 });
 
 test('overall budgets respect daily, weekly and monthly ranges and trigger alerts', () => {
-  const { OVERALL_BUDGET, budgetGroups } = require('../../.expo/finance-tests/budgets.js');
-  const { budgetAlertPlan } = require('../../.expo/finance-tests/notification-plan.js');
+  const { OVERALL_BUDGET, budgetGroups } = require('../../.expo/finance-tests/domain/budgets.js');
+  const { budgetAlertPlan } = require('../../.expo/finance-tests/integrations/notification-plan.js');
   const scopes = ['daily:2026-10-13', 'weekly:2026-10-12', '2026-10'];
   const budgets = scopes.map(month => ({ month, category: OVERALL_BUDGET, limitAmount: 10000 }));
   const rows = [record({ amount: 8000, transactionDate: '2026-10-13' }), record({ id: 'yesterday', category: 'Transport', amount: 1000, transactionDate: '2026-10-12' }), record({ id: 'earlier', amount: 2000, transactionDate: '2026-10-01' })];
@@ -103,7 +103,7 @@ test('overall budgets respect daily, weekly and monthly ranges and trigger alert
 });
 
 test('overall budget totals reject unsafe spending and do not add overlapping category limits', () => {
-  const { OVERALL_BUDGET } = require('../../.expo/finance-tests/budgets.js');
+  const { OVERALL_BUDGET } = require('../../.expo/finance-tests/domain/budgets.js');
   const overall = { ...budget, category: OVERALL_BUDGET, limitAmount: Number.MAX_SAFE_INTEGER };
   assert.equal(budgetReport([overall, { ...budget, limitAmount: Number.MAX_SAFE_INTEGER }], [], budget.month).totalLimit, Number.MAX_SAFE_INTEGER);
   assert.throws(() => budgetReport([overall], [record({ amount: Number.MAX_SAFE_INTEGER }), record({ id: 'extra', category: 'Fees', amount: 1 })], budget.month), /supported range/);

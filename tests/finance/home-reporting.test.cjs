@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {homeReportingPeriod}=require('../../.expo/finance-tests/home-reporting.js');
+const {homeReportingPeriod}=require('../../.expo/finance-tests/reporting/home-reporting.js');
 const now=new Date('2026-11-02T04:00:00Z');
 test('shared Home periods cross month and year boundaries using Philippine dates',()=>{
  const week=homeReportingPeriod('last-week','2026-11',now);assert.equal(week.start,'2026-10-26');assert.equal(week.end,'2026-11-01');
@@ -18,8 +18,8 @@ test('relative periods advance with the date; an explicitly chosen month stays f
 
 
 test('spending calendars keep Monday alignment and all dates in exactly six rows',()=>{
- const {spendingCalendarRows}=require('../../.expo/finance-tests/home-reporting.js');
- const {dashboardSpending}=require('../../.expo/finance-tests/dashboard.js');
+ const {spendingCalendarRows}=require('../../.expo/finance-tests/reporting/home-reporting.js');
+ const {dashboardSpending}=require('../../.expo/finance-tests/reporting/dashboard.js');
  for(const [month,calendarWeeks] of [['2021-02',4],['2026-04',5],['2026-08',6],['2024-02',5]]){
   const days=dashboardSpending([],'month',month,now),rows=spendingCalendarRows(days);
   assert.equal(rows.length,6);assert.ok(rows.every(row=>row.length===7));

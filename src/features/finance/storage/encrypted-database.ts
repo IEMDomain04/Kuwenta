@@ -4,7 +4,7 @@ import { File, Directory } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { getRandomBytesAsync } from 'expo-crypto';
 import { initializeDatabase, DatabaseRecoveryError } from './database';
-import { parseBackup, type FinanceBackup } from '../backup';
+import { parseBackup, type FinanceBackup } from '../backup/backup';
 import { restoreBackup } from './backup';
 
 const DATABASE = 'kuwenta-encrypted.db';

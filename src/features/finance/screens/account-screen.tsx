@@ -1,15 +1,15 @@
-import { useConfirmation } from '../components/confirmation';
+import { useConfirmation } from '../components/shared/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, Modal, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
-import { AccountManager } from '../components/account-manager';
-import { ActionButton, FinanceScreen, BackButton, TransactionRow, IconButton } from '../components/ui';
-import { calculateAccountSummary } from '../calculations';
-import { formatTransactionDateTime } from '../dates';
-import { formatMoney } from '../money';
+import { AccountManager } from '../components/accounts/account-manager';
+import { ActionButton, FinanceScreen, BackButton, TransactionRow, IconButton } from '../components/shared/ui';
+import { calculateAccountSummary } from '../domain/calculations';
+import { formatTransactionDateTime } from '../domain/dates';
+import { formatMoney } from '../domain/money';
 import { useFinance } from '../provider';
 
 export default function AccountScreen() {

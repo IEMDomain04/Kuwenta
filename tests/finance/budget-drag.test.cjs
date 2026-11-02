@@ -19,7 +19,7 @@ function harness({ deferredMeasurements = false, failFirst = false } = {}) {
     if (name === '@/components/themed-text') return {ThemedText:'Text'};
     throw new Error(name);
   }};
-  const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/budget-list.tsx','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/budgets/budget-list.tsx','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   vm.runInNewContext(source,sandbox);
   function render() {
     cursor=0; const nodes=[];

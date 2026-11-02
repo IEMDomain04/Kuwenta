@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { cash, record } = require('./fixtures.cjs');
-const { defaultEntryAccount, previewTransfer } = require('../../.expo/finance-tests/workflows.js');
+const { defaultEntryAccount, previewTransfer } = require('../../.expo/finance-tests/domain/workflows.js');
 const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: 0 };
 test('context wins; remembered accounts must be active and different from the destination', () => {
   assert.equal(defaultEntryAccount([cash, bank], 'bank', 'cash'), 'bank');

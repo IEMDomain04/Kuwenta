@@ -38,7 +38,7 @@ export function openFinanceDatabase(): Promise<SQLiteDatabase> {
 }
 
 /** Only called after a checked backup and an explicit replacement confirmation. */
-export function recoverFinanceDatabase(backup: import('../backup').FinanceBackup): Promise<void> {
+export function recoverFinanceDatabase(backup: import('../backup/backup').FinanceBackup): Promise<void> {
   const operation = opening.then(async () => {
     const { recoverEncryptedDatabase } = await import('./encrypted-database');
     await recoverEncryptedDatabase(backup);

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const vm = require('node:vm');
-const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/confirmation.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/shared/confirmation.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 function harness(dark = false) {
   const hooks = [], effects = []; let cursor = 0, dismissed = 0;
   const theme = { background: dark ? '#0C1711' : '#F3F8F5', backgroundElement: dark ? '#192A21' : '#FFFFFF', text: dark ? '#F1F7F3' : '#0A1129', textSecondary: '#73877A', border: '#73877A', overlay: '#00000099', backgroundSelected: '#264937', accent: '#06633E', accentPressed: '#044C30', onAccent: dark ? '#082417' : '#FFFFFF', error: dark ? '#FF91A1' : '#B4233C', errorSurface: '#42252E' };

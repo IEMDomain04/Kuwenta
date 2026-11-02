@@ -1,6 +1,6 @@
-import { normalizeServiceExchanges } from '../exchanges';
-import { calculateAccountSummary } from '../calculations';
-import type { Account, Transaction } from '../types';
+import { normalizeServiceExchanges } from '../domain/exchanges';
+import { calculateAccountSummary } from '../domain/calculations';
+import type { Account, Transaction } from '../domain/types';
 import type { FinanceDatabase } from './database';
 
 const VERSION = 18;

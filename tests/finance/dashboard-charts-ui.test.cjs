@@ -7,7 +7,7 @@ function charts(hidden = false) {
  const states=[];let cursor=0;const navigation=[];
  const jsx=(type,props)=>({type,props});
  const sandbox={exports:{},require(name){
-    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden,formatAmount:(amount,trim)=>hidden?String.fromCodePoint(8226).repeat(4):require('../../.expo/finance-tests/money.js').formatMoney(amount,trim),conceal:text=>text})};
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden,formatAmount:(amount,trim)=>hidden?String.fromCodePoint(8226).repeat(4):require('../../.expo/finance-tests/domain/money.js').formatMoney(amount,trim),conceal:text=>text})};
   if(name==='react')return{useMemo:fn=>fn(),useRef(initial){const i=cursor++;if(!(i in states))states[i]={current:initial};return states[i];},useState(initial){const i=cursor++;if(!(i in states))states[i]=initial;return[states[i],value=>{states[i]=typeof value==='function'?value(states[i]):value;}];}};
   if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
   if(name==='react-native')return{View:'View',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',useWindowDimensions:()=>({height:800}),PanResponder:{create:config=>({panHandlers:config})}};
@@ -17,10 +17,10 @@ function charts(hidden = false) {
   if(name==='react-native-svg')return{__esModule:true,default:'Svg',Circle:'Circle',Line:'Line',Polyline:'Polyline'};
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
   if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
-  if(['../dates','../money'].includes(name))return require('../../.expo/finance-tests/'+name.slice(3)+'.js');
+  if(['../../domain/dates','../../domain/money'].includes(name))return require('../../.expo/finance-tests/'+name.replace(/^(?:\.\.?\/)+/, '')+'.js');
   throw new Error(name);
  }};
- vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/dashboard-charts.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,sandbox);
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/home/dashboard-charts.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,sandbox);
  const api=sandbox.exports;const render=api.SpendingTrend;api.SpendingTrend=props=>{cursor=0;return render(props);};api.navigation=navigation;return api;
 }
 function nodes(tree){const found=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;found.push(node);walk(node.props.children);}walk(tree);return found;}
@@ -40,7 +40,7 @@ test('optional charts handle empty, single-day and monthly data without invalid 
  }
 });
 test('all account colors are distinct and keep readable text in both themes',()=>{
- const {ACCOUNT_CARD_COLORS}=require('../../.expo/finance-tests/account-colors.js');
+ const {ACCOUNT_CARD_COLORS}=require('../../.expo/finance-tests/domain/account-colors.js');
  function luminance(hex){const rgb=hex.match(/[0-9a-f]{2}/gi).map(channel=>parseInt(channel,16)/255).map(value=>value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4);return rgb[0]*0.2126+rgb[1]*0.7152+rgb[2]*0.0722;}
  for(const theme of ['light','dark']){
   const colors=Object.values(ACCOUNT_CARD_COLORS).map(preset=>preset[theme]);assert.equal(new Set(colors).size,colors.length);

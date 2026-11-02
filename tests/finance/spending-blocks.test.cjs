@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { spendingBlocks } = require('../../.expo/finance-tests/spending-blocks.js');
+const { spendingBlocks } = require('../../.expo/finance-tests/reporting/spending-blocks.js');
 
 function verify(amounts, width = 320, height = 184) {
   const rows = amounts.map((amount, i) => ({ category: 'Category ' + i, amount }));

@@ -2,7 +2,7 @@ const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const Module = require('node:module');
 const { cash, record } = require('./fixtures.cjs');
-const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
 const originalLoad = Module._load;
 const files = [];
 let selected = null, available = true, failShare = false, failWrite = false, shares = 0, identifiers = 0;
@@ -24,7 +24,7 @@ Module._load = function(name, ...args) {
       assert.equal(file.exists, true);
       if (uri.endsWith('.xlsx')) {
         assert.equal(options.mimeType, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        assert.deepEqual(require('../../.expo/finance-tests/excel-backup.js').parseExcelBackup(file.content), parseBackup(json));
+        assert.deepEqual(require('../../.expo/finance-tests/backup/excel-backup.js').parseExcelBackup(file.content), parseBackup(json));
       } else {
         assert.equal(options.mimeType, 'application/json');
         assert.deepEqual(parseBackup(file.content), parseBackup(json));
@@ -36,7 +36,7 @@ Module._load = function(name, ...args) {
   return originalLoad.call(this, name, ...args);
 };
 after(() => { Module._load = originalLoad; });
-const { shareBackup, readBackupFile, pickBackupFile, MAX_BACKUP_FILE_BYTES } = require('../../.expo/finance-tests/backup-files.js');
+const { shareBackup, readBackupFile, pickBackupFile, MAX_BACKUP_FILE_BYTES } = require('../../.expo/finance-tests/backup/backup-files.js');
 const json = serializeBackup(cash, [record({ notes: 'Meals' })], '2026-10-09T06:35:00.000Z');
 function picked(text, reportedSize = Buffer.byteLength(text)) {
   const bytes = Buffer.from(text); let offset = 0;

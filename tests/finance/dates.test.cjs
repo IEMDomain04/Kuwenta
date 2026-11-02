@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { philippineDateTime, isValidDate, isValidTime, isUtcTimestamp } = require('../../.expo/finance-tests/dates.js');
+const { philippineDateTime, isValidDate, isValidTime, isUtcTimestamp } = require('../../.expo/finance-tests/domain/dates.js');
 
 test('Philippine midnight uses the correct date and reporting month', () => {
   assert.deepEqual(philippineDateTime(new Date('2026-09-30T15:59:59Z')), {
@@ -48,7 +48,7 @@ test('audit timestamps use UTC and invalid instants are rejected', () => {
 });
 
 test('picker values represent Philippine wall time independently of the host timezone', () => {
-  const { transactionPickerValue, readableTransactionDate } = require('../../.expo/finance-tests/dates.js');
+  const { transactionPickerValue, readableTransactionDate } = require('../../.expo/finance-tests/domain/dates.js');
   assert.equal(transactionPickerValue('2026-10-10', '00:05:37').toISOString(), '2026-10-09T16:05:37.000Z');
   assert.equal(readableTransactionDate('2026-10-10'), 'October 10, 2026');
   assert.throws(() => transactionPickerValue('2026-02-30', '12:00:00'));
@@ -56,13 +56,13 @@ test('picker values represent Philippine wall time independently of the host tim
 });
 
 test('time selections preserve seconds when minutes are unchanged and reset them when changed', () => {
-  const { pickedTransactionTime } = require('../../.expo/finance-tests/dates.js');
+  const { pickedTransactionTime } = require('../../.expo/finance-tests/domain/dates.js');
   assert.equal(pickedTransactionTime(new Date('2026-10-10T06:35:00Z'), '14:35:37'), '14:35:37');
   assert.equal(pickedTransactionTime(new Date('2026-10-10T06:36:59Z'), '14:35:37'), '14:36:00');
   assert.equal(pickedTransactionTime(new Date('2026-10-09T16:00:00Z'), '23:59:37'), '00:00:00');
 });
 
-const { formatTransactionDateTime } = require('../../.expo/finance-tests/dates.js');
+const { formatTransactionDateTime } = require('../../.expo/finance-tests/domain/dates.js');
 test('readable transaction timestamps preserve Philippine wall time and handle noon/midnight', () => {
   assert.equal(formatTransactionDateTime('2026-10-10', '01:39:25'), 'Oct 10, 2026 · 1:39 AM');
   assert.equal(formatTransactionDateTime('2026-01-01', '00:00:59'), 'Jan 1, 2026 · 12:00 AM');
@@ -72,13 +72,13 @@ test('readable transaction timestamps preserve Philippine wall time and handle n
   assert.throws(() => formatTransactionDateTime('2026-10-10', '24:00:00'));
 });
 test('reporting months use readable names without changing month keys', () => {
-  const { readableReportingMonth } = require('../../.expo/finance-tests/dates.js');
+  const { readableReportingMonth } = require('../../.expo/finance-tests/domain/dates.js');
   assert.equal(readableReportingMonth('2026-10'), 'October 2026');
   assert.equal(readableReportingMonth('2027-01'), 'January 2027');
   assert.throws(() => readableReportingMonth('2026-13'));
 });
 test('day headings follow Philippine midnight and handle previous-month and year dates', () => {
-  const { transactionDayHeading } = require('../../.expo/finance-tests/dates.js');
+  const { transactionDayHeading } = require('../../.expo/finance-tests/domain/dates.js');
   const now = new Date('2026-12-31T16:05:00Z');
   assert.equal(transactionDayHeading('2027-01-01', now), 'Today · Jan 1, 2027');
   assert.equal(transactionDayHeading('2026-12-31', now), 'Yesterday · Dec 31, 2026');
@@ -88,7 +88,7 @@ test('day headings follow Philippine midnight and handle previous-month and year
 });
 
 test('time field labels explicitly distinguish midnight, noon and afternoon', () => {
-  const { formatTransactionTime } = require('../../.expo/finance-tests/dates.js');
+  const { formatTransactionTime } = require('../../.expo/finance-tests/domain/dates.js');
   assert.equal(formatTransactionTime('00:05:59'), '12:05 AM');
   assert.equal(formatTransactionTime('12:00:00'), '12:00 PM');
   assert.equal(formatTransactionTime('18:30:00'), '6:30 PM');

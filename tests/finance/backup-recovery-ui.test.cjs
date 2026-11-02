@@ -4,7 +4,7 @@ const ts = require('typescript');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const { cash } = require('./fixtures.cjs');
-const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/backup-import-preview.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/backup/backup-import-preview.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 
 function harness({ legacy = false, recovery = true, failRestore = false } = {}) {
   const effects = []; const hooks = []; let cursor = 0, confirmation, restored = 0, unlocked = 0;
@@ -23,18 +23,18 @@ function harness({ legacy = false, recovery = true, failRestore = false } = {}) 
       if (!hooks[index] || deps.some((value, i) => value !== hooks[index][i])) { hooks[index] = deps; effects.push(effect); }
     } };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
-    if (name === './confirmation') return { useConfirmation: () => ({ alert: (title, message, buttons, options) => { confirmation = { title, message, buttons, options }; } }) };
+    if (name === '../shared/confirmation') return { useConfirmation: () => ({ alert: (title, message, buttons, options) => { confirmation = { title, message, buttons, options }; } }) };
     if (name.endsWith('/field-error')) return { FieldError: 'FieldError' };
     if (name === 'react-native') return { TextInput: 'Input', Keyboard: { dismiss() {} } };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: '#06633E' }) };
-    if (name === './ui') return { ActionButton: 'Button' };
-    if (name === '../backup-files') return { pickBackupFile: async () => ({ name: 'backup.json', json: '{}', backup: legacy ? null : backup }) };
-    if (name === '../encrypted-backup') return { validateBackupPassword() {}, decryptBackup: async (_, password) => { unlocked++; assert.equal(password, 'password123'); return backup; } };
-    if (name === '../backup') return { previewBackup: () => ({ accountCount: 1, transactionCount: 0, budgetCount: 0, goalCount: 0, debtCount: 0, cashBalance: 100000 }) };
-    if (name === '../calculations') return { calculateCurrentMoney: () => ({ totalMoney: 100000 }) };
-    if (name === '../money') return { formatMoney: amount => String(amount) };
-    if (name === '../dates') return { formatTransactionDateTime: (date, time) => date + ' / ' + time, philippineDateTime: () => ({ transactionDate: '2026-10-12', transactionTime: '08:00:00' }) };
+    if (name === '../shared/ui') return { ActionButton: 'Button' };
+    if (name === '../../backup/backup-files') return { pickBackupFile: async () => ({ name: 'backup.json', json: '{}', backup: legacy ? null : backup }) };
+    if (name === '../../backup/encrypted-backup') return { validateBackupPassword() {}, decryptBackup: async (_, password) => { unlocked++; assert.equal(password, 'password123'); return backup; } };
+    if (name === '../../backup/backup') return { previewBackup: () => ({ accountCount: 1, transactionCount: 0, budgetCount: 0, goalCount: 0, debtCount: 0, cashBalance: 100000 }) };
+    if (name === '../../domain/calculations') return { calculateCurrentMoney: () => ({ totalMoney: 100000 }) };
+    if (name === '../../domain/money') return { formatMoney: amount => String(amount) };
+    if (name === '../../domain/dates') return { formatTransactionDateTime: (date, time) => date + ' / ' + time, philippineDateTime: () => ({ transactionDate: '2026-10-12', transactionTime: '08:00:00' }) };
     throw new Error('Unexpected dependency: ' + name);
   } };
   vm.runInNewContext(source, sandbox);

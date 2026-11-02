@@ -1,23 +1,23 @@
-import { AccountIcon } from '../components/account-icon';
-import { FieldError } from '../components/field-error';
-import { useConfirmation } from '../components/confirmation';
+import { AccountIcon } from '../components/accounts/account-icon';
+import { FieldError } from '../components/shared/field-error';
+import { useConfirmation } from '../components/shared/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
-import { SelectionSheet } from '../components/selection-sheet';
+import { SelectionSheet } from '../components/shared/selection-sheet';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useFinance } from '../provider';
-import { IconButton, ActionButton, FinanceScreen, BackButton } from '../components/ui';
-import { TransactionDateTime } from '../components/transaction-date-time';
-import { MoneyField } from '../components/money-field';
-import { isValidDate } from '../dates';
-import { formatEditableMoney } from '../inputs';
-import { formatMoney, moneyInput, parseMoney } from '../money';
-import { validateGoal, validateAccount } from '../validation';
-import { calculateGoalProgress } from '../calculations';
-import type { SavingsGoal, Account } from '../types';
+import { IconButton, ActionButton, FinanceScreen, BackButton } from '../components/shared/ui';
+import { TransactionDateTime } from '../components/transactions/transaction-date-time';
+import { MoneyField } from '../components/shared/money-field';
+import { isValidDate } from '../domain/dates';
+import { formatEditableMoney } from '../domain/inputs';
+import { formatMoney, moneyInput, parseMoney } from '../domain/money';
+import { validateGoal, validateAccount } from '../domain/validation';
+import { calculateGoalProgress } from '../domain/calculations';
+import type { SavingsGoal, Account } from '../domain/types';
 
 export default function GoalScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();

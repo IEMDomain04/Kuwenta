@@ -13,7 +13,8 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
   const jsx = (type, props) => ({ type, props });
   const theme = { text: '#0A1129', border: '#73877A', accent: '#06633E', error: '#B4233C' };
   const sandbox = { Error, exports: {}, require(name) {
-    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:false,formatAmount:require('../../.expo/finance-tests/money.js').formatMoney,conceal:text=>text})};
+    name = name.replace(/^(?:\.\.\/)+/, '../');
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:false,formatAmount:require('../../.expo/finance-tests/domain/money.js').formatMoney,conceal:text=>text})};
     if (name.endsWith('/peso-icon')) return { PesoIcon: 'PesoIcon' };
     if (name.endsWith('/account-icon')) return { AccountIcon: 'AccountIcon' };
     if (name.endsWith('/budget-period-picker')) return { BudgetPeriodPicker: 'BudgetPeriodPicker' };
@@ -36,7 +37,7 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
     if (name.endsWith('/home-month-picker')) return { HomeMonthPicker: 'MonthPicker' };
     if (name.endsWith('/ui')) return { ActionButton: 'Button', IconButton: 'IconButton', FinanceScreen: 'Screen', BackButton: 'Back' };
     if (name.endsWith('/category-visual')) return { CategoryIcon: 'CategoryIcon', categoryVisual: () => ({ color: '#06633E', icon: 'wallet-outline' }) };
-    if (['../calculations', '../dates', '../inputs', '../money', '../types', '../validation', '../workflows', '../account-colors', '../budgets', '../account-icons', '../budget-periods', '../exchanges', '../debts'].includes(name)) return require('../../.expo/finance-tests/' + name.slice(3) + '.js');
+    if (['../domain/calculations', '../domain/dates', '../domain/inputs', '../domain/money', '../domain/types', '../domain/validation', '../domain/workflows', '../domain/account-colors', '../domain/budgets', '../domain/account-icons', '../domain/budget-periods', '../domain/exchanges', '../domain/debts'].includes(name)) return require('../../.expo/finance-tests/' + name.replace(/^(?:\.\.?\/)+/, '') + '.js');
     throw new Error('Unexpected dependency: ' + name);
   } };
   const source = ts.transpileModule(fs.readFileSync('src/features/finance/' + file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -62,7 +63,7 @@ test('editing a transaction saves directly and repeated taps submit once', async
   assert.equal(h.saved[0][0], original.id); assert.equal(h.saved[0][1].amount, 7500); assert.equal(h.saved[0][2], true);
 });
 test('routine account edits save directly, while a blank name is highlighted and never saved', async () => {
-  const h = harness('components/account-manager.tsx', { params: { id: 'cash' } });
+  const h = harness('components/accounts/account-manager.tsx', { params: { id: 'cash' } });
   h.render().input('Account name').props.onChangeText(' ');
   h.render().button('Save changes').props.onPress();
   assert.equal(h.saved.length, 0); assert.equal(h.prompts.length, 0);
@@ -85,14 +86,14 @@ test('goal edits save directly after validating name, dedicated account and amou
   assert.equal(h.prompts.length, 0); assert.equal(h.saved.length, 1); assert.equal(h.saved[0][0].targetAmount, 600000);
 });
 test('transaction fields highlight invalid amount and missing account, then allow a corrected draft', () => {
-  const drafts = []; const h = harness('components/transaction-form.tsx', { onSubmit: draft => drafts.push(draft) });
+  const drafts = []; const h = harness('components/transactions/transaction-form.tsx', { onSubmit: draft => drafts.push(draft) });
   h.render().button('Save').props.onPress();
   assert.equal(drafts.length, 0);
   assert.ok(h.render().nodes.some(node => node.type === 'FieldError' && node.props.message));
   h.render().input('Amount in pesos').props.onValueChange('120.50');
   h.render().button('Save').props.onPress();
   assert.equal(drafts.length, 1); assert.equal(drafts[0].amount, 12050);
-  const missing = harness('components/transaction-form.tsx', { accounts: [], onSubmit: () => assert.fail('No account must not submit') });
+  const missing = harness('components/transactions/transaction-form.tsx', { accounts: [], onSubmit: () => assert.fail('No account must not submit') });
   missing.render().input('Amount in pesos').props.onValueChange('10');
   missing.render().button('Save').props.onPress();
   assert.ok(missing.render().nodes.some(node => node.type === 'FieldError' && node.props.message === 'Choose an active account.'));
@@ -123,13 +124,13 @@ test('new budget period selection saves the selected date range and exact draft 
  h.render().find('BudgetPeriodPicker').props.onPeriodChange('weekly');
  h.render().button('Save').props.onPress(); await settle();
  assert.equal(h.saved.length,1);
- assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/budget-periods.js').budgetPeriodKey('weekly','2026-10-12'));
+ assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/domain/budget-periods.js').budgetPeriodKey('weekly','2026-10-12'));
  assert.equal(h.saved[0][0].limitAmount,6025);
 });
 
 
 test('compact appearance dropdowns preserve selections in the account save and preview', async () => {
- const h=harness('components/account-manager.tsx',{params:{id:'cash'}});
+ const h=harness('components/accounts/account-manager.tsx',{params:{id:'cash'}});
  h.render().button('Select card color').props.onPress();
  let sheet=h.render().nodes.find(node=>node.type==='SelectionSheet'&&node.props.visible);
  assert.equal(sheet.props.title,'Card color');
@@ -162,7 +163,7 @@ test('Daily is the default, and an existing budget can change period without res
  assert.equal(h.saved.length,0);
  h.render().button('Save').props.onPress();
  h.prompts[1][2].find(button=>button.text==='Confirm').onPress();await settle();
- assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/budget-periods.js').budgetPeriodKey('weekly','2026-10-12'));
+ assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/domain/budget-periods.js').budgetPeriodKey('weekly','2026-10-12'));
  assert.equal(h.saved[0][0].limitAmount,50000);
  assert.equal(h.saved[0][2].month,'2026-10');
 });
@@ -186,14 +187,14 @@ test('budget history reveals older scopes and editing preserves their dates',asy
 
 test('service sale form submits both amounts and receipt clicks edit the linked parent',async()=>{
  const bank={...cash,id:'bank',name:'MariBank',openingBalance:500000};const accounts=[{...cash,openingBalance:500000},bank];let draft;
- const form=harness('components/transaction-form.tsx',{accounts,onSubmit:value=>{draft=value;}});
+ const form=harness('components/transactions/transaction-form.tsx',{accounts,onSubmit:value=>{draft=value;}});
  form.render().button('Category: Meals. Change category.').props.onPress();
  form.render().button('Service exchange').props.onPress();
  form.render().input('Amount paid in pesos').props.onValueChange('95');
  form.render().input('Amount received in pesos').props.onValueChange('100');
  form.render().button('Save').props.onPress();
  assert.equal(draft.exchange.paid,9500);assert.equal(draft.exchange.received,10000);
- const records=require('../../.expo/finance-tests/exchanges.js').exchangeRecords('sale',draft,'2026-10-13T04:00:00.000Z');
+ const records=require('../../.expo/finance-tests/domain/exchanges.js').exchangeRecords('sale',draft,'2026-10-13T04:00:00.000Z');
  const screen=harness('screens/transaction-screen.tsx',{params:{id:'sale:extra'},accounts,transactions:records});
  assert.equal(screen.render().find('TransactionForm').props.original.id,'sale');
  screen.render().find('TransactionForm').props.onSubmit(draft);
@@ -209,7 +210,7 @@ test('service sale form submits both amounts and receipt clicks edit the linked 
 test('cash-in/out reuse the regular form and automatically allocate fees',()=>{
  const bank={...cash,id:'bank',name:'GCash',openingBalance:500000};const accounts=[{...cash,openingBalance:500000},bank];
  for(const [category,paid,received,extra] of [['Cash-in (E-bank)','2040','2000','cash'],['Cash-out (E-bank)','2000','40','bank']]){
-  let draft;const h=harness('components/transaction-form.tsx',{accounts,onSubmit:value=>{draft=value;}});
+  let draft;const h=harness('components/transactions/transaction-form.tsx',{accounts,onSubmit:value=>{draft=value;}});
   h.render().button('Category: Meals. Change category.').props.onPress();h.render().button(category).props.onPress();
   h.render().input('Amount paid in pesos').props.onValueChange(paid);
   h.render().input(category==='Cash-out (E-bank)'?'Fee in pesos':'Amount received in pesos').props.onValueChange(received);
@@ -229,10 +230,10 @@ test('cash-in/out reuse the regular form and automatically allocate fees',()=>{
 
 test('older exchange allocation survives unchanged edits and changes explicitly with the amounts',()=>{
  const accounts=[{...cash,openingBalance:500000},{...cash,id:'bank',name:'GCash',openingBalance:500000}];
- const api=require('../../.expo/finance-tests/exchanges.js');
+ const api=require('../../.expo/finance-tests/domain/exchanges.js');
  const draft=api.exchangeDraft('cash',{kind:'E-bank Cash-in',paid:200000,received:196000,receivedAccountId:'bank',extraAccountId:'bank',earningsConfirmed:false},'2026-10-13','12:00:00');
  const records=api.exchangeRecords('legacy',draft,'2026-10-13T04:00:00.000Z');let saved;
- const h=harness('components/transaction-form.tsx',{accounts,transactions:records,onSubmit:value=>{saved=value;},params:{original:records[0]}});
+ const h=harness('components/transactions/transaction-form.tsx',{accounts,transactions:records,onSubmit:value=>{saved=value;},params:{original:records[0]}});
  h.render().button('Save changes').props.onPress();assert.equal(saved.exchange.extraAccountId,'bank');
  h.render().input('Amount paid in pesos').props.onValueChange('2010');
  assert.ok(h.render().nodes.some(node=>node.props.children==='Fee will be recorded in Cash.'));
@@ -242,7 +243,7 @@ test('older exchange allocation survives unchanged edits and changes explicitly 
 
 test('cash-out defaults to no fee, subtracts exact centavos and rejects fees that consume the amount',()=>{
  const accounts=[{...cash,openingBalance:500000},{...cash,id:'bank',name:'GCash',openingBalance:500000}];let saved;
- const h=harness('components/transaction-form.tsx',{accounts,onSubmit:value=>{saved=value;}});
+ const h=harness('components/transactions/transaction-form.tsx',{accounts,onSubmit:value=>{saved=value;}});
  h.render().button('Category: Meals. Change category.').props.onPress();h.render().button('Cash-out (E-bank)').props.onPress();
  h.render().input('Amount paid in pesos').props.onValueChange('2000');h.render().button('Save').props.onPress();
  assert.equal(saved.exchange.received,200000);
@@ -256,11 +257,11 @@ test('cash-out defaults to no fee, subtracts exact centavos and rejects fees tha
 
 test('cash-out edits derive the fee and retain older earnings records',()=>{
  const accounts=[{...cash,openingBalance:500000},{...cash,id:'bank',name:'GCash',openingBalance:500000}];
- const api=require('../../.expo/finance-tests/exchanges.js');
+ const api=require('../../.expo/finance-tests/domain/exchanges.js');
  for(const received of [196000,201000]){
   const draft=api.exchangeDraft('bank',{kind:'E-bank Cash-out',paid:200000,received,receivedAccountId:'cash',extraAccountId:received>200000?'cash':'bank',earningsConfirmed:true},'2026-10-13','12:00:00');
   const records=api.exchangeRecords('cashout',draft,'2026-10-13T04:00:00.000Z');let saved;
-  const h=harness('components/transaction-form.tsx',{accounts,transactions:records,onSubmit:value=>{saved=value;},params:{original:records[0]}});
+  const h=harness('components/transactions/transaction-form.tsx',{accounts,transactions:records,onSubmit:value=>{saved=value;},params:{original:records[0]}});
   if(received<200000)assert.equal(h.render().input('Fee in pesos').props.value,'40.00');
   else {assert.equal(h.render().input('Fee in pesos'),undefined);assert.equal(h.render().input('Amount received in pesos').props.value,'2010.00');}
   h.render().button('Save changes').props.onPress();assert.equal(saved.exchange.received,received);assert.equal(saved.exchange.paid,200000);
@@ -290,7 +291,7 @@ test('transaction deletion failure keeps the editor available for retry',async()
 });
 
 test('opening a linked receipt deletes its exchange parent with both sides in the confirmation',async()=>{
- const bank={...cash,id:'bank',name:'MariBank'};const api=require('../../.expo/finance-tests/exchanges.js');
+ const bank={...cash,id:'bank',name:'MariBank'};const api=require('../../.expo/finance-tests/domain/exchanges.js');
  const draft=api.exchangeDraft('bank',{kind:'Service sale',paid:9500,received:10000,receivedAccountId:'cash',extraAccountId:'cash',earningsConfirmed:true},'2026-10-13','12:00:00');
  const records=api.exchangeRecords('sale',draft,'2026-10-13T04:00:00.000Z');
  const h=harness('screens/transaction-screen.tsx',{params:{id:records[1].id},accounts:[cash,bank],transactions:records});
@@ -302,7 +303,7 @@ test('opening a linked receipt deletes its exchange parent with both sides in th
 
 
 test('editing account balance confirms old and new values and saves details with one correction',async()=>{
- const h=harness('components/account-manager.tsx',{params:{id:'cash'},transactions:[record()]});
+ const h=harness('components/accounts/account-manager.tsx',{params:{id:'cash'},transactions:[record()]});
  assert.equal(h.render().input('Account current balance in pesos').props.value,'880.00');
  assert.equal(h.render().input('Account opening balance in pesos'),undefined);
  h.render().input('Account name').props.onChangeText('My cash');
@@ -327,7 +328,7 @@ test('transaction editing reloads a stale snapshot before showing unavailable an
 });
 
 test('a removed equal-exchange child ID opens its surviving parent after an update',()=>{
- const bank={...cash,id:'bank',name:'MariBank'};const api=require('../../.expo/finance-tests/exchanges.js');
+ const bank={...cash,id:'bank',name:'MariBank'};const api=require('../../.expo/finance-tests/domain/exchanges.js');
  const draft=api.exchangeDraft('bank',{kind:'Service sale',paid:10000,received:10000,receivedAccountId:'cash',extraAccountId:'cash',earningsConfirmed:true},'2026-10-13','12:00:00');
  const records=api.exchangeRecords('equal',draft,'2026-10-13T04:00:00.000Z');
  const h=harness('screens/transaction-screen.tsx',{params:{id:['equal:extra']},accounts:[cash,bank],transactions:records});
@@ -341,7 +342,7 @@ test('external editor prefills values and previews replacement instead of adding
   assert.equal(h.render().input('External source name').props.value, 'Friend');
   assert.equal(h.render().input('Transfer amount').props.value, '100.00');
   h.render().input('Transfer amount').props.onValueChange('200.00');
-  const { formatMoney } = require('../../.expo/finance-tests/money.js');
+  const { formatMoney } = require('../../.expo/finance-tests/domain/money.js');
   assert.ok(h.render().nodes.some(node => Array.isArray(node.props.children) && node.props.children.includes(formatMoney(120000))));
   h.render().button('Save changes').props.onPress();
   const prompt = h.prompts.at(-1); prompt[2].find(button => button.text === 'Save').onPress(); prompt[2].find(button => button.text === 'Save').onPress(); await settle();
@@ -361,7 +362,7 @@ test('external deletion shows the reverted balance, cancels safely, and submits 
     const original = record({ id: 'external', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: direction, amount: 10000 });
     const h = harness('screens/transfer-screen.tsx', { params: { id: original.id }, transactions: [original] });
     h.render().button('Delete movement').props.onPress();
-    const { formatMoney } = require('../../.expo/finance-tests/money.js');
+    const { formatMoney } = require('../../.expo/finance-tests/domain/money.js');
     assert.equal(h.prompts.at(-1)[3].rows.find(row => row.label === 'Balance after deletion').value, formatMoney(cash.openingBalance));
     h.prompts.at(-1)[2].find(button => button.text === 'Cancel').onPress(); assert.equal(h.removed.length, 0);
     h.render().button('Delete movement').props.onPress(); const button = h.prompts.at(-1)[2].find(button => button.text === 'Delete');
@@ -443,7 +444,7 @@ test('new debts validate fields, select an account, save exact centavos and prev
 });
 
 test('repayments cannot exceed the remaining amount and keep the chosen account and note',async()=>{
- const date=require('../../.expo/finance-tests/dates.js').philippineDateTime();
+ const date=require('../../.expo/finance-tests/domain/dates.js').philippineDateTime();
  const debt={id:'loan',name:'Friend',kind:'owed',amount:50000,accountId:'cash',transactionDate:'2020-01-01',transactionTime:'00:00:00',createdAt:'2020-01-01T00:00:00.000Z',updatedAt:'2020-01-01T00:00:00.000Z'};
  const h=harness('screens/debt-screen.tsx',{params:{id:'loan'},debts:[debt],debtPayments:[{id:'old',debtId:'loan',amount:20000,accountId:'cash',...date,createdAt:'2026-10-19T00:00:00.000Z'}]});
  h.render().input('Repayment amount').props.onValueChange('300.01');h.render().find('SelectionSheet').props.onSelect('cash');
@@ -491,9 +492,9 @@ test('switching back to Just now requires an account and keeps the original bala
 
 
 test('new and edited exchange previews retain account history and match saved exchange amounts', () => {
-  const api = require('../../.expo/finance-tests/exchanges.js');
-  const { calculateAccountSummary } = require('../../.expo/finance-tests/calculations.js');
-  const { formatMoney } = require('../../.expo/finance-tests/money.js');
+  const api = require('../../.expo/finance-tests/domain/exchanges.js');
+  const { calculateAccountSummary } = require('../../.expo/finance-tests/domain/calculations.js');
+  const { formatMoney } = require('../../.expo/finance-tests/domain/money.js');
   const accounts = [{ ...cash, openingBalance: 100000 }, { ...cash, id: 'bank', name: 'MariBank', openingBalance: 1009500 }];
   const stamp = '2026-10-13T04:00:00.000Z';
   const draftFor = (kind, paid, received) => api.exchangeDraft('bank', { kind, paid, received, receivedAccountId: 'cash', extraAccountId: received > paid ? 'cash' : 'bank', earningsConfirmed: true }, '2026-10-13', '12:00:00');
@@ -508,7 +509,7 @@ test('new and edited exchange previews retain account history and match saved ex
   ]) for (const editing of [false, true]) {
     const previous = editing ? api.exchangeRecords('editing', draftFor(kind, 20000, 19000), stamp) : [];
     let saved;
-    const h = harness('components/transaction-form.tsx', { accounts, transactions: [...history, ...previous], params: { original: previous[0], accountId: 'bank' }, onSubmit: value => { saved = value; } });
+    const h = harness('components/transactions/transaction-form.tsx', { accounts, transactions: [...history, ...previous], params: { original: previous[0], accountId: 'bank' }, onSubmit: value => { saved = value; } });
     if (!editing) {
       h.render().button('Category: Meals. Change category.').props.onPress();
       h.render().button(category).props.onPress();
@@ -564,7 +565,7 @@ test('original amount correction confirms old and new amounts and cancellation k
 test('editing legacy income shows one current category choice and keeps the amount',()=>{
  for(const [old,current] of [['Gift','Gifts'],['Other','Other Income']]) {
   const original=record({type:'INCOME',category:old,amount:50000});let saved;
-  const h=harness('components/transaction-form.tsx',{params:{original,type:'INCOME'},onSubmit:row=>{saved=row;}});
+  const h=harness('components/transactions/transaction-form.tsx',{params:{original,type:'INCOME'},onSubmit:row=>{saved=row;}});
   h.render().button('Category: '+current+'. Change category.').props.onPress();
   assert.equal(h.render().nodes.filter(node=>node.props.accessibilityLabel===current).length,1);
   assert.equal(h.render().button(old),undefined);

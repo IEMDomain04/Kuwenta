@@ -1,18 +1,18 @@
-import { groupExchangeTransactions } from '../exchanges';
-import { useConfirmation } from '../components/confirmation';
+import { groupExchangeTransactions } from '../domain/exchanges';
+import { useConfirmation } from '../components/shared/confirmation';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '@/hooks/use-theme';
-import { formatTransactionDateTime, readableReportingMonth, transactionDayHeading } from '../dates';
+import { formatTransactionDateTime, readableReportingMonth, transactionDayHeading } from '../domain/dates';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, SectionList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
-import { FinanceScreen, TransactionRow, ActionButton, AddTransactionButton } from '../components/ui';
-import { HomeMonthPicker } from '../components/home-month-picker';
-import { filterTransactions } from '../reporting';
-import { formatMoney } from '../money';
+import { FinanceScreen, TransactionRow, ActionButton, AddTransactionButton } from '../components/shared/ui';
+import { HomeMonthPicker } from '../components/home/home-month-picker';
+import { filterTransactions } from '../reporting/reporting';
+import { formatMoney } from '../domain/money';
 import { useFinance } from '../provider';
-import type { Transaction } from '../types';
+import type { Transaction } from '../domain/types';
 
 export default function TransactionsScreen() {
   const { accounts, transactions, month, refresh, busy, removeTransaction, showNotice } = useFinance();

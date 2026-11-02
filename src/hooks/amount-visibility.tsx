@@ -1,6 +1,6 @@
 import 'expo-sqlite/localStorage/install';
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
-import { formatMoney } from '@/features/finance/money';
+import { formatMoney } from '@/features/finance/domain/money';
 
 const key = 'kuwenta.hideAmounts';
 export const HIDDEN_AMOUNT = '\u2022\u2022\u2022\u2022';

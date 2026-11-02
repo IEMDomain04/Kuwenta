@@ -7,7 +7,7 @@ const { join } = require('node:path');
 const { initializeDatabase } = require('../../.expo/finance-tests/storage/database.js');
 const { getCashAccount, updateOpeningBalance } = require('../../.expo/finance-tests/storage/accounts.js');
 const { createTransactionId, createTransaction, getTransaction, listTransactions, updateTransaction, deleteTransaction } = require('../../.expo/finance-tests/storage/transactions.js');
-const { calculateAccountSummary } = require('../../.expo/finance-tests/calculations.js');
+const { calculateAccountSummary } = require('../../.expo/finance-tests/domain/calculations.js');
 const { record } = require('./fixtures.cjs');
 
 // Real SQLite with a small adapter for the Expo async methods used by storage.
@@ -220,7 +220,7 @@ test('editing type/category/date/time and clearing notes updates the right repor
 
 test('backup reads a validated SQLite snapshot without changing stored records', async (t) => {
   const { readBackupJson } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   const db = await setup(t);
   await updateOpeningBalance(db, 100000);
   await createTransaction(db, 'income', income());
@@ -246,7 +246,7 @@ function backupFixture(accountOverrides = {}, rows = [
   record({ id: 'restored-income', type: 'INCOME', category: 'Salary', amount: 50000 }),
   record({ id: 'restored-expense', notes: 'Lunch ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±120', updatedAt: '2026-10-09T07:00:00.000Z' }),
 ]) {
-  const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   const { cash } = require('./fixtures.cjs');
   return parseBackup(serializeBackup({ ...cash, ...accountOverrides }, rows, '2026-10-09T06:35:00.000Z'));
 }
@@ -285,7 +285,7 @@ test('invalid restore payloads fail before opening a write transaction and prese
     await assert.rejects(() => restoreBackup(wrapped, backup));
   }
   assert.equal(writes, 0);
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   const after = parseBackup(await readBackupJson(db));
   const original = parseBackup(before);
   assert.deepEqual(after.accounts, original.accounts);
@@ -403,7 +403,7 @@ test('version 2 migration failure preserves the old database and version', async
 });
 test('multiple accounts isolate balances; moving and deleting records recalculate both accounts', async (t) => {
   const { saveAccount, getAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
-  const { calculateFinanceSummary } = require('../../.expo/finance-tests/calculations.js');
+  const { calculateFinanceSummary } = require('../../.expo/finance-tests/domain/calculations.js');
   const { cash } = require('./fixtures.cjs');
   const db = await setup(t);
   const bank = { ...cash, id: 'bank', name: 'Bank', openingBalance: 200000, purpose: 'savings', includedInAvailable: false };
@@ -450,7 +450,7 @@ test('unsafe account or transaction edits roll back and repeat IDs cannot overwr
 test('multi-account backups restore archived settings and records and survive atomic failure', async (t) => {
   const { saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
   const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   const { cash } = require('./fixtures.cjs');
   const db = await setup(t);
   const bank = { ...cash, id: 'bank', name: 'Savings Bank', purpose: 'savings', includedInAvailable: false };
@@ -528,7 +528,7 @@ test('version 3 table migration preserves records and rolls back failures', asyn
 test('adjustments survive backup restore with direction and account balance intact', async (t) => {
   const db = await setup(t);
   const { adjustAccountBalance } = require('../../.expo/finance-tests/storage/transactions.js');
-  const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   const { restoreBackup: restoreBackupRecords } = require('../../.expo/finance-tests/storage/backup.js');
   await adjustAccountBalance(db, 'correction', 'cash', 12345, 0);
   const backup = parseBackup(serializeBackup(await getCashAccount(db), await listTransactions(db)));
@@ -540,8 +540,8 @@ test('adjustments survive backup restore with direction and account balance inta
 test('transfers debit and credit exactly once and exclude financial reports', async (t) => {
   const db = await setup(t);
   const { saveAccount, listAccounts, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
-  const { calculateCurrentMoney, calculateFinanceSummary } = require('../../.expo/finance-tests/calculations.js');
-  const { spendingByCategory, filterTransactions } = require('../../.expo/finance-tests/reporting.js');
+  const { calculateCurrentMoney, calculateFinanceSummary } = require('../../.expo/finance-tests/domain/calculations.js');
+  const { spendingByCategory, filterTransactions } = require('../../.expo/finance-tests/reporting/reporting.js');
   await updateOpeningBalance(db, 61800);
   await saveAccount(db, { ...await getCashAccount(db), id: 'savings', name: 'Savings', openingBalance: 0, purpose: 'savings', includedInAvailable: false }, true);
   const draft = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'savings', amount: 20000 });
@@ -586,7 +586,7 @@ test('transfer validation, overflow and failed writes preserve both balances', a
 test('transfer backups preserve both endpoints, restore atomically, and old payloads remain readable', async (t) => {
   const db = await setup(t);
   const { saveAccount, listAccounts, getAccount } = require('../../.expo/finance-tests/storage/accounts.js');
-  const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup.js');
+  const { serializeBackup, parseBackup, previewBackup } = require('../../.expo/finance-tests/backup/backup.js');
   const { restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
   await saveAccount(db, { ...await getCashAccount(db), id: 'bank', name: 'Bank', openingBalance: 0 }, true);
   await createTransaction(db, 'transfer-backup', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'bank', amount: 123 }));
@@ -690,7 +690,7 @@ test('goal creation retries, editing and deletion preserve funds and enforce ded
 test('transfer purpose snapshots survive account changes and edits; changed endpoints capture new purposes', async (t) => {
   const db = await setup(t);
   const { saveAccount, getAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
-  const { calculateSavings } = require('../../.expo/finance-tests/calculations.js');
+  const { calculateSavings } = require('../../.expo/finance-tests/domain/calculations.js');
   await addSavings(db);
   const draft = record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'goal-savings', amount: 20000 });
   await createTransaction(db, 'snapshot', draft);
@@ -710,7 +710,7 @@ test('goal backups restore all records and roll back failure during goal inserti
   const db = await setup(t);
   const { saveGoal, listGoals } = require('../../.expo/finance-tests/storage/goals.js');
   const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   await addSavings(db);
   await saveGoal(db, goalDraft(), true);
   await createTransaction(db, 'goal-transfer', record({ type: 'TRANSFER', category: 'Transfer', destinationAccountId: 'goal-savings', amount: 123 }));
@@ -789,7 +789,7 @@ test('last-used preference follows successful creation, rolls back failed saves,
   const db = await setup(t);
   const { saveAccount } = require('../../.expo/finance-tests/storage/accounts.js');
   const { restoreBackup, readBackupJson } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   await saveAccount(db, { ...await getCashAccount(db), id: 'bank-last', name: 'Bank' }, true);
   await createTransaction(db, 'bank-expense', record({ accountId: 'bank-last' }));
   assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'lastEntryAccount'")).value, 'bank-last');
@@ -921,7 +921,7 @@ test('active and archived accounts can be deleted with their opening balances an
 test('account deletion removes related activity and transfers, recalculates other balances, and keeps unrelated records', async t => {
   const db = await setup(t);
   const { deleteAccount, saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
-  const { calculateCurrentMoney } = require('../../.expo/finance-tests/calculations.js');
+  const { calculateCurrentMoney } = require('../../.expo/finance-tests/domain/calculations.js');
   const { readBackupJson } = require('../../.expo/finance-tests/storage/backup.js');
   await updateOpeningBalance(db, 100000);
   const bank = { id: 'bank', name: 'Bank', currency: 'PHP', openingBalance: 50000, purpose: 'spending', includedInAvailable: true, archived: false };
@@ -975,7 +975,7 @@ test('deleting a transfer account rolls back if it would overflow the remaining 
 test('budgets persist, copy only missing categories, recalculate expenses, and preserve transactions on deletion', async (t) => {
   const db = await setup(t);
   const { saveBudget, listBudgets, deleteBudget, copyPreviousBudgets } = require('../../.expo/finance-tests/storage/budgets.js');
-  const { budgetReport } = require('../../.expo/finance-tests/budgets.js');
+  const { budgetReport } = require('../../.expo/finance-tests/domain/budgets.js');
   const food = { month: '2026-09', category: 'Food', limitAmount: 500000 };
   await saveBudget(db, food, true);
   await saveBudget(db, food, true);
@@ -1017,7 +1017,7 @@ test('budget backup and reset support atomic replacement and old payloads', asyn
   assert.deepEqual(await listBudgets(db), []);
   await restoreBackup(db, backup);
   assert.deepEqual(await listBudgets(db), [budget]);
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   await restoreBackup(db, parseBackup(JSON.stringify({ ...backup, version: 5, budgets: undefined })));
   assert.deepEqual(await listBudgets(db), []);
 });
@@ -1040,7 +1040,7 @@ test('budget schema migration preserves records and rolls back errors', async (t
 test('copying budgets is atomic and deletion recalculates spending', async (t) => {
   const db = await setup(t);
   const { saveBudget, listBudgets, copyPreviousBudgets } = require('../../.expo/finance-tests/storage/budgets.js');
-  const { budgetReport } = require('../../.expo/finance-tests/budgets.js');
+  const { budgetReport } = require('../../.expo/finance-tests/domain/budgets.js');
   const food = { month: '2026-09', category: 'Food', limitAmount: 500000 };
   await saveBudget(db, food, true);
   await saveBudget(db, { ...food, category: 'Bills' }, true);
@@ -1088,8 +1088,8 @@ test('external movements persist exactly once, exclude reports and History, and 
   const db = await setup(t);
   const { createExternalTransfer } = require('../../.expo/finance-tests/storage/transactions.js');
   const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
-  const { filterTransactions } = require('../../.expo/finance-tests/reporting.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
+  const { filterTransactions } = require('../../.expo/finance-tests/reporting/reporting.js');
   const incoming = record({ id: 'external-in', type: 'EXTERNAL', category: 'External transfer', externalName: 'Untracked wallet', adjustmentDirection: 'increase', amount: 10000 });
   await createExternalTransfer(db, incoming.id, incoming);
   await createExternalTransfer(db, incoming.id, incoming);
@@ -1169,7 +1169,7 @@ test('invalid account order is rejected and broken stored preferences do not hid
 test('account colors persist through edits, restart, export and replacement restore without changing balances', async () => {
   const { saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
   const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
   const directory = mkdtempSync(join(tmpdir(), 'kuwenta-colors-'));
   const filename = join(directory, 'finance.db');
   let db = connect(filename);
@@ -1222,8 +1222,8 @@ test('version 9 account color migration preserves existing records and rolls bac
 test('JSON and Excel backups restore the same records into real SQLite', async t => {
  const db = await setup(t);
  const { cash } = require('./fixtures.cjs');
- const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup.js');
- const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
+ const { serializeBackup, parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
+ const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/backup/excel-backup.js');
  const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
  const stamp = '2026-10-12T00:00:00.000Z';
  const saving = { ...cash, id: 'save', name: 'Savings', purpose: 'savings', includedInAvailable: false, openingBalance: 0, color: 'green' };
@@ -1270,7 +1270,7 @@ test('budget ordering persists without changing amounts, rejects stale orders an
 
 
 test('Home visualization selections persist, support none, and never change financial records', async () => {
-  const { loadHomeVisualizations, saveHomeVisualizations } = require('../../.expo/finance-tests/home-visualizations.js');
+  const { loadHomeVisualizations, saveHomeVisualizations } = require('../../.expo/finance-tests/reporting/home-visualizations.js');
   const directory = mkdtempSync(join(tmpdir(), 'kuwenta-home-options-'));
   const filename = join(directory, 'finance.db'); let db = connect(filename);
   try {
@@ -1297,11 +1297,11 @@ test('Home visualization selections persist, support none, and never change fina
 
 
 test('every account palette choice survives JSON and Excel replacement restore', async t => {
-  const { ACCOUNT_CARD_COLORS } = require('../../.expo/finance-tests/account-colors.js');
+  const { ACCOUNT_CARD_COLORS } = require('../../.expo/finance-tests/domain/account-colors.js');
   const { saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
   const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
-  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
+  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/backup/excel-backup.js');
   const db=await setup(t); const cash=await getCashAccount(db);
   for(const color of Object.keys(ACCOUNT_CARD_COLORS)) await saveAccount(db,{...cash,id:'color-'+color,name:color,color,openingBalance:10000},true);
   const backup=parseBackup(await readBackupJson(db));
@@ -1346,7 +1346,7 @@ test('icon migration preserves monthly records and rolls back on failure; all pe
  const {saveBudget,listBudgets,saveBudgetOrder}=require('../../.expo/finance-tests/storage/budgets.js');
  const {migrateDatabase}=require('../../.expo/finance-tests/storage/migrations.js');
  const {readBackupJson,restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');
- const {parseBackup}=require('../../.expo/finance-tests/backup.js');
+ const {parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
  const monthly={month:'2026-10',category:'Meals',limitAmount:10000};
  await saveBudget(db,monthly,true);
  await db.execAsync('ALTER TABLE accounts DROP COLUMN icon; PRAGMA user_version = 11;');
@@ -1394,9 +1394,9 @@ test('moving a budget is atomic, rejects occupied periods, and preserves transac
 
 test('exchanges save, edit, export, restore and delete their linked records atomically',async t=>{
  const db=await setup(t);const {saveAccount}=require('../../.expo/finance-tests/storage/accounts.js');
- const {exchangeDraft}=require('../../.expo/finance-tests/exchanges.js');const {calculateFinanceSummary}=require('../../.expo/finance-tests/calculations.js');
- const {readBackupJson,restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');const {parseBackup}=require('../../.expo/finance-tests/backup.js');
- const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {exchangeDraft}=require('../../.expo/finance-tests/domain/exchanges.js');const {calculateFinanceSummary}=require('../../.expo/finance-tests/domain/calculations.js');
+ const {readBackupJson,restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');const {parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/backup/excel-backup.js');
  await updateOpeningBalance(db,500000);const cash=await getCashAccount(db);await saveAccount(db,{...cash,id:'bank',name:'Bank',openingBalance:500000},true);
  const draft=(paid,received)=>exchangeDraft('bank',{kind:'Service sale',paid,received,receivedAccountId:'cash',extraAccountId:'bank',earningsConfirmed:false},'2026-10-13','12:00:00');
  await createTransaction(db,'sale',draft(9500,10000));await createTransaction(db,'sale',draft(9500,10000));
@@ -1424,7 +1424,7 @@ test('exchange migration rolls back and receiver account deletion removes the wh
  assert.equal((await listTransactions(db)).length,1);db.execAsync=exec;await initializeDatabase(db);
  const {saveAccount,deleteAccount}=require('../../.expo/finance-tests/storage/accounts.js');const cash=await getCashAccount(db);
  await saveAccount(db,{...cash,id:'receiver',name:'Receiver'},true);
- const draft=require('../../.expo/finance-tests/exchanges.js').exchangeDraft('cash',{kind:'Service sale',paid:9500,received:10000,receivedAccountId:'receiver',extraAccountId:'cash',earningsConfirmed:false},'2026-10-13','12:00:00');
+ const draft=require('../../.expo/finance-tests/domain/exchanges.js').exchangeDraft('cash',{kind:'Service sale',paid:9500,received:10000,receivedAccountId:'receiver',extraAccountId:'cash',earningsConfirmed:false},'2026-10-13','12:00:00');
  await createTransaction(db,'sale',draft);await deleteAccount(db,'receiver');
  assert.equal(await getTransaction(db,'sale'),null);assert.equal((await listTransactions(db)).length,1);
 });
@@ -1434,7 +1434,7 @@ test('account details and current balance edits are atomic, preserve opening his
  const {saveAccountWithBalance}=require('../../.expo/finance-tests/storage/transactions.js');
  const {listAccounts}=require('../../.expo/finance-tests/storage/accounts.js');
  const {readBackupJson,restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');
- const {parseBackup}=require('../../.expo/finance-tests/backup.js');
+ const {parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
  const db=connect();await initializeDatabase(db);await updateOpeningBalance(db,100000);
  await createTransaction(db,'before',expense());const original=await getCashAccount(db);
  const expected=calculateAccountSummary(original,await listTransactions(db),'1900-01').balance;
@@ -1455,9 +1455,9 @@ test('account details and current balance edits are atomic, preserve opening his
 test('version 14 converts old service pairs atomically, preserves balances and supports old JSON and Excel backups',async t=>{
  const db=await setup(t);
  const {saveAccount,listAccounts}=require('../../.expo/finance-tests/storage/accounts.js');
- const {calculateFinanceSummary}=require('../../.expo/finance-tests/calculations.js');
- const {parseBackup}=require('../../.expo/finance-tests/backup.js');
- const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {calculateFinanceSummary}=require('../../.expo/finance-tests/domain/calculations.js');
+ const {parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/backup/excel-backup.js');
  const {restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');
  await updateOpeningBalance(db,500000);const cash=await getCashAccount(db);
  await saveAccount(db,{...cash,id:'bank',name:'MariBank',purpose:'savings',includedInAvailable:false},true);
@@ -1480,7 +1480,7 @@ test('version 14 converts old service pairs atomically, preserves balances and s
   assert.deepEqual(accounts.map(account=>calculateAccountSummary(account,restored,'1900-01').balance),before);
   assert.equal(calculateFinanceSummary(accounts,restored,'2026-10').monthlyIncome,500);
  }
- await updateTransaction(db,'legacy-sale',require('../../.expo/finance-tests/exchanges.js').exchangeDraft('bank',{...old.exchange,paid:9000},old.transactionDate,old.transactionTime));
+ await updateTransaction(db,'legacy-sale',require('../../.expo/finance-tests/domain/exchanges.js').exchangeDraft('bank',{...old.exchange,paid:9000},old.transactionDate,old.transactionTime));
  assert.equal(calculateFinanceSummary(accounts,await listTransactions(db),'2026-10').monthlyIncome,1000);
  await deleteTransaction(db,'legacy-sale:extra');assert.equal((await listTransactions(db)).length,0);
 });
@@ -1490,10 +1490,10 @@ test('external edits retain identity, recalculate both accounts and stay outside
   const db = await setup(t);
   const { createExternalTransfer, updateExternalTransfer } = require('../../.expo/finance-tests/storage/transactions.js');
   const { saveAccountDetails, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
-  const { calculateFinanceSummary } = require('../../.expo/finance-tests/calculations.js');
+  const { calculateFinanceSummary } = require('../../.expo/finance-tests/domain/calculations.js');
   const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
-  const { filterTransactions } = require('../../.expo/finance-tests/reporting.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
+  const { filterTransactions } = require('../../.expo/finance-tests/reporting/reporting.js');
   await saveAccountDetails(db, { id: 'bank', name: 'Bank', currency: 'PHP', openingBalance: 50000, purpose: 'savings', includedInAvailable: false, archived: false }, true);
   const original = record({ id: 'external-edit', type: 'EXTERNAL', category: 'External transfer', externalName: 'Friend', adjustmentDirection: 'increase', amount: 10000 });
   await createExternalTransfer(db, original.id, original);
@@ -1509,7 +1509,7 @@ test('external edits retain identity, recalculate both accounts and stay outside
   assert.equal(totals.monthlyIncome, 0); assert.equal(totals.monthlyExpenses, 0); assert.equal(filterTransactions(rows, '2026-10').length, 0);
   const backup = parseBackup(await readBackupJson(db));
   await restoreBackup(db, backup);
-  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
+  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/backup/excel-backup.js');
   await restoreBackup(db, parseExcelBackup(createExcelBackup(backup)));
   assert.deepEqual(await getTransaction(db, original.id), saved);
   await deleteTransaction(db, original.id);
@@ -1546,11 +1546,11 @@ test('an external edit that overflows a balance rolls back atomically', async t 
 
 
 test('overall budgets create, edit, reorder with categories, restore JSON and Excel, and delete without affecting records', async t => {
-  const { OVERALL_BUDGET, mergeBudgetOrder, budgetReport } = require('../../.expo/finance-tests/budgets.js');
+  const { OVERALL_BUDGET, mergeBudgetOrder, budgetReport } = require('../../.expo/finance-tests/domain/budgets.js');
   const { saveBudget, listBudgets, saveBudgetOrder, deleteBudget } = require('../../.expo/finance-tests/storage/budgets.js');
   const { readBackupJson, restoreBackup } = require('../../.expo/finance-tests/storage/backup.js');
-  const { parseBackup } = require('../../.expo/finance-tests/backup.js');
-  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/excel-backup.js');
+  const { parseBackup } = require('../../.expo/finance-tests/backup/backup.js');
+  const { createExcelBackup, parseExcelBackup } = require('../../.expo/finance-tests/backup/excel-backup.js');
   const db = await setup(t);
   await createTransaction(db, 'meal', { ...expense(), category: 'Meals' });
   const originalRows = await listTransactions(db);
@@ -1576,7 +1576,7 @@ test('overall budgets create, edit, reorder with categories, restore JSON and Ex
 
 
 const debtStore = require('../../.expo/finance-tests/storage/debts.js');
-const debtMath = require('../../.expo/finance-tests/debts.js');
+const debtMath = require('../../.expo/finance-tests/domain/debts.js');
 const sampleDebt = (overrides={}) => ({ id:'loan',name:'Classmate',kind:'owed',amount:50000,accountId:'cash',transactionDate:'2026-10-19',transactionTime:'10:00:00',createdAt:'2026-10-19T02:00:00.000Z',updatedAt:'2026-10-19T02:00:00.000Z',...overrides });
 const samplePayment = (overrides={}) => ({ id:'repayment',debtId:'loan',accountId:'cash',amount:20000,transactionDate:'2026-10-20',transactionTime:'10:00:00',createdAt:'2026-10-20T02:00:00.000Z',...overrides });
 
@@ -1595,7 +1595,7 @@ test('lending, partial repayment and settlement update cash without counting pri
  progress=debtMath.debtProgress(sampleDebt(),await debtStore.listDebtPayments(db));assert.equal(progress.settled,true);
  const summary=calculateAccountSummary(cash,await listTransactions(db),'2026-10');
  assert.equal(summary.balance,100000);assert.equal(summary.monthlyIncome,0);assert.equal(summary.monthlyExpenses,0);
- assert.equal(require('../../.expo/finance-tests/budgets.js').budgetReport([{month:'2026-10',category:'Overall spending',limitAmount:100000}],await listTransactions(db),'2026-10').budgetedSpent,0);
+ assert.equal(require('../../.expo/finance-tests/domain/budgets.js').budgetReport([{month:'2026-10',category:'Overall spending',limitAmount:100000}],await listTransactions(db),'2026-10').budgetedSpent,0);
 });
 
 test('borrowing and repayment from another account preserve report totals and reverse correctly on deletion',async t=>{
@@ -1653,8 +1653,8 @@ test('debt JSON and Excel replacement backups retain linked records and reject b
  const db=await setup(t);await debtStore.createDebt(db,sampleDebt({dueDate:'2026-11-01',notes:'School allowance'}));
  await debtStore.recordDebtPayment(db,samplePayment({notes:'Partial return'}));
  const {readBackupJson,restoreBackup,resetFinancialData}=require('../../.expo/finance-tests/storage/backup.js');
- const {parseBackup,previewBackup}=require('../../.expo/finance-tests/backup.js');
- const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {parseBackup,previewBackup}=require('../../.expo/finance-tests/backup/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/backup/excel-backup.js');
  const backup=parseBackup(await readBackupJson(db));assert.equal(backup.version,12);assert.equal(previewBackup(backup).debtCount,1);
  const workbook=parseExcelBackup(createExcelBackup(backup));assert.deepEqual(workbook,backup);
  await resetFinancialData(db);assert.equal((await debtStore.listDebts(db)).length,0);
@@ -1679,7 +1679,7 @@ test('version 15 debt migration preserves existing activity and rolls back an in
 
 test('existing debts track what is owed without moving balances, while real repayments still move money',async t=>{
  const db=await setup(t);await updateOpeningBalance(db,70000);
- const {calculateCurrentMoney}=require('../../.expo/finance-tests/calculations.js');
+ const {calculateCurrentMoney}=require('../../.expo/finance-tests/domain/calculations.js');
  const {listAccounts}=require('../../.expo/finance-tests/storage/accounts.js');
  const debt=sampleDebt({existing:true,accountId:undefined});
  await debtStore.createDebt(db,debt);await debtStore.createDebt(db,debt);
@@ -1723,8 +1723,8 @@ test('existing debts and repayments round trip through JSON and Excel without in
  await debtStore.createDebt(db,sampleDebt({existing:true,accountId:undefined,notes:'Still owed from last week'}));
  await debtStore.recordDebtPayment(db,samplePayment());
  const {readBackupJson,restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');
- const {parseBackup}=require('../../.expo/finance-tests/backup.js');
- const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/backup/excel-backup.js');
  const backup=parseBackup(await readBackupJson(db));assert.equal(backup.version,13);assert.equal(backup.debts[0].accountId,undefined);
  const excel=parseExcelBackup(createExcelBackup(backup));assert.deepEqual(excel,backup);
  for(const payload of [backup,excel]){
@@ -1765,7 +1765,7 @@ test('version 16 preserves old linked debts and repayments and rolls back an int
 test('service exchange preserves recorded history when saving, editing and deleting from a 6000 bank balance', async t => {
   const db = await setup(t);
   const { saveAccount, listAccounts } = require('../../.expo/finance-tests/storage/accounts.js');
-  const { exchangeDraft } = require('../../.expo/finance-tests/exchanges.js');
+  const { exchangeDraft } = require('../../.expo/finance-tests/domain/exchanges.js');
   const cash = await getCashAccount(db);
   await saveAccount(db, { ...cash, id: 'bank', name: 'MariBank', openingBalance: 1000000 }, true);
   await createTransaction(db, 'earlier-expense', { ...expense(), accountId: 'bank', amount: 400000 });
@@ -1848,9 +1848,9 @@ test('addition validation, linked movement guards and overflow roll back without
 test('additional borrowing JSON and Excel backups restore complete history and reject broken links',async t=>{
  const db=await setup(t);await debtStore.createDebt(db,sampleDebt());await debtStore.recordDebtPayment(db,samplePayment());
  await debtStore.recordDebtAddition(db,sampleAddition());await debtStore.recordDebtAddition(db,sampleAddition({id:'tracked',existing:true,accountId:undefined}));
- const {parseBackup}=require('../../.expo/finance-tests/backup.js');
+ const {parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
  const {readBackupJson,restoreBackup,resetFinancialData}=require('../../.expo/finance-tests/storage/backup.js');
- const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/excel-backup.js');
+ const {createExcelBackup,parseExcelBackup}=require('../../.expo/finance-tests/backup/excel-backup.js');
  const backup=parseBackup(await readBackupJson(db)), excel=parseExcelBackup(createExcelBackup(backup));
  assert.equal(backup.version,14);assert.deepEqual(excel,backup);
  for(const payload of [backup,excel]) {

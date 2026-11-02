@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { dashboardReport, dashboardGreeting } = require('../../.expo/finance-tests/dashboard.js');
+const { dashboardReport, dashboardGreeting } = require('../../.expo/finance-tests/reporting/dashboard.js');
 const { record } = require('./fixtures.cjs');
 
 test('day reports use Philippine midnight and exclude other dates, transfers and adjustments', () => {
@@ -46,7 +46,7 @@ test('greeting uses Philippine hours and handles missing names', () => {
 });
 
 test('daily expense chart uses weekday labels and excludes income and future days in week view', () => {
-  const { dashboardSpending } = require('../../.expo/finance-tests/dashboard.js');
+  const { dashboardSpending } = require('../../.expo/finance-tests/reporting/dashboard.js');
   const now=new Date('2026-10-07T04:00:00Z');
   const records=[record({transactionDate:'2026-10-05',amount:101}),record({transactionDate:'2026-10-07',amount:202}),record({transactionDate:'2026-10-08',amount:303}),record({transactionDate:'2026-10-07',type:'INCOME',amount:500})];
   const week=dashboardSpending(records,'week','2026-10',now);
@@ -68,7 +68,7 @@ test('daily expense chart uses weekday labels and excludes income and future day
 });
 
 test('recorded weekly balances include starting balances and dated records without counting transfers twice', () => {
-  const { weeklyRecordedBalances } = require('../../.expo/finance-tests/dashboard.js');
+  const { weeklyRecordedBalances } = require('../../.expo/finance-tests/reporting/dashboard.js');
   const { cash } = require('./fixtures.cjs');
   const bank={...cash,id:'bank',name:'Bank',openingBalance:0,archived:true};
   const records=[record({type:'INCOME',category:'Salary',amount:50000,transactionDate:'2026-10-05'}),record({id:'expense',amount:12000,transactionDate:'2026-10-06'}),record({id:'transfer',type:'TRANSFER',category:'Transfer',destinationAccountId:'bank',amount:10000,transactionDate:'2026-10-06'}),record({id:'adjust',type:'ADJUSTMENT',category:'Balance adjustment',adjustmentDirection:'decrease',amount:1000,transactionDate:'2026-10-07'})];
@@ -82,7 +82,7 @@ test('recorded weekly balances include starting balances and dated records witho
 
 
 test('category chart aggregates expenses only within the selected period', () => {
-  const { dashboardCategories } = require('../../.expo/finance-tests/dashboard.js');
+  const { dashboardCategories } = require('../../.expo/finance-tests/reporting/dashboard.js');
   const rows = [record({category:'Meals', amount:6000}), record({category:'Meals', amount:12000}), record({category:'Snacks', amount:3000}), record({type:'INCOME', amount:50000}), record({type:'TRANSFER', amount:10000}), record({type:'ADJUSTMENT', amount:1000}), record({transactionDate:'2026-10-11', amount:90000})];
   assert.deepEqual(dashboardCategories(rows, '2026-10-09', '2026-10-09'), {total:21000,rows:[{category:'Meals',amount:18000},{category:'Snacks',amount:3000}]});
   assert.deepEqual(dashboardCategories([], '2026-10-09', '2026-10-09'), {total:0, rows:[]});
@@ -91,7 +91,7 @@ test('category chart aggregates expenses only within the selected period', () =>
 
 
 test('spending activity week browsing totals completed weeks and excludes partial comparisons',()=>{
- const {activityWeek}=require('../../.expo/finance-tests/dashboard.js');
+ const {activityWeek}=require('../../.expo/finance-tests/reporting/dashboard.js');
  const now=new Date('2026-11-03T04:00:00Z');
  const records=[record({id:'older',amount:2000,transactionDate:'2026-10-20'}),record({id:'monday',amount:3000,transactionDate:'2026-10-26'}),record({id:'sunday',amount:4000,transactionDate:'2026-11-01'}),record({id:'today',amount:5000,transactionDate:'2026-11-03'}),record({id:'future',amount:6000,transactionDate:'2026-11-05'}),record({id:'income',type:'INCOME',category:'Salary',amount:9000,transactionDate:'2026-11-01'})];
  const current=activityWeek(records,now,0);assert.equal(current.total,5000);assert.equal(current.difference,null);

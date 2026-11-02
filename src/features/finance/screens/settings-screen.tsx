@@ -1,5 +1,5 @@
-import { HOME_VISUALIZATIONS, type HomeVisualization } from '../home-visualizations';
-import { useConfirmation } from '../components/confirmation';
+import { HOME_VISUALIZATIONS, type HomeVisualization } from '../reporting/home-visualizations';
+import { useConfirmation } from '../components/shared/confirmation';
 import { NotificationSettingsPanel } from '../components/notification-settings';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useAppearance } from '@/hooks/appearance-provider';
@@ -7,9 +7,9 @@ import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
-import { FinanceScreen, ActionButton } from '../components/ui';
-import { BackupExport } from '../components/backup-export';
-import { BackupImportPreview } from '../components/backup-import-preview';
+import { FinanceScreen, ActionButton } from '../components/shared/ui';
+import { BackupExport } from '../components/backup/backup-export';
+import { BackupImportPreview } from '../components/backup/backup-import-preview';
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {

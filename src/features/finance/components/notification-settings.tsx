@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Linking, Switch, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import { ActionButton } from './ui';
-import { getNotificationSettings, saveNotificationSettings, notificationsAvailable, type NotificationSettings } from '../notifications';
+import { ActionButton } from './shared/ui';
+import { getNotificationSettings, saveNotificationSettings, notificationsAvailable, type NotificationSettings } from '../integrations/notifications';
 
 export function NotificationSettingsPanel({ onboarding = false, onChanged }: { onboarding?: boolean; onChanged?: () => void | Promise<void> }) {
   const theme = useTheme();

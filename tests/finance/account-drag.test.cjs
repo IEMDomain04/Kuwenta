@@ -16,7 +16,7 @@ function harness({store = new Map(), failStorage = false, hidden = false, dark =
   const jsx = (type, props) => ({ type, props });
   const sandbox = { exports: {}, localStorage:{getItem:key=>{if(failStorage)throw new Error('Unavailable');return store.get(key)??null;},setItem:(key,value)=>{if(failStorage)throw new Error('Unavailable');store.set(key,value);}}, require(name) {
     if(name==='expo-sqlite/localStorage/install')return{};
-    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({formatAmount:hidden ? ()=>'hidden' : require('../../.expo/finance-tests/money.js').formatMoney})};
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({formatAmount:hidden ? ()=>'hidden' : require('../../.expo/finance-tests/domain/money.js').formatMoney})};
     if (name === './account-icon') return { AccountIcon: 'AccountIcon' };
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect() {} };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
@@ -26,14 +26,14 @@ function harness({store = new Map(), failStorage = false, hidden = false, dark =
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-color-scheme') return { useColorScheme: () => dark ? 'dark' : 'light' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: '#06633E' }) };
-    if (name === '../account-colors') return require('../../.expo/finance-tests/account-colors.js');
-    if (name === '../provider') return { useFinance: () => ({ accounts, transactions: [], busy: false, saveAccountOrder: async ids => { saved.push(Array.from(ids)); } }) };
-    if (name === '../calculations') return { calculateAccountSummary: () => ({ balance: 100 }) };
-    if (name === '../money') return { formatMoney: () => 'PHP 1.00' };
-    if (name === './ui') return { ActionButton: 'Button' };
+    if (name === '../../domain/account-colors') return require('../../.expo/finance-tests/domain/account-colors.js');
+    if (name === '../../provider') return { useFinance: () => ({ accounts, transactions: [], busy: false, saveAccountOrder: async ids => { saved.push(Array.from(ids)); } }) };
+    if (name === '../../domain/calculations') return { calculateAccountSummary: () => ({ balance: 100 }) };
+    if (name === '../../domain/money') return { formatMoney: () => 'PHP 1.00' };
+    if (name === '../shared/ui') return { ActionButton: 'Button' };
     throw new Error(name);
   } };
-  const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/accounts-overview.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const source = ts.transpileModule(fs.readFileSync('src/features/finance/components/accounts/accounts-overview.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   vm.runInNewContext(source, sandbox);
   function render() {
     cursor = 0;

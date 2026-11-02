@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { moneyInsights, accountInsights, moneyInsightReaction } = require('../../.expo/finance-tests/insights.js');
+const { moneyInsights, accountInsights, moneyInsightReaction } = require('../../.expo/finance-tests/reporting/insights.js');
 const { cash, record } = require('./fixtures.cjs');
 const now = new Date('2026-10-11T02:00:00Z');
 const budget = limitAmount => [{ month: '2026-10', category: 'Food', limitAmount }];
@@ -207,7 +207,7 @@ const addedEntry = {id:'more',debtId:'loan',amount:15000,accountId:'cash',transa
 
 test('Home debt insights include later borrowing, partial repayments and both directions without changing money',()=>{
  const context={debts:[debtEntry(),debtEntry({id:'owe',kind:'owe',amount:30000,existing:true,accountId:undefined})],payments:[paymentEntry],additions:[addedEntry]};
- const before=JSON.stringify(context), {debtMovement,debtAdditionMovement}=require('../../.expo/finance-tests/debts.js');
+ const before=JSON.stringify(context), {debtMovement,debtAdditionMovement}=require('../../.expo/finance-tests/domain/debts.js');
  const movements=[debtMovement(context.debts[0]),debtMovement(context.debts[0],paymentEntry),debtAdditionMovement(context.debts[0],addedEntry)];
  const messages=moneyInsights([cash],movements,[],[],now,context);
  assert.ok(messages.some(text=>/People still owe you.*450.*Record repayments/.test(text)));
@@ -232,7 +232,7 @@ test('tracking-only debts explain what remains owed without inventing lending or
 });
 
 test('cash-in/out fee insights exclude exchanged principal, service losses and ordinary Fees entries',()=>{
- const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/exchanges.js');
+ const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/domain/exchanges.js');
  const exchange=(id,kind,paid,received)=>exchangeRecords(id,exchangeDraft('cash',{kind,paid,received,receivedAccountId:'save',extraAccountId:'cash',earningsConfirmed:true},'2026-10-09','10:00:00'),record().createdAt);
  const rows=[...exchange('in','E-bank Cash-in',20400,20000),...exchange('out','E-bank Cash-out',10000,9800),...exchange('service','Service sale',1000,900),record({id:'other-fee',category:'Fees',amount:500})];
  const result=accountInsights([cash,saving],rows,[],now);
@@ -300,7 +300,7 @@ test('savings feedback shows both directions rather than only their net differen
 });
 
 test('account insights explain borrowed money and repayments without counting either as income or spending',()=>{
- const {debtMovement}=require('../../.expo/finance-tests/debts.js');
+ const {debtMovement}=require('../../.expo/finance-tests/domain/debts.js');
  const debt=debtEntry({kind:'owe'}), context={debts:[debt],payments:[paymentEntry],additions:[]};
  const movements=[debtMovement(debt),debtMovement(debt,paymentEntry)];
  const result=accountInsights([cash],movements,[],now,context);
@@ -320,7 +320,7 @@ test('balance adjustment feedback explains the account correction rather than in
 });
 
 test('exchange feedback separates fees and earnings from the transferred amount and total-money changes',()=>{
- const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/exchanges.js');
+ const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/domain/exchanges.js');
  const exchange=(kind,paid,received)=>exchangeRecords('exchange',exchangeDraft('cash',{kind,paid,received,receivedAccountId:'save',extraAccountId:'cash',earningsConfirmed:true},'2026-10-09','10:00:00'),record().createdAt);
  const fee=accountInsights([cash,saving],exchange('E-bank Cash-out',10000,9800),[],now);
  const transfer=fee.insights.find(text=>text.includes('moved from Cash to Savings'));

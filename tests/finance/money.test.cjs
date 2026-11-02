@@ -1,6 +1,6 @@
 ﻿const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseMoney, moneyInput, formatMoney } = require('../../.expo/finance-tests/money.js');
+const { parseMoney, moneyInput, formatMoney } = require('../../.expo/finance-tests/domain/money.js');
 
 test('peso decimals become exact integer centavos', () => {
   assert.equal(parseMoney('120.50'), 12050);

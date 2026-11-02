@@ -3,12 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const vm = require('node:vm');
-const source=ts.transpileModule(fs.readFileSync('src/features/finance/components/period-overview.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+const source=ts.transpileModule(fs.readFileSync('src/features/finance/components/home/period-overview.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z'), options = {}) {
   let reportCalls=0, activityCalls=0, cursor=0; const hooks=[],navigation=[];
   const jsx=(type,props)=>({type,props});
   const sandbox={exports:{},require(name){
-    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:!!options.hidden,formatAmount:options.hidden?()=>'hidden':require('../../.expo/finance-tests/money.js').formatMoney,conceal:text=>options.hidden?text.replace(/(?:\u20b1|PHP\s*)[\d,.]+/g,'hidden'):text})};
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:!!options.hidden,formatAmount:options.hidden?()=>'hidden':require('../../.expo/finance-tests/domain/money.js').formatMoney,conceal:text=>options.hidden?text.replace(/(?:\u20b1|PHP\s*)[\d,.]+/g,'hidden'):text})};
     if(name==='react')return{useState:initial=>{const index=cursor++;if(!(index in hooks))hooks[index]=initial;return[hooks[index],value=>hooks[index]=typeof value==='function'?value(hooks[index]):value];},useMemo:factory=>factory()};
     if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
     if(name==='react-native')return{View:'View',Pressable:'Button',Modal:'Modal',ScrollView:'ScrollView',useWindowDimensions:()=>({fontScale:options.fontScale??1,width:options.width??390,height:800})};
@@ -18,14 +18,14 @@ function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z
     if(name==='@/components/themed-text')return{ThemedText:'Text'};
     if(name==='@/hooks/use-color-scheme')return{useColorScheme:()=> 'light'};
     if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
-    if(name==='./account-balances')return{AccountBalances:'Balances'};
+    if(name==='../accounts/account-balances')return{AccountBalances:'Balances'};
     if(name==='./home-month-picker')return{HomeMonthPicker:'MonthPicker'};
-    if(name==='./selection-sheet')return{SelectionSheet:'SelectionSheet'};
+    if(name==='../shared/selection-sheet')return{SelectionSheet:'SelectionSheet'};
     if(name==='./dashboard-charts')return{SpendingTrend:'Trend',IncomeExpenseChart:'Comparison'};
     if(name==='./category-spending')return{CategorySpending:'Chart'};
-    if(name==='../provider')return{useFinance:()=>({transactions})};
-    if(name==='../dashboard')return{activityWeek:(...args)=>{activityCalls++;return require('../../.expo/finance-tests/dashboard.js').activityWeek(...args);},dashboardReport:(...args)=>{reportCalls++;return require('../../.expo/finance-tests/dashboard.js').dashboardReport(...args);},dashboardSpending:(...args)=>{activityCalls++;return require('../../.expo/finance-tests/dashboard.js').dashboardSpending(...args);}};
-    if(['../dates','../money','../home-visualizations','../home-reporting'].includes(name))return require('../../.expo/finance-tests/'+name.slice(3)+'.js');
+    if(name==='../../provider')return{useFinance:()=>({transactions})};
+    if(name==='../../reporting/dashboard')return{activityWeek:(...args)=>{activityCalls++;return require('../../.expo/finance-tests/reporting/dashboard.js').activityWeek(...args);},dashboardReport:(...args)=>{reportCalls++;return require('../../.expo/finance-tests/reporting/dashboard.js').dashboardReport(...args);},dashboardSpending:(...args)=>{activityCalls++;return require('../../.expo/finance-tests/reporting/dashboard.js').dashboardSpending(...args);}};
+    if(['../../domain/dates','../../domain/money','../../reporting/home-visualizations','../../reporting/home-reporting'].includes(name))return require('../../.expo/finance-tests/'+name.replace(/^(?:\.\.?\/)+/, '')+'.js');
     throw new Error(name);
   }};
   vm.runInNewContext(source,sandbox);
@@ -119,7 +119,7 @@ test('monthly cards fit four, five and six calendar weeks into equal compact hei
 
 test('the larger spending sheet expands days, toggles details and opens the correct transaction',()=>{
  const {record}=require('./fixtures.cjs');
- const {readableTransactionDate}=require('../../.expo/finance-tests/dates.js');
+ const {readableTransactionDate}=require('../../.expo/finance-tests/domain/dates.js');
  const rows=[record({id:'lunch',notes:'Lunch',amount:12345,transactionDate:'2026-10-01'}),record({id:'income',type:'INCOME',amount:90000,transactionDate:'2026-10-01'})];
  let h=render(['activity','summary'],rows);
  h.nodes.find(node=>node.type==='SelectionSheet').props.onSelect('last-month');h=h.rerender();

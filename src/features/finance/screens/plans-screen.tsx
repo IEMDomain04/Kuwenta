@@ -1,10 +1,10 @@
-import { DebtsOverview } from '../components/debts-overview';
+import { DebtsOverview } from '../components/debts/debts-overview';
 import { useState } from 'react';
 import { useFinance } from '../provider';
-import { philippineDateTime } from '../dates';
-import { BudgetOverview } from '../components/budget-overview';
-import { SavingsOverview } from '../components/savings-overview';
-import { FinanceScreen, AddTransactionButton } from '../components/ui';
+import { philippineDateTime } from '../domain/dates';
+import { BudgetOverview } from '../components/budgets/budget-overview';
+import { SavingsOverview } from '../components/savings/savings-overview';
+import { FinanceScreen, AddTransactionButton } from '../components/shared/ui';
 
 export default function PlansScreen() {
   const [draggingBudget, setDraggingBudget] = useState(false);

@@ -16,12 +16,12 @@ function mount(hidden = false, dark = false) {
     if (name === '@/hooks/use-color-scheme') return { useColorScheme: () => dark ? 'dark' : 'light' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ backgroundElement: '#FFFFFF', background: '#EEEEEE', text: '#000000', backgroundSelected: '#DDFFDD' }) };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
-    if (name === './category-visual') return { categoryVisual: () => ({ color: dark ? '#99CC99' : '#225522' }) };
-    if (name === './ui') return { ActionButton: 'Button' };
-    if (['../dashboard', '../dates', '../spending-blocks'].includes(name)) return require('../../.expo/finance-tests/' + name.slice(3) + '.js');
+    if (name === '../shared/category-visual') return { categoryVisual: () => ({ color: dark ? '#99CC99' : '#225522' }) };
+    if (name === '../shared/ui') return { ActionButton: 'Button' };
+    if (['../../reporting/dashboard', '../../domain/dates', '../../reporting/spending-blocks'].includes(name)) return require('../../.expo/finance-tests/' + name.replace(/^(?:\.\.?\/)+/, '') + '.js');
     throw new Error(name);
   } };
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/category-spending.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, sandbox);
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/home/category-spending.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, sandbox);
   return { render(props) { cursor = 0; return sandbox.exports.CategorySpending(props); }, routes };
 }
 function nodes(tree) { const result = []; function walk(node) { if (Array.isArray(node)) return node.forEach(walk); if (!node?.props) return; result.push(node); walk(node.props.children); } walk(tree); return result; }

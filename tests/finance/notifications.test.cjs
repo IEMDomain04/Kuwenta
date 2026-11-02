@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { reminderPlan, budgetAlertPlan } = require('../../.expo/finance-tests/notification-plan.js');
-const { philippineDateTime } = require('../../.expo/finance-tests/dates.js');
+const { reminderPlan, budgetAlertPlan } = require('../../.expo/finance-tests/integrations/notification-plan.js');
+const { philippineDateTime } = require('../../.expo/finance-tests/domain/dates.js');
 const now = new Date('2026-10-12T02:00:00Z');
 function expense(amount, overrides = {}) { return { id: 'one', type: 'EXPENSE', amount, category: 'Food', accountId: 'cash', transactionDate: '2026-10-12', transactionTime: '10:00:00', createdAt: now.toISOString(), updatedAt: now.toISOString(), ...overrides }; }
 test('reminders use six-hour waking slots, stay bounded and never schedule in the past', () => {
@@ -80,7 +80,7 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
     SchedulableTriggerInputTypes: { DATE: 'date' },
   };
   class FixedDate extends Date { constructor(...args) { super(...(args.length ? args : [now.getTime()])); } static now() { return now.getTime(); } }
-  const source = ts.transpileModule(fs.readFileSync('src/features/finance/notifications.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const source = ts.transpileModule(fs.readFileSync('src/features/finance/integrations/notifications.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const sandbox = { exports: {}, Date: FixedDate, console, localStorage: {
     getItem: key => existingStore.get(key) ?? null,
     setItem: (key, value) => existingStore.set(key, value), removeItem: key => existingStore.delete(key),
@@ -90,8 +90,8 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
     if (name === 'react-native') return { Platform: { OS: 'android' } };
     if (name === 'expo-sqlite/localStorage/install') return {};
     if (name === './notification-plan') return { reminderPlan, budgetAlertPlan };
-    if (name === './budget-periods') return require('../../.expo/finance-tests/budget-periods.js');
-    if (name === './dates') return { philippineDateTime: (value = now) => philippineDateTime(value) };
+    if (name === '../domain/budget-periods') return require('../../.expo/finance-tests/domain/budget-periods.js');
+    if (name === '../domain/dates') return { philippineDateTime: (value = now) => philippineDateTime(value) };
     throw new Error('Unexpected dependency: ' + name);
   } };
   vm.runInNewContext(source, sandbox);
