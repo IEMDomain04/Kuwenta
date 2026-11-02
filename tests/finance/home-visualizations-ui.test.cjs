@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const vm = require('node:vm');
-const source=ts.transpileModule(fs.readFileSync('src/features/finance/components/home/period-overview.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+const sources = Object.fromEntries(['period-overview', 'spending-activity', 'income-expense-summary', 'daily-spending-sheet'].map(name => [name, ts.transpileModule(fs.readFileSync('src/features/finance/components/home/' + name + '.tsx', 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText]));
+const source = sources['period-overview'];
 function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z'), options = {}) {
   let reportCalls=0, activityCalls=0, cursor=0; const hooks=[],navigation=[];
   const jsx=(type,props)=>({type,props});
@@ -19,6 +20,11 @@ function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z
     if(name==='@/hooks/use-color-scheme')return{useColorScheme:()=> 'light'};
     if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
     if(name==='../accounts/account-balances')return{AccountBalances:'Balances'};
+    if (sources[name.slice(2)]) {
+      const component = {...sandbox, exports:{}};
+      vm.runInNewContext(sources[name.slice(2)], component);
+      return component.exports;
+    }
     if(name==='./home-month-picker')return{HomeMonthPicker:'MonthPicker'};
     if(name==='../shared/selection-sheet')return{SelectionSheet:'SelectionSheet'};
     if(name==='./dashboard-charts')return{SpendingTrend:'Trend',IncomeExpenseChart:'Comparison'};
@@ -31,7 +37,7 @@ function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z
   vm.runInNewContext(source,sandbox);
   function snapshot(){cursor=0;
   const tree=sandbox.exports.PeriodOverview({now,visible});
-  const nodes=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;nodes.push(node);walk(node.props.children);}walk(tree);
+  const nodes=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;if(typeof node.type==='function')return walk(node.type(node.props));nodes.push(node);walk(node.props.children);}walk(tree);
   return{tree,nodes,reportCalls,activityCalls,navigation,rerender:snapshot};
   } return snapshot();
 }

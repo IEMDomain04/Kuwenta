@@ -1,6 +1,6 @@
 # Folder guide
 
-Kuwenta keeps routes thin and finance code together under `src/features/finance/`. This organization changes file locations only; application behavior and data formats stay the same.
+Kuwenta keeps routes thin and finance code together under `src/features/finance/`. Application behavior and data formats stay the same as code is organized by responsibility.
 
 | Location | Responsibility |
 | --- | --- |
@@ -19,7 +19,10 @@ Kuwenta keeps routes thin and finance code together under `src/features/finance/
 ## Common starting points
 
 - Home layout: `screens/home-screen.tsx`.
-- Spending Activity and income/expense summary: `components/home/period-overview.tsx`.
+- Shared Home reporting period, selection, and calculations: `components/home/period-overview.tsx`.
+- Weekly tiles and monthly calendar: `components/home/spending-activity.tsx`.
+- Compact income/expense card: `components/home/income-expense-summary.tsx`.
+- Expanded daily spending details: `components/home/daily-spending-sheet.tsx`.
 - Account cards and rows: `components/accounts/accounts-overview.tsx`.
 - Budget dashboard: `components/budgets/budget-overview.tsx`.
 - Transaction fields: `components/transactions/transaction-form.tsx`.
@@ -31,3 +34,7 @@ Paths above are relative to `src/features/finance/`. Keep platform counterparts 
 ## Verification
 
 Run `npx tsc --noEmit` and `npm run test:finance` after moving files. Tests compile finance TypeScript into the generated `.expo/finance-tests/` directory. An Android bundle export also checks Metro imports and bundled asset references.
+
+## Code organization
+
+Keep shared reporting state in `PeriodOverview` and pass values and callbacks to the focused views. Cards own their presentation, theme, and privacy formatting. Financial calculations stay in `domain/` and `reporting/`; database writes stay in the provider and storage layer. Extract a component when it represents a distinct view, rather than creating a helper for each JSX fragment.
