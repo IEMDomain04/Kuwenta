@@ -233,3 +233,8 @@ test('monthly spending bars scroll, follow custom months, and keep amounts hidde
   assert.ok(bars().every(node=>Number.isFinite(node.props.style.height)));
   assert.ok(!h.nodes.some(node=>node.props.accessibilityLiveRegion==='polite'));
 });
+
+
+test('Home starts without charts until the user chooses a visualization',()=>{
+  assert.equal(render(undefined).tree,null);
+});

@@ -1,3 +1,4 @@
+import { initialTrackerSetup, saveTrackerSetup } from './tracker-setup';
 import type { Account, Transaction } from '../domain/types';
 import { validateAccount } from '../domain/validation';
 import { calculateAccountSummary, calculateCurrentMoney, calculateFinanceSummary, calculateSavings } from '../domain/calculations';
@@ -56,10 +57,11 @@ export async function updateOpeningBalance(db: FinanceDatabase, cents: number): 
   await saveAccount(db, { ...await getCashAccount(db), openingBalance: cents }, false);
 }
 /** Save setup exactly once; opening money is never recorded as income. */
-export async function completeCashSetup(db: FinanceDatabase, cents: number, displayName = '', accountName = 'Cash'): Promise<void> {
+export async function completeCashSetup(db: FinanceDatabase, cents: number, displayName = '', accountName = 'Cash', balanceProvided = cents > 0): Promise<void> {
   if (typeof displayName !== 'string' || displayName.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(displayName)) throw new Error('Name must be at most 50 characters without control characters.');
   if (typeof accountName !== 'string' || !accountName.trim() || accountName.trim().length > 50 || /[\u0000-\u001f\u007f]/.test(accountName)) throw new Error('Enter an account name up to 50 characters.');
   if (!Number.isSafeInteger(cents) || cents < 0) throw new Error('Starting money must be zero or positive integer centavos.');
+  if (typeof balanceProvided !== 'boolean') throw new Error('Invalid starting balance confirmation.');
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const completed = await transaction.getFirstAsync<{ value: string }>("SELECT value FROM preferences WHERE key = 'cashSetupComplete'");
     if (completed?.value !== '0') return;
@@ -68,6 +70,7 @@ export async function completeCashSetup(db: FinanceDatabase, cents: number, disp
     await transaction.runAsync("UPDATE accounts SET openingBalance = ?, name = ? WHERE id = 'cash'", cents, accountName.trim());
     await transaction.runAsync("INSERT INTO preferences(key, value) VALUES ('displayName', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", displayName.trim());
     await transaction.runAsync("UPDATE preferences SET value = '1' WHERE key = 'cashSetupComplete'");
+    await saveTrackerSetup(transaction, initialTrackerSetup(balanceProvided));
   });
 }
 

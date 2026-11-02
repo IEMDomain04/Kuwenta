@@ -11,7 +11,7 @@ import { MoneyField } from './money-field';
 import { ActionButton } from './ui';
 import { parseMoney, formatMoney } from '../../domain/money';
 
-const titles = ['Welcome to Kuwenta', 'What should we call you?', 'See where your money goes', 'Make room for your plans', 'Your starting money', 'Keep your records on track', 'You are ready!'];
+const titles = ['Welcome to Kuwenta', 'What should we call you?', 'See where your money goes', 'Make room for your plans', 'Your starting money', 'Keep your records on track', 'Make Home yours', 'You are ready!'];
 const mascots = [
   require('../../../../../assets/images/mascot/friendly.png'),
   require('../../../../../assets/images/mascot/friendly.png'),
@@ -19,9 +19,10 @@ const mascots = [
   require('../../../../../assets/images/mascot/encouraging.png'),
   require('../../../../../assets/images/mascot/thinking.png'),
   require('../../../../../assets/images/mascot/encouraging.png'),
+  require('../../../../../assets/images/mascot/friendly.png'),
   require('../../../../../assets/images/mascot/celebrating.png'),
 ];
-export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (cents: number, name: string, accountName: string) => Promise<void> }) {
+export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (cents: number, name: string, accountName: string, balanceProvided: boolean) => Promise<void> }) {
   const theme = useTheme();
   const [step, setStep] = useState(0);
   const nameInput = useRef<TextInput>(null);
@@ -74,7 +75,7 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
     if (locked || pending.current) return;
     if (!name.trim()) { setError('Enter your name.'); setStep(1); return; }
     pending.current = true; setSaving(true); setInvalidField(undefined); setError('');
-    try { await onComplete(cents, name.trim(), accountName.trim()); }
+    try { await onComplete(cents, name.trim(), accountName.trim(), amount.trim() !== ''); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not finish setup. Your details are kept.'); }
     finally { pending.current = false; setSaving(false); }
   }
@@ -131,13 +132,18 @@ export function CashSetup({ busy, onComplete }: { busy: boolean; onComplete: (ce
           <NotificationSettingsPanel onboarding />
         </> : null}
         {step === 6 ? <>
+          <Ionicons name="bar-chart-outline" size={30} color={theme.accent} style={{ alignSelf: 'center' }} />
+          <ThemedText type="small" style={{ textAlign: 'center' }}>Choose the charts and summaries you want to see on Home.</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>See daily spending, account balances, and more. Change your selection anytime in Settings under Home visualizations.</ThemedText>
+        </> : null}
+        {step === 7 ? <>
           <ThemedText type="small" style={{ textAlign: 'center' }}>{name.trim() ? 'Welcome, ' + name.trim() + '!' : 'Welcome!'} {accountName.trim()} starts with {formatMoney(cents)}.</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>Your records stay on this device. Export a backup from Settings to keep a safe copy.</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>A short checklist on Home will help you finish setting up. Your records stay on this device; export a backup from Settings to keep a copy.</ThemedText>
         </> : null}
       </ScrollView>
       <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 12, width: '100%', maxWidth: 520, alignSelf: 'center' }}>
         {step > 0 ? <View style={{ flex: 1 }}><ActionButton label="Back" disabled={locked} onPress={back} /></View> : null}
-        <View style={{ flex: 2 }}><ActionButton primary label={saving ? 'Saving...' : step === 6 ? 'Start tracking' : 'Next'} disabled={locked || step === 4 && rejected} onPress={() => { if (step === 6) void finish(); else next(); }} /></View>
+        <View style={{ flex: 2 }}><ActionButton primary label={saving ? 'Saving...' : step === 7 ? 'Start tracking' : 'Next'} disabled={locked || step === 4 && rejected} onPress={() => { if (step === 7) void finish(); else next(); }} /></View>
       </View>
     </KeyboardAvoidingView>
   </SafeAreaView>;

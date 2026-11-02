@@ -1276,7 +1276,7 @@ test('Home visualization selections persist, support none, and never change fina
   try {
     await initializeDatabase(db);
     await createTransaction(db,'expense',expense());
-    assert.deepEqual(await loadHomeVisualizations(db), ['activity','summary','categories','budgets']);
+    assert.deepEqual(await loadHomeVisualizations(db), []);
     await saveHomeVisualizations(db,['balances']);
     db.close(); db=connect(filename);
     assert.deepEqual(await loadHomeVisualizations(db),['balances']);
@@ -1295,7 +1295,7 @@ test('Home visualization selections persist, support none, and never change fina
     assert.deepEqual(await loadHomeVisualizations(db),[]);
     assert.equal((await listTransactions(db)).length,1);
     await db.runAsync("UPDATE preferences SET value = 'broken' WHERE key = 'homeVisualizations'");
-    assert.deepEqual(await loadHomeVisualizations(db), ['activity','summary','categories','budgets']);
+    assert.deepEqual(await loadHomeVisualizations(db), []);
   } finally { db.close(); for (const name of readdirSync(directory)) unlinkSync(join(directory,name)); rmdirSync(directory); }
 });
 
@@ -1876,4 +1876,83 @@ test('version 17 migration preserves existing debt history and rolls back on int
  db.execAsync=exec;await initializeDatabase(db);assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version,18);
  assert.deepEqual(await listTransactions(db),before);assert.equal((await debtStore.listDebtPayments(db)).length,1);
  assert.deepEqual(await db.getAllAsync('PRAGMA foreign_key_check'),[]);
+});
+
+
+test('tracker setup enrolls only completed new onboarding, accepts zero, and persists optional skips and dismissal', async () => {
+  const {completeCashSetup} = require('../../.expo/finance-tests/storage/accounts.js');
+  const {loadTrackerSetup,saveTrackerSetup,trackerSetupFinished} = require('../../.expo/finance-tests/storage/tracker-setup.js');
+  const directory=mkdtempSync(join(tmpdir(),'kuwenta-tracker-setup-'));
+  const filename=join(directory,'finance.db'); let db=connect(filename);
+  try {
+    await initializeDatabase(db);
+    assert.equal(await loadTrackerSetup(db,['transaction']),null);
+    const run=db.runAsync;
+    db.runAsync=async(sql,...args)=>{if(sql.includes("'trackerSetup'"))throw new Error('setup progress failure');return run(sql,...args);};
+    await assert.rejects(completeCashSetup(db,10000,'Ana'),/setup progress failure/);
+    db.runAsync=run;
+    assert.equal((await getCashAccount(db)).openingBalance,0);
+    assert.equal((await db.getFirstAsync("SELECT value FROM preferences WHERE key = 'cashSetupComplete'")).value,'0');
+    assert.equal(await loadTrackerSetup(db),null);
+    await completeCashSetup(db,0,'Ana');
+    assert.deepEqual((await loadTrackerSetup(db)).completed,[]);
+    let progress=await loadTrackerSetup(db,['accounts','transaction','visuals']);
+    await saveTrackerSetup(db,{...progress,skipped:['budget','goal'],dismissed:true});
+    db.close();db=connect(filename);await initializeDatabase(db);
+    progress=await loadTrackerSetup(db);
+    assert.equal(progress.dismissed,true);
+    assert.equal(trackerSetupFinished(progress),true);
+    assert.deepEqual(progress.skipped,['budget','goal']);
+    assert.deepEqual(progress.completed,['accounts','visuals','transaction']);
+    assert.deepEqual((await loadTrackerSetup(db)).completed,progress.completed);
+    const upgraded=await loadTrackerSetup(db,['budget']);
+    assert.ok(upgraded.completed.includes('budget'));
+    assert.deepEqual(upgraded.skipped,['goal']);
+    await assert.rejects(saveTrackerSetup(db,{...progress,skipped:['accounts']}),/Invalid tracker setup/);
+    assert.equal((await listTransactions(db)).length,0);
+    const {resetFinancialData}=require('../../.expo/finance-tests/storage/backup.js');
+    await resetFinancialData(db);
+    assert.equal(await loadTrackerSetup(db),null);
+    await completeCashSetup(db,0,'Ben');
+    assert.deepEqual((await loadTrackerSetup(db)).completed,[]);
+  } finally {db.close();for(const file of readdirSync(directory))unlinkSync(join(directory,file));rmdirSync(directory);}
+});
+
+test('established users and restored backups do not receive setup progress automatically', async t => {
+  const db=await setup(t);
+  const {loadTrackerSetup}=require('../../.expo/finance-tests/storage/tracker-setup.js');
+  const {serializeBackup,parseBackup}=require('../../.expo/finance-tests/backup/backup.js');
+  const {restoreBackup}=require('../../.expo/finance-tests/storage/backup.js');
+  await db.runAsync("UPDATE preferences SET value = '1' WHERE key = 'cashSetupComplete'");
+  assert.equal(await loadTrackerSetup(db,['accounts','transaction','budget','goal']),null);
+  const before=await getCashAccount(db);
+  await restoreBackup(db,parseBackup(serializeBackup([before],[],new Date().toISOString(),[])));
+  assert.equal(await loadTrackerSetup(db),null);
+  assert.deepEqual(await getCashAccount(db),before);
+});
+
+
+test('an empty tracker can initialize an unchecked checklist and never resets a dismissal',async t=>{
+  const db=await setup(t);
+  const {loadTrackerSetup,saveTrackerSetup}=require('../../.expo/finance-tests/storage/tracker-setup.js');
+  const first=await loadTrackerSetup(db,[],true);
+  assert.deepEqual(first.completed,[]);assert.equal(first.dismissed,false);
+  await saveTrackerSetup(db,{...first,dismissed:true});
+  const reopened=await loadTrackerSetup(db,[],true);
+  assert.equal(reopened.dismissed,true);assert.deepEqual(reopened.completed,[]);
+});
+
+
+test('onboarding checks accounts only for an explicitly confirmed balance, including zero',async t=>{
+  const {completeCashSetup}=require('../../.expo/finance-tests/storage/accounts.js');
+  const {loadTrackerSetup}=require('../../.expo/finance-tests/storage/tracker-setup.js');
+  const {resetFinancialData}=require('../../.expo/finance-tests/storage/backup.js');
+  const db=await setup(t);
+  for(const [cents,confirmed] of [[0,false],[0,true],[12550,true]]){
+    await resetFinancialData(db);
+    await completeCashSetup(db,cents,'Ana','Cash',confirmed);
+    assert.deepEqual((await loadTrackerSetup(db)).completed,confirmed?['accounts']:[]);
+    assert.equal((await getCashAccount(db)).openingBalance,cents);
+    assert.equal((await listTransactions(db)).length,0);
+  }
 });

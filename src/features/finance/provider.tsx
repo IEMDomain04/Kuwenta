@@ -1,3 +1,4 @@
+import { loadTrackerSetup, saveTrackerSetup as saveTrackerSetupRecord, type TrackerSetup } from './storage/tracker-setup';
 import { FinanceNotice, type FinanceNoticeData } from './components/shared/finance-notice';
 import { listDebts, listDebtPayments, createDebt, recordDebtPayment, removeDebtRecord, listDebtAdditions, recordDebtAddition, correctDebtAmount, removeDebtAddition } from './storage/debts';
 import { validateDebtRecords } from './domain/debts';
@@ -29,8 +30,9 @@ import { saveAccountWithBalance, createExternalTransfer, updateExternalTransfer,
 import type { Account, Transaction, TransactionDraft, SavingsGoal, Budget } from './domain/types';
 import { FinanceScreen, ActionButton } from './components/shared/ui';
 
-type Snapshot = { currentDate: string; debtAdditions: DebtAddition[]; debts: Debt[]; debtPayments: DebtPayment[]; homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
+type Snapshot = { trackerSetup: TrackerSetup | null; currentDate: string; debtAdditions: DebtAddition[]; debts: Debt[]; debtPayments: DebtPayment[]; homeVisualizations: HomeVisualization[]; displayName?: string; budgets: Budget[]; needsCashSetup: boolean; lastEntryAccount?: string; goals: SavingsGoal[]; accounts: Account[]; account: Account; transactions: Transaction[]; month: string; summary: ReturnType<typeof calculateFinanceSummary> };
 type Actions = {
+  saveTrackerSetup: (state: TrackerSetup) => Promise<void>;
   addDebtAmount: (addition: DebtAddition) => Promise<void>;
   correctDebtAmount: (id: string, amount: number, expectedAmount: number) => Promise<void>;
   removeDebtAddition: (id: string) => Promise<void>;
@@ -48,7 +50,7 @@ type Actions = {
   removeBudget: (month: string, category: string) => Promise<void>;
   copyBudgets: (month: string) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
-  completeSetup: (cents: number, displayName?: string, accountName?: string) => Promise<void>;
+  completeSetup: (cents: number, displayName?: string, accountName?: string, balanceProvided?: boolean) => Promise<void>;
   resetData: () => Promise<void>;
   saveGoal: (goal: SavingsGoal, creating: boolean, newAccount?: Account) => Promise<void>;
   removeGoal: (id: string) => Promise<void>;
@@ -109,6 +111,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const budgets = await renewBudgets(connection, currentDate);
       const debts = await listDebts(connection), debtPayments = await listDebtPayments(connection), debtAdditions = await listDebtAdditions(connection);
       validateDebtRecords(debts, debtPayments, accounts, transactions, debtAdditions);
+      const trackerSetup = await loadTrackerSetup(connection, [
+        ...(transactions.some(row => row.type === 'INCOME' || row.type === 'EXPENSE' || row.type === 'TRANSFER') ? ['transaction' as const] : []),
+        ...(budgets.length ? ['budget' as const] : []),
+        ...(goals.length ? ['goal' as const] : []),
+      ], !needsCashSetup && !transactions.length && !budgets.length && !goals.length && !debts.length);
       const month = currentDate.slice(0, 7);
       const summary = calculateFinanceSummary(accounts, transactions, month);
       void syncNotifications(budgets, transactions, baseline).catch(cause => console.warn('Could not sync Kuwenta notifications:', cause));
@@ -116,7 +123,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       catch (cause) { console.warn('Could not update Kuwenta widgets:', cause); }
       loadedDate = currentDate;
       if (active) {
-        const next = { currentDate, debts, debtPayments, debtAdditions, homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
+        const next = { trackerSetup, currentDate, debts, debtPayments, debtAdditions, homeVisualizations, displayName, budgets, needsCashSetup, lastEntryAccount, goals, accounts, account, transactions, month, summary };
         loadedSnapshot.current = next; setSnapshot(next); setError(''); setCanRecover(false); recoveryAllowed = false;
       }
     }
@@ -145,7 +152,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       finally { locked = false; if (active) setBusy(false); }
     }
     actions.current = {
-      saveHomeVisualizations: selected => write(db => saveHomeVisualizationsRecord(db, selected), undefined),
+      saveTrackerSetup: state => write(db => saveTrackerSetupRecord(db, state), undefined),
+      saveHomeVisualizations: selected => write(async db => {
+        await db.withExclusiveTransactionAsync(async transaction => {
+          await saveHomeVisualizationsRecord(transaction, selected);
+          await loadTrackerSetup(transaction, ['visuals']);
+        });
+      }, undefined),
       saveBudgetOrder: (month, categories) => write(db => saveBudgetOrderRecord(db, month, categories), undefined),
       recoverBackup: async backup => {
         if (locked || !active || connection || !recoveryAllowed) throw new Error('Recovery is not available. Tap Retry first.');
@@ -175,7 +188,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       removeBudget: (month, category) => write((db) => deleteBudget(db, month, category), 'Budget deleted.'),
       copyBudgets: (month) => write((db) => copyPreviousBudgets(db, month), 'Budgets copied.'),
       removeAccount: (id) => write((db) => deleteAccount(db, id), 'Account deleted.'),
-      completeSetup: (cents, name, accountName) => write((db) => completeCashSetup(db, cents, name, accountName), 'Cash account ready.'),
+      completeSetup: (cents, name, accountName, balanceProvided) => write((db) => completeCashSetup(db, cents, name, accountName, balanceProvided), 'Cash account ready.'),
       resetData: () => write((db) => resetFinancialData(db), 'Data reset.', undefined, true),
       saveGoal: (goal, creating, newAccount) => write((db) => saveGoalRecord(db, goal, creating, newAccount), creating ? 'Goal added.' : 'Goal updated.'),
       removeGoal: (id) => write((db) => deleteGoal(db, id), 'Goal removed.'),
@@ -188,7 +201,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (!data) throw new Error('Please wait for records to finish loading.');
         return serializeBackup(data.accounts, data.transactions, new Date().toISOString(), data.goals, data.budgets, data.debts, data.debtPayments, data.debtAdditions);
       },
-      saveAccount: (account, creating, balanceChange) => write((db) => balanceChange && !creating ? saveAccountWithBalance(db, account, balanceChange) : saveAccountRecords(db, account, creating), creating ? 'Account added.' : 'Account updated.'),
+      saveAccount: (account, creating, balanceChange) => write(async db => {
+        await (balanceChange && !creating ? saveAccountWithBalance(db, account, balanceChange) : saveAccountRecords(db, account, creating));
+        await loadTrackerSetup(db, ['accounts']);
+      }, creating ? 'Account added.' : 'Account updated.'),
       saveOpeningBalance: (amount) => write((db) => updateOpeningBalance(db, amount), 'Opening balance saved.'),
       newSubmissionId: async () => {
         if (locked || !active || !connection) throw new Error('Please wait for records to finish loading.');
@@ -222,7 +238,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     <ActionButton label="Retry" disabled={busy} onPress={() => { void actions.current?.refresh(); }} />
     {canRecover ? <BackupImportPreview recovery busy={busy} onRestore={backup => actions.current?.recoverBackup(backup) ?? Promise.reject(new Error('App is closing.'))} onNotice={message => setError(message)} /> : null}
   </FinanceScreen></KeyboardAvoidingView>;
-  if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? Promise.reject(new Error('App is closing.'))} />;
+  if (snapshot.needsCashSetup) return <CashSetup busy={busy} onComplete={(cents, name, accountName, balanceProvided) => actions.current?.completeSetup(cents, name, accountName, balanceProvided) ?? Promise.reject(new Error('App is closing.'))} />;
   if (!report?.summary) return <FinanceScreen title="Reporting error"><ThemedText accessibilityRole="alert">{report?.error}</ThemedText><ActionButton label="Current month" onPress={() => setSelectedMonth(null)} /></FinanceScreen>;
   const unavailable = () => Promise.reject(new Error('App is closing.'));
   return <Context.Provider value={{ ...snapshot, busy, month: selectedMonth ?? snapshot.month, currentMonth: snapshot.month, summary: report.summary,
@@ -233,6 +249,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     payDebt: payment => actions.current?.payDebt(payment) ?? unavailable(),
     removeDebt: (id,repayment) => actions.current?.removeDebt(id,repayment) ?? unavailable(),
     showNotice: (message, error = false) => setNotice({ message, tone: error ? 'error' : 'success', expiresAt: Date.now() + (error ? 7000 : 4000) }),
+    saveTrackerSetup: state => actions.current?.saveTrackerSetup(state) ?? unavailable(),
     saveHomeVisualizations: selected => actions.current?.saveHomeVisualizations(selected) ?? unavailable(),
     saveBudgetOrder: (month, categories) => actions.current?.saveBudgetOrder(month, categories) ?? unavailable(),
     recoverBackup: backup => actions.current?.recoverBackup(backup) ?? unavailable(),
@@ -249,7 +266,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     removeGoal: (id) => actions.current?.removeGoal(id) ?? unavailable(),
     adjustBalance: (id, accountId, target, expected) => actions.current?.adjustBalance(id, accountId, target, expected) ?? unavailable(),
     refresh: () => actions.current?.refresh() ?? Promise.resolve(),
-    completeSetup: (cents, name, accountName) => actions.current?.completeSetup(cents, name, accountName) ?? unavailable(),
+    completeSetup: (cents, name, accountName, balanceProvided) => actions.current?.completeSetup(cents, name, accountName, balanceProvided) ?? unavailable(),
     resetData: () => actions.current?.resetData() ?? unavailable(),
     restoreBackup: (backup) => actions.current?.restoreBackup(backup) ?? unavailable(),
     getBackupJson: () => actions.current?.getBackupJson() ?? unavailable(),

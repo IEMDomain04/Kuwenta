@@ -11,12 +11,7 @@ export const HOME_VISUALIZATIONS = [
   { id: "comparison", label: "Income vs. expenses" },
 ] as const;
 export type HomeVisualization = (typeof HOME_VISUALIZATIONS)[number]["id"];
-export const DEFAULT_HOME_VISUALIZATIONS: HomeVisualization[] = [
-  "activity",
-  "summary",
-  "categories",
-  "budgets",
-];
+export const DEFAULT_HOME_VISUALIZATIONS: HomeVisualization[] = [];
 export function validateHomeVisualizations(
   value: unknown,
 ): HomeVisualization[] {

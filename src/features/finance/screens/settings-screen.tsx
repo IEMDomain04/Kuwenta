@@ -1,9 +1,11 @@
+import { initialTrackerSetup } from '../storage/tracker-setup';
+import { router, useLocalSearchParams } from 'expo-router';
 import { HOME_VISUALIZATIONS, type HomeVisualization } from '../reporting/home-visualizations';
 import { useConfirmation } from '../components/shared/confirmation';
 import { NotificationSettingsPanel } from '../components/notification-settings';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useAppearance } from '@/hooks/appearance-provider';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { ThemedText } from '@/components/themed-text';
@@ -13,12 +15,15 @@ import { BackupImportPreview } from '../components/backup/backup-import-preview'
 import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
-  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup, homeVisualizations, saveHomeVisualizations } = useFinance();
+  const params = useLocalSearchParams<{ section?: string }>();
+  const { trackerSetup, saveTrackerSetup, busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup, homeVisualizations, saveHomeVisualizations } = useFinance();
   const theme = useTheme();
   const confirmation = useConfirmation();
   const { mode, setMode } = useAppearance();
   function setAppearanceError(message: string) { if (message) showNotice(message, true); }
-  const [visualizationsOpen, setVisualizationsOpen] = useState(false);
+  const [visualizationsOpen, setVisualizationsOpen] = useState(params.section === 'visuals');
+  useEffect(() => { if (params.section === 'visuals') setVisualizationsOpen(true); }, [params.section]);
+  const setupPending = useRef(false);
   const visualizationPending = useRef(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearanceOptions = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Use device setting']] as const;
@@ -42,6 +47,15 @@ export default function SettingsScreen() {
     try { await saveHomeVisualizations(selected); }
     catch (cause) { showNotice(cause instanceof Error ? cause.message : 'Could not save Home visualizations.', true); }
     finally { visualizationPending.current = false; }
+  }
+  async function openTrackerSetup() {
+    if (busy || setupPending.current) return;
+    setupPending.current = true;
+    try {
+      await saveTrackerSetup({ ...(trackerSetup ?? initialTrackerSetup()), dismissed: false });
+      router.push({ pathname: '/', params: { setup: '1' } });
+    } catch { /* The provider reports save failures. */ }
+    finally { setupPending.current = false; }
   }
   const section = { padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 };
   const pending = useRef(false);
@@ -81,8 +95,9 @@ export default function SettingsScreen() {
       </Pressable>)}
     </View> : null}
 
+    <ActionButton compact label="Tracker setup" disabled={busy} onPress={() => { void openTrackerSetup(); }} />
     <ThemedText type="smallBold">Home visualizations</ThemedText>
-    <Pressable accessibilityRole="button" accessibilityLabel="Home visualizations" accessibilityState={{ expanded: visualizationsOpen }} onPress={() => setVisualizationsOpen(value => !value)}
+    <Pressable accessibilityRole="button" accessibilityLabel="Home visualizations" accessibilityState={{ expanded: visualizationsOpen }} onPress={() => { router.setParams({ section: undefined }); setVisualizationsOpen(value => !value); }}
       style={{ minHeight: 48, paddingHorizontal: 12, borderRadius: 12, backgroundColor: theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <ThemedText type="small" style={{ flex: 1 }}>{homeVisualizations.length ? homeVisualizations.length + ' selected' : 'None selected'}</ThemedText>
       <Ionicons name={visualizationsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textSecondary} />
@@ -97,6 +112,7 @@ export default function SettingsScreen() {
           <ThemedText type="small" style={{ flex: 1 }}>{option.label}</ThemedText>
         </Pressable>;
       })}
+      {trackerSetup && !trackerSetup.completed.includes('visuals') ? <ActionButton compact primary label="Use these visuals" disabled={busy} onPress={() => { void saveVisualizations(homeVisualizations); }} /> : null}
       <ActionButton compact label="Select none" disabled={busy || homeVisualizations.length === 0} onPress={() => { void saveVisualizations([]); }} />
     </View> : null}
 
@@ -131,6 +147,11 @@ export default function SettingsScreen() {
 
     </View>
     <ThemedText type="smallBold" accessibilityRole="header">About Kuwenta</ThemedText>
-    <ThemedText type="small" themeColor="textSecondary">Track, move, and save money in Philippine pesos.</ThemedText>
+    <ThemedText type="smallBold">Managing money is universal. How we manage it is personal.</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Kuwenta started with a simple goal: Emman wanted to organize his money, his way.</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">But after exploring and comparing different finance apps, he realized something: <ThemedText type="smallBold">We all manage money, but we don't all experience it the same way.</ThemedText></ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">Different people have different habits, priorities, and financial journeys. Yet managing money should never feel complicated.</ThemedText>
+    <ThemedText type="small" themeColor="textSecondary">That's why he built <ThemedText type="smallBold">Kuwenta {'\u2014'} a personal finance app designed to make organizing your money simpler, clearer, and more personal.</ThemedText></ThemedText>
+    <ThemedText type="smallBold">Your money. Your way. Kuwenta.</ThemedText>
   </FinanceScreen></KeyboardAvoidingView>;
 }

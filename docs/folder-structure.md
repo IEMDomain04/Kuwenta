@@ -27,6 +27,7 @@ Kuwenta keeps routes thin and finance code together under `src/features/finance/
 - Account cards and rows: `components/accounts/accounts-overview.tsx`.
 - Budget dashboard: `components/budgets/budget-overview.tsx`.
 - Transaction fields: `components/transactions/transaction-form.tsx`.
+- Home setup checklist: `components/home/tracker-setup.tsx`; progress is saved by `storage/tracker-setup.ts`.
 - Shared controls and confirmations: `components/shared/`.
 - Finance state and operations: `provider.tsx` and its web counterpart.
 
@@ -39,3 +40,9 @@ Run `npx tsc --noEmit` and `npm run test:finance` after moving files. Tests comp
 ## Code organization
 
 Keep shared reporting state in `PeriodOverview` and pass values and callbacks to the focused views. Cards own their presentation, theme, and privacy formatting. Financial calculations stay in `domain/` and `reporting/`; database writes stay in the provider and storage layer. Extract a component when it represents a distinct view, rather than creating a helper for each JSX fragment.
+
+## First-run setup
+
+`components/shared/cash-setup.tsx` introduces Home visuals before setup finishes. Completing onboarding creates checklist progress in the existing SQLite preferences table, with accounts checked only if the user explicitly entered a balance, including zero. A blank balance leaves that step unchecked. The provider checks accounts after an account is saved, and checks transaction, budget, and goal milestones after successful saves. Home visualizations start with none selected. Users choose their own charts in Settings, where confirming no selection also completes the visuals step. Existing saved choices remain unchanged.
+
+The Home checklist starts expanded below the mascot and hides when dismissed or when every step is completed or skipped. Only budgets and goals can be skipped. An empty tracker without saved progress also starts the checklist automatically. Users with records are not enrolled automatically, and saved dismissals are respected. Settings > Tracker setup explicitly opens the checklist, including completed steps. These local guidance preferences are separate from financial backup records.

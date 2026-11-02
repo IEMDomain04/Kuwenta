@@ -1,3 +1,4 @@
+import { TrackerSetupChecklist } from '../components/home/tracker-setup';
 import { AmountVisibilityButton } from '../components/shared/amount-visibility-button';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { ThemedText } from "@/components/themed-text";
@@ -5,7 +6,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   AppState,
@@ -36,6 +37,7 @@ const mascotImages = {
 };
 
 export default function HomeScreen() {
+  const params = useLocalSearchParams<{ setup?: string }>();
   const {
     displayName,
     accounts,
@@ -208,6 +210,10 @@ export default function HomeScreen() {
           </ThemedText>
         </Pressable>
       </LinearGradient>
+      <TrackerSetupChecklist
+        forceVisible={params.setup === '1'}
+        onClose={() => { if (params.setup) router.setParams({ setup: undefined }); }}
+      />
       <Modal
         visible={insightsOpen}
         transparent

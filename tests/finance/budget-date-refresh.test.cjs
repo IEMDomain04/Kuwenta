@@ -19,6 +19,7 @@ test('provider renews on startup, at Philippine midnight while open, and on resu
   'react-native':{AppState:{currentState:'active',addEventListener:(_,callback)=>{listener=callback;return{remove(){listener=undefined;}};}},Platform:{OS:'android'}},
   '@/hooks/use-theme':{useTheme:()=>({})},
   './storage/database':{openFinanceDatabase:async()=>db},
+  './storage/tracker-setup':{loadTrackerSetup:async()=>null},
   './storage/budgets':{renewBudgets:async(_,date)=>{renewed.push(date);return[];}},
   './storage/accounts':{listAccounts:async()=>[cash]},
   './storage/transactions':{listTransactions:async()=>[]},
