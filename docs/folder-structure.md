@@ -21,6 +21,7 @@ Kuwenta keeps routes thin and finance code together under `src/features/finance/
 - Home layout: `screens/home-screen.tsx`.
 - Shared Home reporting period, selection, and calculations: `components/home/period-overview.tsx`.
 - Weekly tiles and monthly calendar: `components/home/spending-activity.tsx`.
+- Optional daily spending bar chart: `components/home/daily-spending-chart.tsx`. Enable it in Settings > Home visualizations.
 - Compact income/expense card: `components/home/income-expense-summary.tsx`.
 - Expanded daily spending details: `components/home/daily-spending-sheet.tsx`.
 - Account cards and rows: `components/accounts/accounts-overview.tsx`.

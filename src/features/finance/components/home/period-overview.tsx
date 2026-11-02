@@ -24,6 +24,7 @@ import { SelectionSheet } from "../shared/selection-sheet";
 import { SpendingActivity } from "./spending-activity";
 import { IncomeExpenseSummary } from "./income-expense-summary";
 import { DailySpendingSheet } from "./daily-spending-sheet";
+import { DailySpendingChart } from "./daily-spending-chart";
 
 /** Owns the shared reporting period and daily selection for all Home visuals. */
 export function PeriodOverview({
@@ -43,6 +44,7 @@ export function PeriodOverview({
   const [monthOpen, setMonthOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [dailyOpen, setDailyOpen] = useState(false);
+  const [barDate, setBarDate] = useState("");
   const [recordLimit, setRecordLimit] = useState(10);
   const range = useMemo(
     () => homeReportingPeriod(selection, customMonth, now),
@@ -54,10 +56,11 @@ export function PeriodOverview({
   const showActivity = visible.includes("activity");
   const showSummary = visible.includes("summary");
   const showCategories = visible.includes("categories");
+  const showBars = visible.includes("daily-spending");
   const showTrend = visible.includes("trend");
   const showComparison = visible.includes("comparison");
   const needsReport = showSummary || showCategories || showComparison;
-  const needsHistory = needsReport || showActivity || showTrend;
+  const needsHistory = needsReport || showActivity || showTrend || showBars;
   const records = useMemo(
     () =>
       needsHistory
@@ -79,10 +82,10 @@ export function PeriodOverview({
         : null,
     [records, now, selection, period, showActivity],
   );
-  // Tiles and trend share a single daily series and the same calendar boundaries.
+  // Tiles, bars, and trend share one daily series and the same calendar boundaries.
   const days = useMemo(
     () =>
-      !showActivity && !showTrend
+      !showActivity && !showTrend && !showBars
         ? []
         : (week?.days ??
           dashboardSpending(records, period, month, range.anchor).map(
@@ -97,6 +100,7 @@ export function PeriodOverview({
       week,
       showActivity,
       showTrend,
+      showBars,
     ],
   );
 
@@ -118,6 +122,7 @@ export function PeriodOverview({
   function choosePeriod(value: HomeReportingSelection) {
     setSelection(value);
     setSelectedDate("");
+    setBarDate("");
     setDailyOpen(false);
     if (value === "custom") setMonthOpen(true);
   }
@@ -152,6 +157,7 @@ export function PeriodOverview({
               onOpenChange={setMonthOpen}
               onChange={(value) => {
                 setCustomMonth(value);
+                setBarDate("");
                 setSelectedDate("");
                 setDailyOpen(false);
               }}
@@ -201,6 +207,7 @@ export function PeriodOverview({
     !showActivity &&
     !showSummary &&
     !showCategories &&
+    !showBars &&
     !showTrend &&
     !showComparison
   )
@@ -267,6 +274,16 @@ export function PeriodOverview({
           end={report.end}
           period={period}
           label={range.label}
+        />
+      ) : null}
+      {showBars ? (
+        <DailySpendingChart
+          days={days}
+          today={today}
+          monthly={monthly}
+          label={range.label}
+          selectedDate={barDate}
+          onSelectDate={(date) => setBarDate(current => current === date ? "" : date)}
         />
       ) : null}
       {showTrend ? (

@@ -1283,6 +1283,10 @@ test('Home visualization selections persist, support none, and never change fina
     await saveHomeVisualizations(db,['categories','activity']);
     db.close(); db=connect(filename);
     assert.deepEqual(await loadHomeVisualizations(db),['activity','categories']);
+    await saveHomeVisualizations(db,['daily-spending','activity']);
+    db.close(); db=connect(filename);
+    assert.deepEqual(await loadHomeVisualizations(db),['activity','daily-spending']);
+    await saveHomeVisualizations(db,['activity','categories']);
     await assert.rejects(saveHomeVisualizations(db,['unknown']));
     await assert.rejects(saveHomeVisualizations(db,['activity','activity']));
     assert.deepEqual(await loadHomeVisualizations(db),['activity','categories']);

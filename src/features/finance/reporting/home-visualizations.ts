@@ -6,6 +6,7 @@ export const HOME_VISUALIZATIONS = [
   { id: "balances", label: "Where your money is" },
   { id: "categories", label: "Spending by category chart" },
   { id: "budgets", label: "Budget overview" },
+  { id: "daily-spending", label: "Daily spending bar chart" },
   { id: "trend", label: "Spending trend" },
   { id: "comparison", label: "Income vs. expenses" },
 ] as const;

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const vm = require('node:vm');
-const sources = Object.fromEntries(['period-overview', 'spending-activity', 'income-expense-summary', 'daily-spending-sheet'].map(name => [name, ts.transpileModule(fs.readFileSync('src/features/finance/components/home/' + name + '.tsx', 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText]));
+const sources = Object.fromEntries(['period-overview', 'spending-activity', 'income-expense-summary', 'daily-spending-sheet', 'daily-spending-chart'].map(name => [name, ts.transpileModule(fs.readFileSync('src/features/finance/components/home/' + name + '.tsx', 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText]));
 const source = sources['period-overview'];
 function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z'), options = {}) {
   let reportCalls=0, activityCalls=0, cursor=0; const hooks=[],navigation=[];
@@ -18,7 +18,7 @@ function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z
     if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
     if(name==='@/components/themed-text')return{ThemedText:'Text'};
     if(name==='@/hooks/use-color-scheme')return{useColorScheme:()=> 'light'};
-    if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
+    if(name==='@/hooks/use-theme')return{useTheme:()=>options.theme??{}};
     if(name==='../accounts/account-balances')return{AccountBalances:'Balances'};
     if (sources[name.slice(2)]) {
       const component = {...sandbox, exports:{}};
@@ -42,11 +42,12 @@ function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z
   } return snapshot();
 }
 test('every visualization combination renders only selected sections and skips hidden calculations',()=>{
-  for(let mask=0;mask<64;mask++){
-    const visible=['activity','summary','categories','trend','comparison','balances'].filter((_,i)=>mask&(1<<i));
+  for(let mask=0;mask<128;mask++){
+    const visible=['activity','summary','categories','trend','comparison','balances','daily-spending'].filter((_,i)=>mask&(1<<i));
     const h=render(visible);
-    assert.equal(h.activityCalls,Number(visible.includes('activity')||visible.includes('trend')));
+    assert.equal(h.activityCalls,Number(visible.includes('activity')||visible.includes('trend')||visible.includes('daily-spending')));
     assert.equal(h.reportCalls,visible.includes('summary')||visible.includes('categories')||visible.includes('comparison')?1:0);
+    assert.equal(h.nodes.some(node=>node.props.testID==='daily-spending-chart'),visible.includes('daily-spending'));
     assert.equal(h.nodes.some(node=>node.type==='Trend'),visible.includes('trend'));
     assert.equal(h.nodes.some(node=>node.type==='Comparison'),visible.includes('comparison'));
     assert.equal(h.nodes.some(node=>node.type==='Chart'),visible.includes('categories'));
@@ -166,4 +167,69 @@ test('monthly comparison represents recorded income and expenses, including empt
   assert.equal(h.nodes.find(node=>node.props.accessibilityLabel==='Open daily spending').props.style.marginTop,undefined);
   assert.equal(h.nodes.find(node=>node.props.testID==='income-expense-summary-card').props.style.justifyContent,'flex-start');
  }
+});
+
+
+test('daily spending bars compare actual expenses, toggle details, and leave future days unavailable', () => {
+  const {record} = require('./fixtures.cjs');
+  const {readableTransactionDate} = require('../../.expo/finance-tests/domain/dates.js');
+  const rows = [
+    record({id:'mon',transactionDate:'2026-11-02',amount:10000}),
+    record({id:'tue',transactionDate:'2026-11-03',amount:20000}),
+    record({id:'income',type:'INCOME',transactionDate:'2026-11-03',amount:90000}),
+    record({id:'transfer',type:'TRANSFER',transactionDate:'2026-11-03',amount:80000}),
+    record({id:'future',transactionDate:'2026-11-05',amount:999999}),
+  ];
+  let h = render(['daily-spending'], rows);
+  const bars = () => h.nodes.filter(node => node.props.testID?.startsWith('daily-spending-bar-'));
+  const buttons = () => h.nodes.filter(node => node.type==='Button' && node.props.accessibilityState?.selected !== undefined);
+  const detail = () => h.nodes.find(node => node.props.accessibilityLiveRegion==='polite');
+  assert.equal(bars().length, 7);
+  assert.equal(bars()[0].props.style.height, 64);
+  assert.equal(bars()[1].props.style.height, 128);
+  assert.ok(bars().slice(2).every(node => node.props.style.height===2));
+  assert.equal(buttons()[2].props.disabled, true);
+  assert.equal(detail(), undefined);
+  buttons()[1].props.onPress(); h=h.rerender();
+  assert.equal(buttons()[1].props.accessibilityState.selected, true);
+  assert.ok(JSON.stringify(detail().props.children).includes(readableTransactionDate('2026-11-03')));
+  assert.ok(JSON.stringify(detail().props.children).includes('200.00'));
+  buttons()[1].props.onPress(); h=h.rerender();
+  assert.equal(detail(), undefined);
+  buttons()[0].props.onPress(); h=h.rerender();
+  h.nodes.find(node=>node.type==='SelectionSheet').props.onSelect('last-week'); h=h.rerender();
+  assert.equal(detail(), undefined);
+  assert.ok(h.nodes.some(node=>node.props.children==='No expenses recorded for this period.'));
+});
+
+test('monthly spending bars scroll, follow custom months, and keep amounts hidden', () => {
+  const {record} = require('./fixtures.cjs');
+  let h = render(['daily-spending'], [record({id:'oct',transactionDate:'2026-10-01',amount:12345})], undefined, {hidden:true,theme:{accent:'#74DCA6',backgroundSelected:'#264937'}});
+  h.nodes.find(node=>node.type==='SelectionSheet').props.onSelect('last-month'); h=h.rerender();
+  const bars = () => h.nodes.filter(node=>node.props.testID?.startsWith('daily-spending-bar-'));
+  const buttons = () => h.nodes.filter(node=>node.type==='Button' && node.props.accessibilityState?.selected !== undefined);
+  assert.equal(bars().length,31);
+  assert.equal(h.nodes.find(node=>node.type==='ScrollView').props.horizontal,true);
+  assert.equal(h.nodes.find(node=>node.type==='ScrollView').props.showsHorizontalScrollIndicator,false);
+  assert.ok(h.nodes.some(node=>node.props.children==='Swipe for more'));
+  h.nodes.find(node=>node.type==='ScrollView').props.onLayout({nativeEvent:{layout:{width:330}}}); h=h.rerender();
+  const barWidth=buttons()[0].props.style.width;
+  const fullBars=Math.floor((330+6)/(barWidth+6));
+  assert.ok(Math.abs((330-fullBars*(barWidth+6))/barWidth-0.5)<0.01, 'the next bar is half visible');
+  const thumb=()=>h.nodes.find(node=>node.props.testID==='daily-spending-scroll-thumb');
+  assert.equal(thumb().props.style.backgroundColor,'#74DCA6');
+  assert.equal(thumb().props.style.transform[0].translateX,0);
+  h.nodes.find(node=>node.type==='ScrollView').props.onScroll({nativeEvent:{contentOffset:{x:200}}}); h=h.rerender();
+  assert.ok(thumb().props.style.transform[0].translateX>0);
+  buttons()[0].props.onPress(); h=h.rerender();
+  assert.ok(h.nodes.some(node=>node.props.accessibilityLiveRegion==='polite'));
+  const text=JSON.stringify(h.nodes.filter(node=>node.type==='Text').map(node=>node.props.children));
+  assert.ok(text.includes('hidden')); assert.ok(!text.includes('123.45'));
+  assert.ok(h.nodes.every(node=>!node.props.accessibilityLabel?.includes('123.45')));
+  h.nodes.find(node=>node.type==='SelectionSheet').props.onSelect('custom'); h=h.rerender();
+  h.nodes.find(node=>node.type==='MonthPicker').props.onChange('2024-02'); h=h.rerender();
+  assert.equal(bars().length,29);
+  assert.equal(thumb().props.style.transform[0].translateX,0);
+  assert.ok(bars().every(node=>Number.isFinite(node.props.style.height)));
+  assert.ok(!h.nodes.some(node=>node.props.accessibilityLiveRegion==='polite'));
 });
