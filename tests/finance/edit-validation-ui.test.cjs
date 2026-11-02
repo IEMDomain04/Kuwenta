@@ -7,7 +7,7 @@ const { cash, record } = require('./fixtures.cjs');
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], debts = [], debtPayments = [], debtAdditions = [], onSubmit = () => {}, deleteFailure = false, refreshRecords } = {}) {
   const hooks = []; let cursor = 0; const saved = [], prompts = [], notices = [], removed = [], navigation = [], effects = [], refreshed = [];
-  const finance = { removeBudget: async (...args) => removed.push(args), removeGoal: async id => removed.push(id), debts, debtPayments, debtAdditions, addDebtAmount: async addition => saved.push(addition), correctDebtAmount: async (...args) => saved.push(args), removeDebtAddition: async id => removed.push(id), addDebt: async debt => saved.push(debt), payDebt: async payment => saved.push(payment), removeDebt: async (...args) => removed.push(args), saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
+  const finance = { currentDate: '2026-10-12', removeBudget: async (...args) => removed.push(args), removeGoal: async id => removed.push(id), debts, debtPayments, debtAdditions, addDebtAmount: async addition => saved.push(addition), correctDebtAmount: async (...args) => saved.push(args), removeDebtAddition: async id => removed.push(id), addDebt: async debt => saved.push(debt), payDebt: async payment => saved.push(payment), removeDebt: async (...args) => removed.push(args), saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
   finance.refresh = async () => { refreshed.push(true); refreshRecords?.(finance); };
   const state = initial => { const index = cursor++; if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial; return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }]; };
   const jsx = (type, props) => ({ type, props });
@@ -123,7 +123,7 @@ test('new budget period selection saves the selected date range and exact draft 
  h.render().find('BudgetPeriodPicker').props.onPeriodChange('weekly');
  h.render().button('Save').props.onPress(); await settle();
  assert.equal(h.saved.length,1);
- assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/budget-periods.js').budgetPeriodKey('weekly',require('../../.expo/finance-tests/dates.js').philippineDateTime().transactionDate));
+ assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/budget-periods.js').budgetPeriodKey('weekly','2026-10-12'));
  assert.equal(h.saved[0][0].limitAmount,6025);
 });
 
@@ -162,7 +162,7 @@ test('Daily is the default, and an existing budget can change period without res
  assert.equal(h.saved.length,0);
  h.render().button('Save').props.onPress();
  h.prompts[1][2].find(button=>button.text==='Confirm').onPress();await settle();
- assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/budget-periods.js').budgetPeriodKey('weekly',require('../../.expo/finance-tests/dates.js').philippineDateTime().transactionDate));
+ assert.equal(h.saved[0][0].month,require('../../.expo/finance-tests/budget-periods.js').budgetPeriodKey('weekly','2026-10-12'));
  assert.equal(h.saved[0][0].limitAmount,50000);
  assert.equal(h.saved[0][2].month,'2026-10');
 });

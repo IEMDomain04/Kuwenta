@@ -11,10 +11,10 @@ import type { dashboardSpending } from '../dashboard';
 import { formatTransactionDateTime, philippineDateTime, readableTransactionDate } from '../dates';
 import type { Transaction } from '../types';
 
-export function SpendingTrend({ days, period, transactions = [], now = new Date() }: { days: ReturnType<typeof dashboardSpending>; period: string; transactions?: readonly Transaction[]; now?: Date }) {
+export function SpendingTrend({ days, period, transactions = [], now = new Date(), label }: { days: ReturnType<typeof dashboardSpending>; period: string; transactions?: readonly Transaction[]; now?: Date; label?: string }) {
   const theme = useTheme();
   const { height } = useWindowDimensions();
-  const periodLabel = period === 'day' ? 'Last 7 days' : period === 'week' ? 'This week' : 'This month';
+  const periodLabel = label ?? (period === 'day' ? 'Last 7 days' : period === 'week' ? 'This week' : 'This month');
   const { formatAmount: formatMoney, conceal } = useAmountVisibility();
   const [selectedDate, setSelectedDate] = useState('');
   const [previewDate, setPreviewDate] = useState<string | null>(null);

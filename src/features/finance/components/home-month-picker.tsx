@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -9,20 +9,25 @@ import { ActionButton } from './ui';
 
 const months = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en-PH', { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, i, 1))));
 const years = Array.from({ length: 8100 }, (_, i) => i + 1900);
-export function HomeMonthPicker({ disabled = false }: { disabled?: boolean } = {}) {
-  const { month, currentMonth, setMonth } = useFinance();
+export function HomeMonthPicker({ disabled = false, compact = false, value, onChange, open: controlledOpen, onOpenChange }: { disabled?: boolean; compact?: boolean; value?: string; onChange?: (month: string) => void; open?: boolean; onOpenChange?: (open: boolean) => void } = {}) {
+  const finance = useFinance();
+  const month = value ?? finance.month, currentMonth = finance.currentMonth;
+  const setMonth = onChange ?? finance.setMonth;
   const theme = useTheme();
   const { height, fontScale } = useWindowDimensions();
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  function setOpen(value: boolean) { if (onOpenChange) onOpenChange(value); else setLocalOpen(value); }
   const [year, setYear] = useState(Number(month.slice(0, 4)));
   const [choosingYear, setChoosingYear] = useState(false);
+  useEffect(() => { if (open) { setYear(Number(month.slice(0,4))); setChoosingYear(false); } },[open,month]);
   const rowHeight = Math.max(52, Math.ceil(24 * fontScale) + 24);
   const label = months[Number(month.slice(5)) - 1] + ' ' + month.slice(0, 4);
   function select(value: string) { if (disabled) return; setMonth(value); setOpen(false); }
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose reporting month, ' + label} accessibilityState={{ disabled }} disabled={disabled} onPress={() => { setYear(Number(month.slice(0, 4))); setChoosingYear(false); setOpen(true); }}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 10, borderRadius: 12, backgroundColor: theme.backgroundElement }}>
-      <ThemedText type="smallBold" themeColor="accent">{label}</ThemedText><Ionicons name="chevron-down" color={theme.accent} size={16} />
+      style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 4 : 6, minHeight: 44, paddingHorizontal: compact ? 8 : 10, borderRadius: 12, backgroundColor: theme.backgroundElement }}>
+      <ThemedText type="smallBold" themeColor="accent" style={compact ? {fontSize:10,lineHeight:14} : undefined}>{label}</ThemedText><Ionicons name="chevron-down" color={theme.accent} size={compact ? 14 : 16} />
     </Pressable>
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>

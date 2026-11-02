@@ -20,7 +20,7 @@ export function AccountBalances() {
     return { rows, totals, maximum: Math.max(1, ...rows.map(row => Math.abs(row.balance))) };
   }, [accounts, transactions]);
   return <View style={{ padding: 14, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 12 }}>
-    <ThemedText type="smallBold" accessibilityRole="header">Where your money is</ThemedText>
+    <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}><ThemedText type="smallBold" accessibilityRole="header">Where your money is</ThemedText><ThemedText type="small" themeColor="textSecondary" style={{fontSize:10}}>Current balances</ThemedText></View>
     <View style={{ gap: 4 }}>
       <ThemedText type="smallBold">Total money: {formatMoney(totals.totalMoney, true)}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">Available for spending: {formatMoney(totals.availableMoney, true)}</ThemedText>

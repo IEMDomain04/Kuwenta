@@ -4,7 +4,7 @@ const ts = require('typescript');
 const vm = require('node:vm');
 const fs = require('node:fs');
 
-function harness() {
+function harness({store = new Map(), failStorage = false, hidden = false, dark = false} = {}) {
   const hooks = []; let cursor = 0;
   const saved = [], navigation = [], scrolling = [];
   const accounts = ['cash', 'bank', 'savings'].map(id => ({ id, name: id, purpose: id === 'savings' ? 'savings' : 'spending', openingBalance: 100, archived: false }));
@@ -14,8 +14,9 @@ function harness() {
     return [hooks[index], value => { hooks[index] = value; }];
   };
   const jsx = (type, props) => ({ type, props });
-  const sandbox = { exports: {}, require(name) {
-    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({formatAmount:require('../../.expo/finance-tests/money.js').formatMoney})};
+  const sandbox = { exports: {}, localStorage:{getItem:key=>{if(failStorage)throw new Error('Unavailable');return store.get(key)??null;},setItem:(key,value)=>{if(failStorage)throw new Error('Unavailable');store.set(key,value);}}, require(name) {
+    if(name==='expo-sqlite/localStorage/install')return{};
+    if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({formatAmount:hidden ? ()=>'hidden' : require('../../.expo/finance-tests/money.js').formatMoney})};
     if (name === './account-icon') return { AccountIcon: 'AccountIcon' };
     if (name === 'react') return { useState: state, useRef: value => state(() => ({ current: value }))[0], useEffect() {} };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
@@ -23,7 +24,7 @@ function harness() {
     if (name === 'expo-router') return { router: { push: value => navigation.push(value) } };
     if (name === '@react-native-vector-icons/ionicons') return { Ionicons: 'Icon' };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
-    if (name === '@/hooks/use-color-scheme') return { useColorScheme: () => 'light' };
+    if (name === '@/hooks/use-color-scheme') return { useColorScheme: () => dark ? 'dark' : 'light' };
     if (name === '@/hooks/use-theme') return { useTheme: () => ({ accent: '#06633E' }) };
     if (name === '../account-colors') return require('../../.expo/finance-tests/account-colors.js');
     if (name === '../provider') return { useFinance: () => ({ accounts, transactions: [], busy: false, saveAccountOrder: async ids => { saved.push(Array.from(ids)); } }) };
@@ -51,7 +52,7 @@ function harness() {
     });
     return { nodes, cards, positions: nodes.filter(node => typeof node.type === 'function' && node.type.name === 'MovingCard').map(node => ({ x: node.props.x, y: node.props.y })), pan: nodes.find(node => node.props.onPanResponderMove).props };
   }
-  return { render, saved, navigation, scrolling };
+  return { render, saved, navigation, scrolling, store };
 }
 
 test('holding and dragging saves order without navigating, while normal taps still open accounts', () => {
@@ -101,5 +102,28 @@ test('switching account list and cards repeatedly restores explicit card widths'
   assert.ok(h.render().nodes.filter(node=>typeof node.type==='function'&&node.type.name==='MovingCard').every(node=>node.props.style.width==='100%'));
   h.render().nodes.find(node=>node.props.accessibilityLabel==='Account cards').props.onPress();
   assert.ok(h.render().nodes.filter(node=>typeof node.type==='function'&&node.type.name==='MovingCard').every(node=>node.props.style.width==='47%' && node.props.style.flexShrink===0));
+ }
+});
+
+
+test('account view restores on remount, defaults to cards, and tolerates unavailable storage',()=>{
+ const first=harness();assert.equal(first.render().nodes.find(node=>node.props.accessibilityLabel==='Account cards').props.accessibilityState.selected,true);
+ first.render().nodes.find(node=>node.props.accessibilityLabel==='Account list').props.onPress();
+ assert.equal(first.store.get('kuwenta.accountsView'),'list');
+ const reopened=harness({store:first.store});
+ assert.equal(reopened.render().nodes.find(node=>node.props.accessibilityLabel==='Account list').props.accessibilityState.selected,true);
+ reopened.render().nodes.find(node=>node.props.accessibilityLabel==='Account cards').props.onPress();
+ assert.equal(harness({store:first.store}).render().nodes.find(node=>node.props.accessibilityLabel==='Account cards').props.accessibilityState.selected,true);
+ const failed=harness({failStorage:true});failed.render().nodes.find(node=>node.props.accessibilityLabel==='Account list').props.onPress();
+ assert.equal(failed.render().nodes.find(node=>node.props.accessibilityLabel==='Account list').props.accessibilityState.selected,true);
+});
+
+test('rows keep card colors in both themes and respect masked balances in text and accessibility',()=>{
+ for(const dark of [false,true]){
+  const h=harness({dark,hidden:true});const card=h.render().cards[0].style({pressed:false});
+  h.render().nodes.find(node=>node.props.accessibilityLabel==='Account list').props.onPress();
+  const row=h.render().cards[0];assert.equal(row.style({pressed:false}).backgroundColor,card.backgroundColor);
+  assert.ok(row.accessibilityLabel.includes('hidden'));assert.ok(!row.accessibilityLabel.includes('1.00'));
+  const icon=h.render().nodes.find(node=>node.type==='AccountIcon');assert.equal(icon.props.color,dark?'#082417':'#FFFFFF');
  }
 });

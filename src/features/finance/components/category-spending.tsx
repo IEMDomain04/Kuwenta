@@ -20,7 +20,7 @@ function blockTextColor(color: string) {
   return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722 > 0.179 ? '#000000' : '#FFFFFF';
 }
 
-export function CategorySpending({ transactions, start, end, period }: { transactions: readonly Transaction[]; start: string; end: string; period: string }) {
+export function CategorySpending({ transactions, start, end, period, label }: { transactions: readonly Transaction[]; start: string; end: string; period: string; label?: string }) {
   const theme = useTheme();
   const dark = useColorScheme() === 'dark';
   const { fontScale } = useWindowDimensions();
@@ -46,7 +46,7 @@ export function CategorySpending({ transactions, start, end, period }: { transac
   return <View style={{ padding: 14, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 12 }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <ThemedText type="smallBold" style={{ flex: 1 }}>Top spending categories</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">{period === 'day' ? 'Today' : period === 'week' ? 'This week' : 'This month'}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">{label ?? (period === 'day' ? 'Today' : period === 'week' ? 'This week' : 'This month')}</ThemedText>
     </View>
     {total ? <>
       <View onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ height: 184, borderRadius: 12, overflow: 'hidden' }}>

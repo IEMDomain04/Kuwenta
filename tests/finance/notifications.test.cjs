@@ -91,7 +91,7 @@ function notificationHarness(existingStore = new Map(), expoGo = false) {
     if (name === 'expo-sqlite/localStorage/install') return {};
     if (name === './notification-plan') return { reminderPlan, budgetAlertPlan };
     if (name === './budget-periods') return require('../../.expo/finance-tests/budget-periods.js');
-    if (name === './dates') return { philippineDateTime };
+    if (name === './dates') return { philippineDateTime: (value = now) => philippineDateTime(value) };
     throw new Error('Unexpected dependency: ' + name);
   } };
   vm.runInNewContext(source, sandbox);

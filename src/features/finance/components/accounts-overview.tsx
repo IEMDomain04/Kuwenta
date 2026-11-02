@@ -1,3 +1,4 @@
+import 'expo-sqlite/localStorage/install';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { AccountIcon } from './account-icon';
 import { accountCardColor } from '../account-colors';
@@ -37,7 +38,14 @@ export function AccountsOverview({ compact = false, showAdd = true, onDraggingCh
   const cardText = dark ? '#082417' : '#FFFFFF';
   const { fontScale } = useWindowDimensions();
   const [showArchived, setShowArchived] = useState(false);
-  const [layout, setLayout] = useState<'cards' | 'list'>('cards');
+  const [layout, setLayout] = useState<'cards' | 'list'>(() => {
+    try { return !compact && localStorage.getItem('kuwenta.accountsView') === 'list' ? 'list' : 'cards'; }
+    catch { return 'cards'; }
+  });
+  function chooseLayout(value: 'cards' | 'list') {
+    bounds.current = {}; held.current = false; setPreview(null); setLayout(value);
+    try { localStorage.setItem('kuwenta.accountsView', value); } catch { /* Keep the selection for this session. */ }
+  }
   type Drag = { id: string; purpose: string; x: number; y: number; dx: number; dy: number; target: string };
   const [preview, setPreview] = useState<string[] | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -102,7 +110,7 @@ export function AccountsOverview({ compact = false, showAdd = true, onDraggingCh
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
       <ThemedText type="smallBold" accessibilityRole="header">Your accounts</ThemedText>
       <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
-        {compact ? <ActionButton compact label="View all" disabled={busy} onPress={() => router.navigate('/accounts')} /> : (['cards', 'list'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value === 'cards' ? 'Account cards' : 'Account list'} accessibilityState={{ selected: layout === value }} disabled={busy || !!drag} onPress={() => { bounds.current = {}; held.current = false; setPreview(null); setLayout(value); }} style={{ minWidth: 44, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: layout === value ? theme.backgroundSelected : theme.backgroundElement }}><Ionicons name={value === 'cards' ? 'grid-outline' : 'list-outline'} size={18} color={theme.accent} /></Pressable>)}
+        {compact ? <ActionButton compact label="View all" disabled={busy} onPress={() => router.navigate('/accounts')} /> : (['cards', 'list'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value === 'cards' ? 'Account cards' : 'Account list'} accessibilityState={{ selected: layout === value }} disabled={busy || !!drag} onPress={() => chooseLayout(value)} style={{ minWidth: 44, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: layout === value ? theme.backgroundSelected : theme.backgroundElement }}><Ionicons name={value === 'cards' ? 'grid-outline' : 'list-outline'} size={18} color={theme.accent} /></Pressable>)}
         {showAdd ? <ActionButton compact label="Add account" disabled={busy} onPress={() => router.push('/account')} /> : null}
       </View>
     </View>
@@ -115,6 +123,7 @@ export function AccountsOverview({ compact = false, showAdd = true, onDraggingCh
         <View {...pan.panHandlers} onTouchEnd={() => finish.current(true)} onTouchCancel={() => finish.current(false)} style={{ flexDirection: cards ? 'row' : 'column', flexWrap: 'wrap', gap: 10 }}>{rows.map((account) => {
           const balance = calculateAccountSummary(account, transactions, '1900-01').balance;
           const color = accountCardColor(account, dark);
+          const colored = !compact && !account.archived;
           const original = bounds.current[account.id];
           const slot = bounds.current[rows[projected.findIndex(row => row.id === account.id)]?.id];
           const moving = drag?.id === account.id;
@@ -131,20 +140,20 @@ export function AccountsOverview({ compact = false, showAdd = true, onDraggingCh
             delayLongPress={350} onPressIn={() => { held.current = false; }}
             onLongPress={event => start(account.id, purpose, event.nativeEvent.pageX, event.nativeEvent.pageY)}
             onPress={() => { if (!held.current) router.push({ pathname: '/account', params: { id: account.id } }); }}
-            style={({ pressed }) => ({ ...(cards ? { minHeight: 154 } : { width: '100%' }), padding: 14, borderRadius: cards ? 20 : 16, borderWidth: 1, borderColor: drag?.target === account.id ? theme.accent : account.archived || !cards ? theme.border : color, boxShadow: cards ? '0 3px 8px rgba(20, 36, 67, 0.08)' : undefined, flexDirection: cards ? 'column' : 'row', alignItems: cards ? 'stretch' : 'center', gap: 10, backgroundColor: cards && !account.archived ? color : theme.backgroundElement, opacity: busy ? 0.5 : drag?.id === account.id ? 0.95 : pressed ? 0.5 : 1, zIndex: drag?.id === account.id ? 10 : 0, elevation: drag?.id === account.id ? 8 : 0, transform: drag?.id === account.id ? [{ scale: 1.04 }] : [] })}>
+            style={({ pressed }) => ({ ...(cards ? { minHeight: 154 } : { width: '100%' }), padding: 14, borderRadius: cards ? 20 : 16, borderWidth: 1, borderColor: drag?.target === account.id ? theme.accent : colored ? color : theme.border, boxShadow: cards ? '0 3px 8px rgba(20, 36, 67, 0.08)' : undefined, flexDirection: cards ? 'column' : 'row', alignItems: cards ? 'stretch' : 'center', gap: 10, backgroundColor: colored ? color : theme.backgroundElement, opacity: busy ? 0.5 : drag?.id === account.id ? 0.95 : pressed ? 0.5 : 1, zIndex: drag?.id === account.id ? 10 : 0, elevation: drag?.id === account.id ? 8 : 0, transform: drag?.id === account.id ? [{ scale: 1.04 }] : [] })}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: cards ? undefined : 1 }}>
-              <AccountIcon account={account} size={24} color={cards && !account.archived ? cardText : color} />
+              <AccountIcon account={account} size={24} color={colored ? cardText : color} />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: cards && !account.archived ? cardText : theme.text }}>{account.name}</ThemedText>
-                <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: cards && !account.archived ? cardText : theme.textSecondary }}>{account.archived ? 'Archived / PHP' : purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
+                <ThemedText type="smallBold" numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, color: colored ? cardText : theme.text }}>{account.name}</ThemedText>
+                <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: colored ? cardText : theme.textSecondary }}>{account.archived ? 'Archived / PHP' : purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP'}</ThemedText>
               </View>
             </View>
-            <View style={{ gap: 3, marginTop: cards ? 'auto' : 0 }}>
-              <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: cards && !account.archived ? cardText : theme.textSecondary }}>CURRENT BALANCE</ThemedText>
-              <ThemedText style={{ fontSize: cards ? 18 : 16, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: cards && !account.archived ? cardText : theme.text }}>{formatMoney(balance)}</ThemedText>
-              {balance < 0 ? <ThemedText type="small" accessibilityRole="alert" style={{ color: cards && !account.archived ? cardText : theme.text }}>Negative balance</ThemedText> : null}
+            <View style={{ gap: 3, marginTop: cards ? 'auto' : 0, flexShrink: 1, maxWidth: cards ? undefined : '48%', alignItems: cards ? 'flex-start' : 'flex-end' }}>
+              <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: colored ? cardText : theme.textSecondary }}>CURRENT BALANCE</ThemedText>
+              <ThemedText numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: cards ? 18 : 16, lineHeight: 24, fontWeight: '700', fontVariant: ['tabular-nums'], color: colored ? cardText : theme.text }}>{formatMoney(balance)}</ThemedText>
+              {balance < 0 ? <ThemedText type="small" accessibilityRole="alert" style={{ color: colored ? cardText : theme.text }}>Negative balance</ThemedText> : null}
             </View>
-            {cards ? <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: account.archived ? theme.textSecondary : cardText }}>{account.includedInAvailable ? 'Included in Available Money' : 'Excluded from Available Money'}</ThemedText> : <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />}
+            {cards ? <ThemedText type="small" style={{ fontSize: 10, lineHeight: 14, color: account.archived ? theme.textSecondary : cardText }}>{account.includedInAvailable ? 'Included in Available Money' : 'Excluded from Available Money'}</ThemedText> : <Ionicons name="chevron-forward" size={16} color={colored ? cardText : theme.textSecondary} />}
           </Pressable></MovingCard>;
         })}</View>
       </View>;
