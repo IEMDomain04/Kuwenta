@@ -1,11 +1,5 @@
-import { useAmountVisibility } from '@/hooks/amount-visibility';
-import { BudgetPeriodPicker } from '../components/budgets/budget-period-picker';
-import { budgetPeriodKey, budgetPeriodLabel, budgetPeriodRange, isBudgetPeriodKey, type BudgetPeriod } from '../domain/budget-periods';
-import { philippineDateTime } from '../domain/dates';
-import { BudgetList } from '../components/budgets/budget-list';
-import { FieldError } from '../components/shared/field-error';
-import { type ConfirmationOptions, useConfirmation } from '../components/shared/confirmation';
 import { ThemedText } from "@/components/themed-text";
+import { useAmountVisibility } from "@/hooks/amount-visibility";
 import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useLocalSearchParams } from "expo-router";
@@ -19,10 +13,18 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { OVERALL_BUDGET, mergeBudgetOrder, BUDGET_CATEGORIES, budgetGroups, budgetReport, validateBudget } from "../domain/budgets";
-import { calculateCurrentMoney } from "../domain/calculations";
+import { BudgetList } from "../components/budgets/budget-list";
+import { BudgetPeriodPicker } from "../components/budgets/budget-period-picker";
 import { BudgetUsage } from "../components/budgets/budget-usage";
-import { CategoryIcon, categoryVisual } from "../components/shared/category-visual";
+import {
+  CategoryIcon,
+  categoryVisual,
+} from "../components/shared/category-visual";
+import {
+  useConfirmation,
+  type ConfirmationOptions,
+} from "../components/shared/confirmation";
+import { FieldError } from "../components/shared/field-error";
 import { MoneyField } from "../components/shared/money-field";
 import { SelectionSheet } from "../components/shared/selection-sheet";
 import {
@@ -31,28 +33,79 @@ import {
   FinanceScreen,
   IconButton,
 } from "../components/shared/ui";
+import {
+  budgetPeriodKey,
+  budgetPeriodLabel,
+  budgetPeriodRange,
+  isBudgetPeriodKey,
+  type BudgetPeriod,
+} from "../domain/budget-periods";
+import {
+  BUDGET_CATEGORIES,
+  OVERALL_BUDGET,
+  budgetGroups,
+  budgetReport,
+  mergeBudgetOrder,
+  validateBudget,
+} from "../domain/budgets";
+import { calculateCurrentMoney } from "../domain/calculations";
+import { philippineDateTime } from "../domain/dates";
 import { formatEditableMoney } from "../domain/inputs";
 import { formatMoney, moneyInput, parseMoney } from "../domain/money";
+import { type Budget } from "../domain/types";
 import { useFinance } from "../provider";
-import { CATEGORIES, type Budget } from "../domain/types";
 
 export default function BudgetsScreen() {
-  const params = useLocalSearchParams<{ add?: string; category?: string; scope?: string; history?: string }>();
+  const params = useLocalSearchParams<{
+    add?: string;
+    category?: string;
+    scope?: string;
+    history?: string;
+  }>();
   const finance = useFinance();
   const theme = useTheme();
   const { formatAmount } = useAmountVisibility();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const confirmation = useConfirmation();
   const { budgets, transactions, busy } = finance;
-  const initialScope = typeof params.scope === 'string' && isBudgetPeriodKey(params.scope) ? params.scope : undefined;
-  const [period, setPeriod] = useState<BudgetPeriod | 'all'>(() => initialScope ? budgetPeriodRange(initialScope).period : 'all');
-  useEffect(() => { if (initialScope) { const range = budgetPeriodRange(initialScope); setPeriod(range.period); if (range.period === 'monthly') finance.setMonth(initialScope); } }, [initialScope]);
+  const initialScope =
+    typeof params.scope === "string" && isBudgetPeriodKey(params.scope)
+      ? params.scope
+      : undefined;
+  const [period, setPeriod] = useState<BudgetPeriod | "all">(() =>
+    initialScope ? budgetPeriodRange(initialScope).period : "all",
+  );
+  useEffect(() => {
+    if (initialScope) {
+      const range = budgetPeriodRange(initialScope);
+      setPeriod(range.period);
+      if (range.period === "monthly") finance.setMonth(initialScope);
+    }
+  }, [initialScope]);
   const today = finance.currentDate ?? philippineDateTime().transactionDate;
-  const [showHistory, setShowHistory] = useState(params.history === '1' || Boolean(initialScope && budgetPeriodRange(initialScope).end < today));
-  const month = budgetPeriodKey(period === 'all' ? 'daily' : period, today);
-  const groups = useMemo(() => budgetGroups(budgets, transactions, period, today, showHistory), [budgets, transactions, period, today, showHistory]);
-  const report = useMemo(() => budgetReport(budgets, transactions, month), [budgets, transactions, month]);
-  const available = useMemo(() => calculateCurrentMoney(finance.accounts, transactions).availableMoney, [finance.accounts, transactions]);
+  const [showHistory, setShowHistory] = useState(
+    params.history === "1" ||
+      Boolean(initialScope && budgetPeriodRange(initialScope).end < today),
+  );
+  const month = budgetPeriodKey(period === "all" ? "daily" : period, today);
+  const groups = useMemo(() => {
+    const groups = budgetGroups(
+      budgets,
+      transactions,
+      period,
+      today,
+      showHistory,
+    );
+    return showHistory ? groups.filter((group) => group.end < today) : groups;
+  }, [budgets, transactions, period, today, showHistory]);
+  const report = useMemo(
+    () => budgetReport(budgets, transactions, month),
+    [budgets, transactions, month],
+  );
+  const available = useMemo(
+    () => calculateCurrentMoney(finance.accounts, transactions).availableMoney,
+    [finance.accounts, transactions],
+  );
   const [editor, setEditor] = useState<{
     category: string;
     amount: string;
@@ -80,23 +133,34 @@ export default function BudgetsScreen() {
   }, [locked]);
   useEffect(() => {
     const existing = budgets.find(
-      (row) => row.month === (initialScope ?? month) && row.category === params.category,
+      (row) =>
+        row.month === (initialScope ?? month) &&
+        row.category === params.category,
     );
     const unusedCategory = BUDGET_CATEGORIES.find(
       (category) => !report.rows.some((row) => row.category === category),
     );
-    setEditor((current) => current?.creating && !existing && unusedCategory ? { ...current, category: report.rows.some(row => row.category === current.category) ? unusedCategory : current.category } :
-      existing
+    setEditor((current) =>
+      current?.creating && !existing && unusedCategory
         ? {
-            month: existing.month,
-            original: existing,
-            category: existing.category,
-            amount: formatEditableMoney(moneyInput(existing.limitAmount))!,
-            creating: false,
+            ...current,
+            category: report.rows.some(
+              (row) => row.category === current.category,
+            )
+              ? unusedCategory
+              : current.category,
           }
-        : params.add === "1" && unusedCategory
-          ? { category: unusedCategory, amount: "", creating: true, month }
-          : null,
+        : existing
+          ? {
+              month: existing.month,
+              original: existing,
+              category: existing.category,
+              amount: formatEditableMoney(moneyInput(existing.limitAmount))!,
+              creating: false,
+            }
+          : params.add === "1" && unusedCategory
+            ? { category: unusedCategory, amount: "", creating: true, month }
+            : null,
     );
     setCategoryOpen(false);
     setFieldErrors({});
@@ -106,7 +170,17 @@ export default function BudgetsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.add, params.category, initialScope]);
   useEffect(() => {
-    setEditor(current => current?.creating ? { ...current, month: budgetPeriodKey(budgetPeriodRange(current.month).period, today) } : current);
+    setEditor((current) =>
+      current?.creating
+        ? {
+            ...current,
+            month: budgetPeriodKey(
+              budgetPeriodRange(current.month).period,
+              today,
+            ),
+          }
+        : current,
+    );
   }, [today]);
   async function perform(operation: () => Promise<void>) {
     setWorking(true);
@@ -168,7 +242,8 @@ export default function BudgetsScreen() {
       budgetReport(
         [
           ...budgets.filter(
-            (row) => row.month !== budget.month || row.category !== budget.category,
+            (row) =>
+              row.month !== budget.month || row.category !== budget.category,
           ),
           budget,
         ],
@@ -176,7 +251,9 @@ export default function BudgetsScreen() {
         budget.month,
       );
     } catch (cause) {
-      setFieldErrors({ amount: cause instanceof Error ? cause.message : "Invalid budget." });
+      setFieldErrors({
+        amount: cause instanceof Error ? cause.message : "Invalid budget.",
+      });
       setError(cause instanceof Error ? cause.message : "Invalid budget.");
       amountInput.current?.focus();
       return;
@@ -184,21 +261,48 @@ export default function BudgetsScreen() {
     const creating = editor.creating;
     const original = editor.original;
     const moved = original && original.month !== budget.month;
-    if (creating || original && !moved && original.limitAmount === budget.limitAmount) {
+    if (
+      creating ||
+      (original && !moved && original.limitAmount === budget.limitAmount)
+    ) {
       pending.current = true;
       void perform(() => finance.saveBudget(budget, creating, original));
     } else if (original) {
       confirm(
-        'Save budget changes?',
-        moved ? 'Moves this budget and its renewal to the selected period. Recorded expenses stay unchanged.' : 'Updates this limit. The latest active limit repeats next period; past spending stays unchanged.',
+        "Save budget changes?",
+        moved
+          ? "Moves this budget and its renewal to the selected period. Recorded expenses stay unchanged."
+          : "Updates this limit. The latest active limit repeats next period; past spending stays unchanged.",
         () => finance.saveBudget(budget, false, original),
         false,
-        { rows: [{ label: 'Category', value: budget.category }, { label: 'Period', value: budgetPeriodLabel(budget.month) }, { label: 'Limit', value: formatMoney(budget.limitAmount) }], change: moved ? { label: 'Budget period', before: budgetPeriodLabel(original.month), after: budgetPeriodLabel(budget.month) } : { label: 'Budget limit', before: formatMoney(original.limitAmount), after: formatMoney(budget.limitAmount) } },
+        {
+          rows: [
+            { label: "Category", value: budget.category },
+            { label: "Period", value: budgetPeriodLabel(budget.month) },
+            { label: "Limit", value: formatMoney(budget.limitAmount) },
+          ],
+          change: moved
+            ? {
+                label: "Budget period",
+                before: budgetPeriodLabel(original.month),
+                after: budgetPeriodLabel(budget.month),
+              }
+            : {
+                label: "Budget limit",
+                before: formatMoney(original.limitAmount),
+                after: formatMoney(budget.limitAmount),
+              },
+        },
       );
     }
   }
 
-  function renderBudget(row: ReturnType<typeof budgetReport>['rows'][number], totalRemaining: number, current: boolean, onHold?: (event: import('react-native').GestureResponderEvent) => void) {
+  function renderBudget(
+    row: ReturnType<typeof budgetReport>["rows"][number],
+    totalRemaining: number,
+    current: boolean,
+    onHold?: (event: import("react-native").GestureResponderEvent) => void,
+  ) {
     return (
       <View
         key={row.category}
@@ -223,9 +327,7 @@ export default function BudgetsScreen() {
                     month: row.month,
                     original: row,
                     category: row.category,
-                    amount: formatEditableMoney(
-                      moneyInput(row.limitAmount),
-                    )!,
+                    amount: formatEditableMoney(moneyInput(row.limitAmount))!,
                     creating: false,
                   });
                   setFieldErrors({});
@@ -241,7 +343,11 @@ export default function BudgetsScreen() {
   }
 
   const unused = BUDGET_CATEGORIES.filter(
-    (category) => !budgets.some((row) => row.month === (editor?.month ?? month) && row.category === category),
+    (category) =>
+      !budgets.some(
+        (row) =>
+          row.month === (editor?.month ?? month) && row.category === category,
+      ),
   );
   return (
     <KeyboardAvoidingView
@@ -249,29 +355,47 @@ export default function BudgetsScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <FinanceScreen
-        title="Budgets"
+        title={showHistory && !editor ? "Budget history" : "Budgets"}
         scrollEnabled={!dragging}
         tabScreen={false}
         headerLeading={<BackButton disabled={locked} />}
         headerAccessory={
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-
-            {editor?.original ? <IconButton
-              icon="trash-outline"
-              destructive
-              label={"Delete " + editor.original.category + " budget"}
-              disabled={locked}
-              onPress={() => {
-                const original = editor.original!;
-                confirm(
-                  "Delete budget?",
-                  "Remove " + original.category + " budget for " + budgetPeriodLabel(original.month) + "? Deleting the latest period also stops its renewal. Your expenses are kept.",
-                  () => finance.removeBudget(original.month, original.category),
-                  true,
-                  { rows: [{ label: 'Category', value: original.category }, { label: 'Period', value: budgetPeriodLabel(original.month) }, { label: 'Limit', value: formatMoney(original.limitAmount) }] },
-                );
-              }}
-            /> : null}
+            {editor?.original ? (
+              <IconButton
+                icon="trash-outline"
+                destructive
+                label={"Delete " + editor.original.category + " budget"}
+                disabled={locked}
+                onPress={() => {
+                  const original = editor.original!;
+                  confirm(
+                    "Delete budget?",
+                    "Remove " +
+                      original.category +
+                      " budget for " +
+                      budgetPeriodLabel(original.month) +
+                      "? Deleting the latest period also stops its renewal. Your expenses are kept.",
+                    () =>
+                      finance.removeBudget(original.month, original.category),
+                    true,
+                    {
+                      rows: [
+                        { label: "Category", value: original.category },
+                        {
+                          label: "Period",
+                          value: budgetPeriodLabel(original.month),
+                        },
+                        {
+                          label: "Limit",
+                          value: formatMoney(original.limitAmount),
+                        },
+                      ],
+                    },
+                  );
+                }}
+              />
+            ) : null}
             {!editor ? (
               <ActionButton
                 compact
@@ -280,6 +404,7 @@ export default function BudgetsScreen() {
                 label="Add"
                 disabled={locked || unused.length === 0}
                 onPress={() => {
+                  setShowHistory(false);
                   setEditor({
                     month,
                     category: unused[0],
@@ -288,30 +413,102 @@ export default function BudgetsScreen() {
                   });
                   setRejected(false);
                   setFieldErrors({});
-                setError("");
+                  setError("");
                 }}
               />
             ) : null}
           </View>
         }
       >
-        {!editor ? <ActionButton compact label={showHistory ? 'Hide budget history' : 'Budget history'} disabled={locked} onPress={() => setShowHistory(!showHistory)} /> : null}
-        {!editor ? <BudgetPeriodPicker period={period} date={today} disabled={locked} onPeriodChange={setPeriod} allowAll showDate={false} /> : null}
+        {!editor ? (
+          <BudgetPeriodPicker
+            period={period}
+            date={today}
+            disabled={locked}
+            onPeriodChange={setPeriod}
+            allowAll
+            showDate={false}
+          />
+        ) : null}
         {!editor ? (
           <>
-            {groups.map(group => <View key={group.scope} style={{ gap: 10 }}>
-              <ThemedText type="smallBold">{group.period === 'daily' ? 'Daily' : group.period === 'weekly' ? 'Weekly' : 'Monthly'} | {budgetPeriodLabel(group.scope)}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">{formatAmount(group.budgetedSpent, true)} spent of {formatAmount(group.totalLimit, true)} | {formatAmount(Math.abs(group.remaining), true)} {group.remaining < 0 ? 'over budget' : 'remaining'}</ThemedText>
-            {group.rows.filter(row => row.category === OVERALL_BUDGET).map(row => <View key={row.category}>{renderBudget(row, group.positiveRemaining, group.start <= today && group.end >= today)}</View>)}
-            {group.rows.some(row => row.category === OVERALL_BUDGET) && group.rows.some(row => row.category !== OVERALL_BUDGET) ? <ThemedText type="smallBold">Category limits</ThemedText> : null}
-            <BudgetList key={group.scope + JSON.stringify(group.rows.map(row => row.category))} rows={group.rows.filter(row => row.category !== OVERALL_BUDGET)} disabled={locked} onDraggingChange={setDragging} onReorder={categories => finance.saveBudgetOrder(group.scope, mergeBudgetOrder(group.rows.map(row => row.category), categories))} renderRow={(row, onHold) => renderBudget(row, group.positiveRemaining, group.start <= today && group.end >= today, onHold)} />
-            </View>)}
+            {groups.map((group) => (
+              <View key={group.scope} style={{ gap: 10 }}>
+                <ThemedText type="smallBold">
+                  {group.period === "daily"
+                    ? "Daily"
+                    : group.period === "weekly"
+                      ? "Weekly"
+                      : "Monthly"}{" "}
+                  | {budgetPeriodLabel(group.scope)}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {formatAmount(group.budgetedSpent, true)} spent of{" "}
+                  {formatAmount(group.totalLimit, true)} |{" "}
+                  {formatAmount(Math.abs(group.remaining), true)}{" "}
+                  {group.remaining < 0 ? "over budget" : "remaining"}
+                </ThemedText>
+                {group.rows
+                  .filter((row) => row.category === OVERALL_BUDGET)
+                  .map((row) => (
+                    <View key={row.category}>
+                      {renderBudget(
+                        row,
+                        group.positiveRemaining,
+                        group.start <= today && group.end >= today,
+                      )}
+                    </View>
+                  ))}
+                {group.rows.some((row) => row.category === OVERALL_BUDGET) &&
+                group.rows.some((row) => row.category !== OVERALL_BUDGET) ? (
+                  <ThemedText type="smallBold">Category limits</ThemedText>
+                ) : null}
+                <BudgetList
+                  key={
+                    group.scope +
+                    JSON.stringify(group.rows.map((row) => row.category))
+                  }
+                  rows={group.rows.filter(
+                    (row) => row.category !== OVERALL_BUDGET,
+                  )}
+                  disabled={locked}
+                  onDraggingChange={setDragging}
+                  onReorder={(categories) =>
+                    finance.saveBudgetOrder(
+                      group.scope,
+                      mergeBudgetOrder(
+                        group.rows.map((row) => row.category),
+                        categories,
+                      ),
+                    )
+                  }
+                  renderRow={(row, onHold) =>
+                    renderBudget(
+                      row,
+                      group.positiveRemaining,
+                      group.start <= today && group.end >= today,
+                      onHold,
+                    )
+                  }
+                />
+              </View>
+            ))}
             {groups.length === 0 ? (
               <ThemedText type="small" themeColor="textSecondary">
-                No budgets yet. Tap Add to set a spending limit.
+                {showHistory
+                  ? "No past budgets for this period."
+                  : "No current budgets. Tap Add to set a spending limit."}
               </ThemedText>
             ) : null}
           </>
+        ) : null}
+        {!editor ? (
+          <ActionButton
+            compact
+            label={showHistory ? "Current budgets" : "Budget history"}
+            disabled={locked}
+            onPress={() => setShowHistory(!showHistory)}
+          />
         ) : null}
         {editor && (
           <View
@@ -326,7 +523,16 @@ export default function BudgetsScreen() {
               {editor.creating ? "Add budget" : "Edit budget"} -{" "}
               {budgetPeriodLabel(editor.month)}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">{budgetPeriodRange(editor.month).end < today ? 'Past period. Editing it does not change newer limits.' : (budgetPeriodRange(editor.month).period === 'daily' ? 'Renews every day.' : budgetPeriodRange(editor.month).period === 'weekly' ? 'Renews every Monday.' : 'Renews on the first day of each month.') + ' Unused allowance does not carry over.'}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {budgetPeriodRange(editor.month).end < today
+                ? "Past period. Editing it does not change newer limits."
+                : (budgetPeriodRange(editor.month).period === "daily"
+                    ? "Renews every day."
+                    : budgetPeriodRange(editor.month).period === "weekly"
+                      ? "Renews every Monday."
+                      : "Renews on the first day of each month.") +
+                  " Unused allowance does not carry over."}
+            </ThemedText>
             <ThemedText type="small">Spending covered</ThemedText>
             <Pressable
               accessibilityRole="button"
@@ -376,7 +582,9 @@ export default function BudgetsScreen() {
                 setError("");
               }}
               onRejected={() => {
-                setFieldErrors({ amount: "Use digits and up to two decimal places." });
+                setFieldErrors({
+                  amount: "Use digits and up to two decimal places.",
+                });
                 setRejected(true);
                 setError("Use digits and up to two decimal places.");
               }}
@@ -390,8 +598,23 @@ export default function BudgetsScreen() {
               }}
             />
             <ThemedText type="small">Budget period</ThemedText>
-            <BudgetPeriodPicker period={budgetPeriodRange(editor.month).period} date={budgetPeriodRange(editor.month).start} disabled={locked}
-              onPeriodChange={value => { if (value === 'all') return; setEditor({ ...editor, month: editor.original && budgetPeriodRange(editor.original.month).period === value ? editor.original.month : budgetPeriodKey(value, today) }); setFieldErrors({}); }} />
+            <BudgetPeriodPicker
+              period={budgetPeriodRange(editor.month).period}
+              date={budgetPeriodRange(editor.month).start}
+              disabled={locked}
+              onPeriodChange={(value) => {
+                if (value === "all") return;
+                setEditor({
+                  ...editor,
+                  month:
+                    editor.original &&
+                    budgetPeriodRange(editor.original.month).period === value
+                      ? editor.original.month
+                      : budgetPeriodKey(value, today),
+                });
+                setFieldErrors({});
+              }}
+            />
             <ActionButton
               primary
               label={working ? "Saving..." : "Save"}
@@ -405,7 +628,7 @@ export default function BudgetsScreen() {
                 if (!pending.current) {
                   setEditor(null);
                   setFieldErrors({});
-                setError("");
+                  setError("");
                 }
               }}
             />
@@ -441,7 +664,8 @@ export default function BudgetsScreen() {
               }}
             >
               <ThemedText type="smallBold" style={{ flex: 1 }}>
-                Spending without a budget ({report.unbudgeted.length}) | {budgetPeriodLabel(month)}
+                Spending without a budget ({report.unbudgeted.length}) |{" "}
+                {budgetPeriodLabel(month)}
               </ThemedText>
               <Ionicons
                 name={unbudgetedOpen ? "chevron-up" : "chevron-down"}
