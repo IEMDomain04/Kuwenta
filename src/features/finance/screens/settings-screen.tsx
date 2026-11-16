@@ -1,4 +1,3 @@
-import { initialTrackerSetup } from '../storage/tracker-setup';
 import { router, useLocalSearchParams } from 'expo-router';
 import { HOME_VISUALIZATIONS, type HomeVisualization } from '../reporting/home-visualizations';
 import { useConfirmation } from '../components/shared/confirmation';
@@ -16,14 +15,13 @@ import { useFinance } from '../provider';
 
 export default function SettingsScreen() {
   const params = useLocalSearchParams<{ section?: string }>();
-  const { trackerSetup, saveTrackerSetup, busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup, homeVisualizations, saveHomeVisualizations } = useFinance();
+  const { busy, resetData, displayName, saveDisplayName, refresh, showNotice, restoreBackup, homeVisualizations, saveHomeVisualizations } = useFinance();
   const theme = useTheme();
   const confirmation = useConfirmation();
   const { mode, setMode } = useAppearance();
   function setAppearanceError(message: string) { if (message) showNotice(message, true); }
   const [visualizationsOpen, setVisualizationsOpen] = useState(params.section === 'visuals');
   useEffect(() => { if (params.section === 'visuals') setVisualizationsOpen(true); }, [params.section]);
-  const setupPending = useRef(false);
   const visualizationPending = useRef(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearanceOptions = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Use device setting']] as const;
@@ -47,15 +45,6 @@ export default function SettingsScreen() {
     try { await saveHomeVisualizations(selected); }
     catch (cause) { showNotice(cause instanceof Error ? cause.message : 'Could not save Home visualizations.', true); }
     finally { visualizationPending.current = false; }
-  }
-  async function openTrackerSetup() {
-    if (busy || setupPending.current) return;
-    setupPending.current = true;
-    try {
-      await saveTrackerSetup({ ...(trackerSetup ?? initialTrackerSetup()), dismissed: false });
-      router.push({ pathname: '/', params: { setup: '1' } });
-    } catch { /* The provider reports save failures. */ }
-    finally { setupPending.current = false; }
   }
   const section = { padding: 14, borderRadius: 18, backgroundColor: theme.backgroundElement, gap: 8 };
   const pending = useRef(false);
@@ -95,7 +84,6 @@ export default function SettingsScreen() {
       </Pressable>)}
     </View> : null}
 
-    <ActionButton compact label="Tracker setup" disabled={busy} onPress={() => { void openTrackerSetup(); }} />
     <ThemedText type="smallBold">Home visualizations</ThemedText>
     <Pressable accessibilityRole="button" accessibilityLabel="Home visualizations" accessibilityState={{ expanded: visualizationsOpen }} onPress={() => { router.setParams({ section: undefined }); setVisualizationsOpen(value => !value); }}
       style={{ minHeight: 48, paddingHorizontal: 12, borderRadius: 12, backgroundColor: theme.background, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -112,7 +100,6 @@ export default function SettingsScreen() {
           <ThemedText type="small" style={{ flex: 1 }}>{option.label}</ThemedText>
         </Pressable>;
       })}
-      {trackerSetup && !trackerSetup.completed.includes('visuals') ? <ActionButton compact primary label="Use these visuals" disabled={busy} onPress={() => { void saveVisualizations(homeVisualizations); }} /> : null}
       <ActionButton compact label="Select none" disabled={busy || homeVisualizations.length === 0} onPress={() => { void saveVisualizations([]); }} />
     </View> : null}
 

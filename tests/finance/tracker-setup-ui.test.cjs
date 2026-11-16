@@ -96,34 +96,18 @@ test('Home checklist guides the next action, permits optional skips, and hides a
   assert.equal(existing.render().tree,null);
 });
 
-test('Settings accepts the current visuals or none and explicitly reopens tracker setup',async()=>{
-  for(const selection of [['activity','summary'],[]]){
-    const h=harness('screens/settings-screen.tsx',{homeVisualizations:selection},{section:'visuals'});
-    assert.ok(h.render().button('Use these visuals'));
-    h.render().button('Use these visuals').props.onPress();await settle();
-    assert.equal(JSON.stringify(h.saved[0]),JSON.stringify(selection));
-    assert.ok(h.finance.trackerSetup.completed.includes('visuals'));
-  }
-  const h=harness('screens/settings-screen.tsx',{trackerSetup:null});
-  h.render().button('Tracker setup').props.onPress();await settle();
-  assert.equal(h.finance.trackerSetup.dismissed,false);
-  assert.equal(h.navigation[0].pathname,'/');assert.equal(h.navigation[0].params.setup,'1');
-});
-
-
-test('Home mounts the setup checklist below the mascot, and supports reopening from Settings',()=>{
-  const params={setup:'1'};
-  const h=harness('screens/home-screen.tsx',{},params);
+test('Settings keeps visualization selection without checklist actions',async()=>{
+  const h=harness('screens/settings-screen.tsx',{homeVisualizations:['activity','summary']},{section:'visuals'});
   const view=h.render();
-  const checklist=view.nodes.find(node=>node.type==='TrackerSetupChecklist');
-  assert.ok(checklist,'the checklist must be rendered on Home');
-  assert.equal(checklist.props.forceVisible,true);
-  assert.ok(view.nodes.indexOf(checklist)>view.nodes.findIndex(node=>node.type==='Gradient'));
-  checklist.props.onClose();
-  assert.equal(params.setup,undefined);
-  assert.equal(h.render().nodes.find(node=>node.type==='TrackerSetupChecklist').props.forceVisible,false);
+  assert.ok(!view.nodes.some(node=>node.props?.label==='Tracker setup' || node.props?.label==='Use these visuals'));
+  view.button('Select none').props.onPress();await settle();
+  assert.equal(JSON.stringify(h.saved[0]),'[]');
 });
 
+test('Home does not show the tracker checklist',()=>{
+  const h=harness('screens/home-screen.tsx',{}, {setup:'1'});
+  assert.ok(!h.render().nodes.some(node=>node.type==='TrackerSetupChecklist'));
+});
 
 test('onboarding distinguishes an explicitly entered zero or amount from a cleared balance',async()=>{
   for(const [value,cents,confirmed] of [['0',0,true],['125.50',12550,true],['',0,false]]){
