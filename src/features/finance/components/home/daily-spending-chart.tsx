@@ -4,6 +4,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useState } from "react";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { Pressable, ScrollView, View } from "react-native";
+import Svg, { Line } from "react-native-svg";
 import { readableTransactionDate } from "../../domain/dates";
 import type { dashboardSpending } from "../../reporting/dashboard";
 
@@ -43,6 +44,7 @@ export function DailySpendingChart({
     : 0;
   const maximum = Math.max(0, ...days.filter(day => day.date <= today).map(day => day.expenses));
   const selected = days.find(day => day.date === selectedDate && day.date <= today);
+  const chartWidth = monthly ? contentWidth : Math.max(plotWidth, days.length * 32 + Math.max(0, days.length - 1) * BAR_GAP);
 
   return (
     <View testID="daily-spending-chart" style={{ padding: 14, gap: 10, borderRadius: 20, backgroundColor: theme.backgroundElement }}>
@@ -57,50 +59,62 @@ export function DailySpendingChart({
           <ThemedText type="small" themeColor="textSecondary" style={{ flexShrink: 1, textAlign: "right", fontSize: 11 }}>{label}</ThemedText>
         )}
       </View>
-      {monthly ? <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11 }}>{label}</ThemedText> : null}
-      <ScrollView
-        key={periodKey}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        onLayout={event => setPlotWidth(event.nativeEvent.layout.width)}
-        onScroll={monthly ? event => setScroll({ key: periodKey, offset: event.nativeEvent.contentOffset.x }) : undefined}
-        scrollEventThrottle={32}
-        contentContainerStyle={{ flexGrow: 1, gap: BAR_GAP }}
-      >
-        {days.map(day => {
-          const future = day.date > today;
-          const active = selected?.date === day.date;
-          return (
-            <Pressable
-              key={day.date}
-              accessibilityRole="button"
-              accessibilityLabel={readableTransactionDate(day.date) + (day.isToday ? ", Today" : "") + ", " + (future ? "Upcoming" : formatAmount(day.expenses) + " spent")}
-              accessibilityState={{ selected: active, disabled: future }}
-              disabled={future}
-              onPress={() => onSelectDate(day.date)}
-              style={{ flex: monthly ? undefined : 1, width: monthly ? barWidth : undefined, minWidth: 32, gap: 5, alignItems: "center", opacity: future ? 0.4 : 1 }}
-            >
-              <View style={{ height: BAR_HEIGHT, width: "100%", justifyContent: "flex-end", alignItems: "center" }}>
-                <View
-                  testID={"daily-spending-bar-" + day.date}
-                  style={{
-                    width: "70%",
-                    height: !future && day.expenses > 0 ? day.expenses / Math.max(1, maximum) * BAR_HEIGHT : 2,
-                    borderRadius: 4,
-                    backgroundColor: active ? theme.text : (!future && day.expenses > 0 ? theme.accent : theme.border),
-                  }}
-                />
-              </View>
-              <ThemedText type="small" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 10, lineHeight: 16, color: day.isToday ? theme.accent : theme.textSecondary }}>
-                {monthly ? Number(day.date.slice(8)) : WEEKDAYS[new Date(day.date + "T12:00:00Z").getUTCDay()]}
-              </ThemedText>
-              <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: day.isToday ? theme.accent : "transparent" }} />
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {days.length ? <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11 }}>{readableTransactionDate(days[0].date)} to {readableTransactionDate(days[days.length - 1].date)}</ThemedText> : null}
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        <View testID="daily-spending-scale" style={{ height: BAR_HEIGHT, width: 66, justifyContent: "space-between" }}>
+          {[maximum, Math.round(maximum / 2), 0].map((amount, index) => <ThemedText key={index} type="small" numberOfLines={1} adjustsFontSizeToFit themeColor="textSecondary" style={{ fontSize: 10, lineHeight: 14 }}>{formatAmount(amount, true)}</ThemedText>)}
+        </View>
+        <ScrollView
+          key={periodKey}
+          horizontal
+          style={{ flex: 1 }}
+          showsHorizontalScrollIndicator={false}
+          onLayout={event => setPlotWidth(event.nativeEvent.layout.width)}
+          onScroll={monthly ? event => setScroll({ key: periodKey, offset: event.nativeEvent.contentOffset.x }) : undefined}
+          scrollEventThrottle={32}
+          contentContainerStyle={{ flexGrow: 1, gap: BAR_GAP }}
+        >
+          {plotWidth > 0 ? (
+            <Svg testID="daily-spending-guides" pointerEvents="none" accessible={false} width={chartWidth} height={BAR_HEIGHT}
+              style={{ position: "absolute", left: 0, top: 0 }}>
+              {[1, BAR_HEIGHT / 2, BAR_HEIGHT - 1].map(y => <Line key={y} x1={0} y1={y} x2={chartWidth} y2={y} stroke={theme.textSecondary} strokeOpacity={0.35} strokeWidth={1} strokeDasharray="4 4" />)}
+            </Svg>
+          ) : null}
+          {days.map(day => {
+            const future = day.date > today;
+            const active = selected?.date === day.date;
+            return (
+              <Pressable
+                key={day.date}
+                accessibilityRole="button"
+                accessibilityLabel={readableTransactionDate(day.date) + (day.isToday ? ", Today" : "") + ", " + (future ? "Upcoming" : formatAmount(day.expenses) + " spent")}
+                accessibilityState={{ selected: active, disabled: future }}
+                disabled={future}
+                onPress={() => onSelectDate(day.date)}
+                style={{ flex: monthly ? undefined : 1, width: monthly ? barWidth : undefined, minWidth: 32, gap: 5, alignItems: "center", opacity: future ? 0.4 : 1 }}
+              >
+                <View style={{ height: BAR_HEIGHT, width: "100%", justifyContent: "flex-end", alignItems: "center" }}>
+                  <View
+                    testID={"daily-spending-bar-" + day.date}
+                    style={{
+                      width: "70%",
+                      height: !future && day.expenses > 0 ? day.expenses / Math.max(1, maximum) * BAR_HEIGHT : 2,
+                      borderRadius: 0,
+                      backgroundColor: active ? theme.text : (!future && day.expenses > 0 ? theme.accent : theme.border),
+                    }}
+                  />
+                </View>
+                <ThemedText type="small" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 10, lineHeight: 16, color: day.isToday ? theme.accent : theme.textSecondary }}>
+                  {monthly ? Number(day.date.slice(8)) : WEEKDAYS[new Date(day.date + "T12:00:00Z").getUTCDay()]}
+                </ThemedText>
+                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: day.isToday ? theme.accent : "transparent" }} />
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
       {monthly ? (
-        <View testID="daily-spending-scroll-track" accessible={false} pointerEvents="none" style={{ height: 3, borderRadius: 2, backgroundColor: theme.backgroundSelected, overflow: "hidden" }}>
+        <View testID="daily-spending-scroll-track" accessible={false} pointerEvents="none" style={{ marginLeft: 72, height: 3, borderRadius: 2, backgroundColor: theme.backgroundSelected, overflow: "hidden" }}>
           <View testID="daily-spending-scroll-thumb" style={{ height: 3, width: thumbWidth, borderRadius: 2, backgroundColor: theme.accent, transform: [{ translateX: progress * (plotWidth - thumbWidth) }] }} />
         </View>
       ) : null}

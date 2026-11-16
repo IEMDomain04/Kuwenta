@@ -13,6 +13,7 @@ function render(visible, transactions = [], now = new Date('2026-11-03T04:00:00Z
     if(name==='react')return{useState:initial=>{const index=cursor++;if(!(index in hooks))hooks[index]=initial;return[hooks[index],value=>hooks[index]=typeof value==='function'?value(hooks[index]):value];},useMemo:factory=>factory()};
     if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
     if(name==='react-native')return{View:'View',Pressable:'Button',Modal:'Modal',ScrollView:'ScrollView',useWindowDimensions:()=>({fontScale:options.fontScale??1,width:options.width??390,height:800})};
+    if(name==='react-native-svg')return{__esModule:true,default:'Svg',Line:'Line'};
     if(name==='react-native-safe-area-context')return{SafeAreaView:'SafeAreaView'};
     if(name==='expo-router')return{router:{push:value=>navigation.push(value)}};
     if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
@@ -184,7 +185,18 @@ test('daily spending bars compare actual expenses, toggle details, and leave fut
   const bars = () => h.nodes.filter(node => node.props.testID?.startsWith('daily-spending-bar-'));
   const buttons = () => h.nodes.filter(node => node.type==='Button' && node.props.accessibilityState?.selected !== undefined);
   const detail = () => h.nodes.find(node => node.props.accessibilityLiveRegion==='polite');
+  const scale = h.nodes.find(node=>node.props.testID==='daily-spending-scale');
+  assert.ok(scale);
+  assert.ok(JSON.stringify(scale.props.children).includes('200'));
+  assert.ok(h.nodes.some(node=>JSON.stringify(node.props.children).includes('November 2, 2026')));
   assert.equal(bars().length, 7);
+  h.nodes.find(node=>node.type==='ScrollView').props.onLayout({nativeEvent:{layout:{width:330}}}); h=h.rerender();
+  const guides=h.nodes.find(node=>node.props.testID==='daily-spending-guides');
+  assert.ok(guides);
+  assert.equal(guides.props.pointerEvents,'none');
+  const lines=h.nodes.filter(node=>node.type==='Line');
+  assert.equal(lines.length,3);
+  assert.ok(lines.every(line=>line.props.y1===line.props.y2));
   assert.equal(bars()[0].props.style.height, 64);
   assert.equal(bars()[1].props.style.height, 128);
   assert.ok(bars().slice(2).every(node => node.props.style.height===2));

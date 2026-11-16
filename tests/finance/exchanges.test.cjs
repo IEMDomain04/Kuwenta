@@ -47,3 +47,13 @@ test('old service pairs normalize without changing balances, and transaction gro
   assert.equal(resolveTransactionId(updated,'missing'),'missing');
  }
 });
+
+test('exchange summaries clearly label earnings fees and losses while equal exchanges show the amount',()=>{
+ const {exchangeSummary}=require('../../.expo/finance-tests/domain/exchanges.js');
+ const {formatMoney}=require('../../.expo/finance-tests/domain/money.js');
+ const exchange={kind:'Service sale',paid:9500,received:10000};
+ assert.equal(exchangeSummary(exchange),'Earnings: '+formatMoney(500,true));
+ assert.equal(exchangeSummary({...exchange,received:9000}),'Loss: '+formatMoney(500,true));
+ assert.equal(exchangeSummary({...exchange,kind:'E-bank Cash-in',received:9000}),'Fee: '+formatMoney(500,true));
+ assert.equal(exchangeSummary({...exchange,received:9500}),formatMoney(9500,true));
+});

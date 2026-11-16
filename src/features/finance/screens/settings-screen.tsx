@@ -93,11 +93,11 @@ export default function SettingsScreen() {
     {visualizationsOpen ? <View style={{ borderRadius: 12, padding: 4, backgroundColor: theme.background }}>
       {HOME_VISUALIZATIONS.map(option => {
         const checked = homeVisualizations.includes(option.id);
-        return <Pressable key={option.id} accessibilityRole="checkbox" accessibilityLabel={option.label} accessibilityState={{ checked, disabled: busy }} disabled={busy}
+        return <Pressable key={option.id} accessibilityRole="checkbox" accessibilityLabel={option.label} accessibilityHint={option.description} accessibilityState={{ checked, disabled: busy }} disabled={busy}
           onPress={() => { void saveVisualizations(checked ? homeVisualizations.filter(value => value !== option.id) : [...homeVisualizations, option.id]); }}
           style={{ minHeight: 48, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10, opacity: busy ? 0.5 : 1 }}>
           <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={20} color={checked ? theme.accent : theme.textSecondary} />
-          <ThemedText type="small" style={{ flex: 1 }}>{option.label}</ThemedText>
+          <View style={{ flex: 1, gap: 2, paddingVertical: 8 }}><ThemedText type="smallBold">{option.label}</ThemedText><ThemedText type="small" themeColor="textSecondary">{option.description}</ThemedText></View>
         </Pressable>;
       })}
       <ActionButton compact label="Select none" disabled={busy || homeVisualizations.length === 0} onPress={() => { void saveVisualizations([]); }} />

@@ -204,7 +204,7 @@ export default function HomeScreen() {
             ellipsizeMode="tail"
             style={styles.message}
           >
-            {conceal(insightMessage)}
+            {conceal(insightMessage.split('\n')[0])}
           </ThemedText>
         </Pressable>
       </LinearGradient>
@@ -456,16 +456,14 @@ export default function HomeScreen() {
                   </ThemedText>
                 </View>
                 <ThemedText
+                  testID={transaction.exchange ? "recent-exchange-summary" : undefined}
                   type="smallBold"
                   style={{
-                    color:
-                      transaction.exchange ? transaction.exchange.received > transaction.exchange.paid ? theme.income : transaction.exchange.received < transaction.exchange.paid ? theme.expense : theme.text : transaction.type === "INCOME" ? theme.income : theme.text,
-                    fontVariant: ["tabular-nums"],
-                    flexShrink: 1,
+                    color: transaction.exchange ? transaction.exchange.received > transaction.exchange.paid ? theme.income : transaction.exchange.received < transaction.exchange.paid ? theme.expense : theme.text : transaction.type === "INCOME" ? theme.income : theme.text,
+                    fontVariant: ["tabular-nums"], textAlign: "right", maxWidth: "45%", flexShrink: transaction.exchange ? 0 : 1,
                   }}
                 >
-                  {transaction.exchange || transfer ? "" : increase ? "+" : "−"}
-                  {transaction.exchange ? conceal(exchangeSummary(transaction.exchange)) : formatMoney(transaction.amount)}
+                  {transaction.exchange ? conceal(exchangeSummary(transaction.exchange)) : <>{transfer ? "" : increase ? "+" : "\u2212"}{formatMoney(transaction.amount)}</>}
                 </ThemedText>
               </Pressable>
             );

@@ -7,11 +7,13 @@ const money = require('../../.expo/finance-tests/domain/money.js');
 const cash = { id: 'cash', name: 'Cash', currency: 'PHP', openingBalance: 100000, purpose: 'spending', includedInAvailable: true, archived: false };
 function render(accounts, transactions = [], dark = false, hidden = false) {
   const jsx = (type, props) => ({ type, props });
+  const navigation = [];
   const sandbox = { exports: {}, require(name) {
     if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden,formatAmount:(amount,trim)=>hidden?String.fromCodePoint(8226).repeat(4):money.formatMoney(amount,trim),conceal:text=>text})};
     if (name === 'react') return { useMemo: factory => factory() };
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
-    if (name === 'react-native') return { View: 'View' };
+    if (name === 'react-native') return { View: 'View', Pressable: 'Button' };
+    if (name === 'expo-router') return { router: { push: value => navigation.push(value) } };
     if (name === '@/components/themed-text') return { ThemedText: 'Text' };
     if (name === '@/hooks/use-color-scheme') return { useColorScheme: () => dark ? 'dark' : 'light' };
     if (name === '../../domain/account-colors') return require('../../.expo/finance-tests/domain/account-colors.js');
@@ -27,6 +29,7 @@ function render(accounts, transactions = [], dark = false, hidden = false) {
   const nodes = [];
   function walk(node) { if (Array.isArray(node)) return node.forEach(walk); if (!node?.props) return; nodes.push(node); walk(node.props.children); }
   walk(sandbox.exports.AccountBalances());
+  nodes.navigation = navigation;
   return nodes;
 }
 test('balance visualization includes savings, negative and archived accounts with matching totals', () => {
@@ -75,3 +78,12 @@ test('hidden balances conceal amounts in summaries and accessibility labels', ()
     assert.ok(!text.includes(String.fromCodePoint(8369)));
   }
 });
+
+ test('balance rows open the selected account without exposing hidden amounts',()=>{
+   const nodes=render([cash],[],false,true);
+   const row=nodes.find(node=>node.props.accessibilityLabel==='View Cash account');
+   row.props.onPress();
+   assert.equal(nodes.navigation[0].pathname,'/account');
+   assert.equal(nodes.navigation[0].params.id,'cash');
+   assert.ok(!JSON.stringify(nodes.map(node=>node.props.accessibilityLabel)).includes('1,000'));
+ });

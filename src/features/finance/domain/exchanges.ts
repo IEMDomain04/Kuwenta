@@ -82,5 +82,5 @@ export function resolveTransactionId(rows: readonly Transaction[], requested: st
 
 export function exchangeSummary(exchange: Exchange): string {
   const difference = exchange.received - exchange.paid;
-  return difference === 0 ? formatMoney(exchange.paid, true) : formatMoney(Math.abs(difference), true) + (difference > 0 ? ' earnings' : exchange.kind === 'Service sale' ? ' loss' : ' fee');
+  return difference === 0 ? formatMoney(exchange.paid, true) : (difference > 0 ? 'Earnings: ' : exchange.kind === 'Service sale' ? 'Loss: ' : 'Fee: ') + formatMoney(Math.abs(difference), true);
 }

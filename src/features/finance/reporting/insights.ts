@@ -77,10 +77,15 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
     const current = recorded.filter(row => row.type === 'EXPENSE' && row.transactionDate.slice(0, 7) === month && Number(row.transactionDate.slice(8)) <= elapsed);
     const prior = recorded.filter(row => row.type === 'EXPENSE' && row.transactionDate.slice(0, 7) === previous && Number(row.transactionDate.slice(8)) <= elapsed);
     if (current.length && prior.length) {
-      const difference = calculateFinanceSummary(accounts, current, month).monthlyExpenses - calculateFinanceSummary(accounts, prior, previous).monthlyExpenses;
+      const currentSpent = calculateFinanceSummary(accounts, current, month).monthlyExpenses;
+      const previousSpent = calculateFinanceSummary(accounts, prior, previous).monthlyExpenses;
+      const difference = currentSpent - previousSpent;
       if (difference !== 0) {
         const range = (key: string) => readableReportingMonth(key).replace(' ' + key.slice(0, 4), ' 1-' + elapsed + ', ' + key.slice(0, 4));
-        const message = 'You spent ' + money(Math.abs(difference)) + (difference > 0 ? ' more' : ' less') + ' during ' + range(month) + ' than during ' + range(previous) + '.';
+        const comparison = elapsed === Number(date.slice(8)) ? 'so far this month than by the same date last month.' : 'over the first ' + elapsed + ' days of this month than over the same days last month.';
+        const message = 'You spent ' + money(Math.abs(difference)) + (difference > 0 ? ' more ' : ' less ') + comparison
+          + '\n' + range(month) + ': ' + money(currentSpent)
+          + ' | ' + range(previous) + ': ' + money(previousSpent);
         (difference > 0 ? observations : progress).push(message);
       }
     }
@@ -115,8 +120,8 @@ export function moneyInsights(accounts: readonly Account[], transactions: readon
 export function moneyInsightReaction(message: string): 'friendly' | 'thinking' | 'celebrating' | 'encouraging' | 'concerned' {
   if (/shows -|more than your .* (?:budget|limit)|Your budgets have .*remaining, but/i.test(message)) return 'concerned';
   if (/goal reached its .* target\.$/i.test(message)) return 'celebrating';
-  if (/goal has|moved into savings this month|You spent .* less during/i.test(message)) return 'encouraging';
-  if (/You've spent|You've used|moved out|You spent .* more during|insights are unavailable/i.test(message)) return 'thinking';
+  if (/goal has|moved into savings this month|You spent .* less (?:during|so far|over the first)/i.test(message)) return 'encouraging';
+  if (/You've spent|You've used|moved out|You spent .* more (?:during|so far|over the first)|insights are unavailable/i.test(message)) return 'thinking';
   return 'friendly';
 }
 

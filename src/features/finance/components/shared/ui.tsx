@@ -60,7 +60,7 @@ export function TransactionRow({ transaction, accountName, destinationName, disa
           {transaction.exchange ? <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{formatMoney(transaction.exchange.paid, true)} paid / {formatMoney(transaction.exchange.received, true)} received</ThemedText> : null}
           <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>{showDate ? formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime) : formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime).split(' · ')[1]}</ThemedText>
         </View>
-        <ThemedText type="smallBold" style={{ color: transaction.exchange ? transaction.exchange.received > transaction.exchange.paid ? theme.income : transaction.exchange.received < transaction.exchange.paid ? theme.expense : theme.text : income ? theme.income : theme.text, fontVariant: ['tabular-nums'], flexShrink: 1, fontSize: 14, lineHeight: 20 }}>
+        <ThemedText type="smallBold" style={{ color: transaction.exchange ? transaction.exchange.received > transaction.exchange.paid ? theme.income : transaction.exchange.received < transaction.exchange.paid ? theme.expense : theme.text : income ? theme.income : theme.text, fontVariant: ['tabular-nums'], flexShrink: transaction.exchange ? 0 : 1, fontSize: 14, lineHeight: 20 }}>
           {transaction.exchange ? exchangeSummary(transaction.exchange) : <>{transaction.type === 'TRANSFER' ? '' : (income || transaction.type === 'ADJUSTMENT' && transaction.adjustmentDirection === 'increase') ? '+' : '-'}{formatMoney(transaction.amount)}</>}
         </ThemedText>
       </View>

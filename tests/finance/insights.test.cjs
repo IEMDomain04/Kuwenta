@@ -192,8 +192,9 @@ test('within-budget spending, saving and goals produce supportive expressions', 
 
 test('higher spending and savings withdrawals are observations, not sad reactions', () => {
  const rows = [record(), record({ id: 'prior', amount: 10000, transactionDate: '2026-09-09' })];
- const higher = moneyInsights([cash], rows, [], [], now).find(text => /more during/.test(text));
+ const higher = moneyInsights([cash], rows, [], [], now).find(text => /more so far this month/.test(text));
  assert.ok(higher);
+ assert.match(higher.split('\n')[0], /more so far this month than by the same date last month/);
  assert.equal(moneyInsightReaction(higher), 'thinking');
  const out = record({ type: 'TRANSFER', category: 'Transfer', accountId: 'save', destinationAccountId: 'cash', amount: 10000, sourcePurpose: 'savings', destinationPurpose: 'spending' });
  const withdrawal = moneyInsights([cash, { ...saving, openingBalance: 20000 }], [out], [], [], now)[0];

@@ -1,14 +1,14 @@
 import type { FinanceDatabase } from "../storage/database";
 
 export const HOME_VISUALIZATIONS = [
-  { id: "activity", label: "Spending activity tiles" },
-  { id: "summary", label: "Income and expense summary" },
-  { id: "balances", label: "Where your money is" },
-  { id: "categories", label: "Spending by category chart" },
-  { id: "budgets", label: "Budget overview" },
-  { id: "daily-spending", label: "Daily spending bar chart" },
-  { id: "trend", label: "Spending trend" },
-  { id: "comparison", label: "Income vs. expenses" },
+  { id: "activity", label: "Spending activity tiles", description: "See which days had more spending." },
+  { id: "summary", label: "Income and expense summary", description: "See income, expenses, and their difference for the selected period." },
+  { id: "balances", label: "Where your money is", description: "See where your money is held across your accounts." },
+  { id: "categories", label: "Spending by category chart", description: "Explore spending by category and view its transactions." },
+  { id: "budgets", label: "Budget overview", description: "Track spending against your current budget limits." },
+  { id: "daily-spending", label: "Daily spending bar chart", description: "Compare spending amounts by day." },
+  { id: "trend", label: "Spending trend", description: "Follow how daily spending changes over time." },
+  { id: "comparison", label: "Income vs. expenses", description: "Compare income and expenses across recent months." },
 ] as const;
 export type HomeVisualization = (typeof HOME_VISUALIZATIONS)[number]["id"];
 export const DEFAULT_HOME_VISUALIZATIONS: HomeVisualization[] = [];

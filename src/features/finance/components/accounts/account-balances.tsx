@@ -1,6 +1,7 @@
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { router } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { accountCardColor } from '../../domain/account-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -10,7 +11,7 @@ import { useFinance } from '../../provider';
 import { AccountIcon } from './account-icon';
 
 export function AccountBalances() {
-  const { accounts, transactions } = useFinance();
+  const { accounts, transactions, busy } = useFinance();
   const theme = useTheme();
   const { formatAmount: formatMoney } = useAmountVisibility();
   const dark = useColorScheme() === 'dark';
@@ -19,7 +20,7 @@ export function AccountBalances() {
     const rows = accounts.map(account => ({ account, balance: calculateAccountSummary(account, transactions, '1900-01').balance }));
     return { rows, totals, maximum: Math.max(1, ...rows.map(row => Math.abs(row.balance))) };
   }, [accounts, transactions]);
-  return <View style={{ padding: 14, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 12 }}>
+  return <View style={{ padding: 14, borderRadius: 20, backgroundColor: theme.backgroundElement, gap: 8 }}>
     <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}><ThemedText type="smallBold" accessibilityRole="header">Where your money is</ThemedText><ThemedText type="small" themeColor="textSecondary" style={{fontSize:10}}>Current balances</ThemedText></View>
     <View style={{ gap: 4 }}>
       <ThemedText type="smallBold">Total money: {formatMoney(totals.totalMoney, true)}</ThemedText>
@@ -27,7 +28,9 @@ export function AccountBalances() {
     </View>
     {rows.map(({ account, balance }) => {
       const color = accountCardColor(account, dark);
-      return <View key={account.id} style={{ gap: 5 }}>
+      return <Pressable key={account.id} accessibilityRole="button" accessibilityLabel={'View ' + account.name + ' account'} accessibilityHint="Opens account details and activity" disabled={busy}
+        onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
+        style={({ pressed }) => ({ gap: 4, paddingVertical: 2, minHeight: 48, opacity: pressed ? 0.7 : 1 })}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <AccountIcon account={account} size={20} color={color} />
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -39,7 +42,7 @@ export function AccountBalances() {
         <View accessible accessibilityLabel={account.name + ', balance ' + formatMoney(balance)} style={{ height: 10, borderRadius: 5, backgroundColor: theme.backgroundSelected, overflow: 'hidden' }}>
           <View style={{ height: 10, borderRadius: 5, backgroundColor: color, width: `${Math.abs(balance) / maximum * 100}%` }} />
         </View>
-      </View>;
+      </Pressable>;
     })}
 
   </View>;

@@ -123,3 +123,20 @@ test('onboarding distinguishes an explicitly entered zero or amount from a clear
     assert.equal(JSON.stringify(h.finished),JSON.stringify([[cents,'Ana','Cash',confirmed]]));
   }
 });
+
+test('Home keeps exchange outcomes explicitly labelled on the right, including after edits',()=>{
+ const {exchangeDraft,exchangeRecords}=require('../../.expo/finance-tests/domain/exchanges.js');
+ const bank={...require('./fixtures.cjs').cash,id:'bank',name:'MariBank'};
+ const h=harness('screens/home-screen.tsx',{accounts:[require('./fixtures.cjs').cash,bank]});
+ for(const [paid,received,label] of [[9500,10000,'Earnings: '],[10000,9500,'Loss: '],[10000,10000,'']]){
+  h.finance.transactions=exchangeRecords('sale',exchangeDraft('bank',{kind:'Service sale',paid,received,receivedAccountId:'cash',extraAccountId:'cash',earningsConfirmed:true},'2026-11-16','12:00:00'),'2026-11-16T04:00:00Z');
+  const view=h.render();
+  const summaries=view.nodes.filter(node=>node.props.testID==='recent-exchange-summary');
+  assert.equal(summaries.length,1);
+  const expected=label+require('../../.expo/finance-tests/domain/money.js').formatMoney(Math.abs(received-paid)||paid,true);
+  assert.equal(summaries[0].props.children,expected);
+  assert.equal(summaries[0].props.numberOfLines,undefined);
+  assert.equal(summaries[0].props.style.textAlign,'right');
+  assert.ok(!view.nodes.some(node=>Array.isArray(node.props.children)&&node.props.children[0]==='+'));
+ }
+});
