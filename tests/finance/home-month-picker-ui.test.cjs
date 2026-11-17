@@ -14,7 +14,7 @@ function picker(){
   if(name==='react-native-safe-area-context')return{SafeAreaView:'SafeAreaView'};
   if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
-  if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
+  if(name==='@/hooks/use-theme')return{useTheme:()=>({backgroundSelected:'shaded',backgroundElement:'plain',accent:'green'})};
   if(name==='../../provider')return{useFinance:()=>finance};
   if(name==='../shared/ui')return{ActionButton:'ActionButton'};
   throw new Error(name);
@@ -42,4 +42,15 @@ test('full-width month picker centers its button without changing month selectio
  const h=picker();const button=h.render({fullWidth:true}).find(node=>node.props.accessibilityLabel==='Choose reporting month, Nov 2026');
  assert.equal(button.props.style.width,'100%');assert.equal(button.props.style.justifyContent,'center');
  button.props.onPress();assert.equal(h.render({fullWidth:true}).find(node=>node.type==='Modal').props.visible,true);
+});
+
+test('month shading marks the actual current month while a border and check mark the selected month',()=>{
+ const h=picker();const nodes=h.render({value:'2026-10',open:true});
+ const october=nodes.find(node=>node.props.accessibilityLabel==='Oct 2026');
+ const november=nodes.find(node=>node.props.accessibilityLabel==='Nov 2026');
+ assert.equal(october.props.accessibilityState.selected,true);assert.equal(october.props.style.backgroundColor,'plain');
+ assert.equal(october.props.style.borderColor,'green');
+ assert.equal(november.props.accessibilityState.selected,false);assert.equal(november.props.style.backgroundColor,'shaded');
+ assert.equal(november.props.accessibilityHint,'Current calendar month');
+ assert.ok(!nodes.some(node=>node.props.label==='Current month'));
 });

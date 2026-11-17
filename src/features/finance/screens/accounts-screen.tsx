@@ -1,3 +1,4 @@
+import { InsightItem } from '../components/shared/insight-item';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo, useState } from 'react';
 import { Image } from 'expo-image';
@@ -80,7 +81,7 @@ export default function AccountsScreen() {
                   <ThemedText type="smallBold">Available Money: {formatMoney(money.availableMoney, true)}</ThemedText>
                 </> : null}
                 <ThemedText type="small" themeColor="textSecondary">Balances come from starting money and recorded activity. Kuwenta does not check your bank or actual cash.</ThemedText>
-              </> : money?.insights.map((insight,index) => <View key={insight} style={{paddingTop:index ? 12 : 0,borderTopWidth:index ? 1 : 0,borderTopColor:theme.border}}><ThemedText type="small">{conceal(insight)}</ThemedText></View>)}
+              </> : money?.insights.map((insight,index) => <View key={insight} style={{paddingTop:index ? 12 : 0,borderTopWidth:index ? 1 : 0,borderTopColor:theme.border}}><InsightItem message={insight} /></View>)}
             </ScrollView>
           </View>
         </SafeAreaView>

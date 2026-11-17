@@ -26,7 +26,8 @@ export function HomeMonthPicker({ disabled = false, compact = false, fullWidth =
   function select(value: string) { if (disabled) return; setMonth(value); setOpen(false); }
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose reporting month, ' + label} accessibilityState={{ disabled }} disabled={disabled} onPress={() => { setYear(Number(month.slice(0, 4))); setChoosingYear(false); setOpen(true); }}
-      style={{ flexDirection: 'row', alignItems: 'center', ...(fullWidth ? { width: '100%', justifyContent: 'center' } as const : {}), gap: compact ? 4 : 6, minHeight: 44, paddingHorizontal: compact ? 8 : 10, borderRadius: 12, backgroundColor: theme.backgroundElement }}>
+      style={{ flexDirection: 'row', alignItems: 'center', ...(fullWidth ? { width: '100%', justifyContent: 'center' } as const : {}), gap: compact ? 4 : 6, minHeight: 44, paddingHorizontal: compact ? 8 : 10, borderRadius: 12, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.backgroundElement }}>
+      <Ionicons name="calendar-outline" size={compact ? 14 : 16} color={theme.accent} />
       <ThemedText type="smallBold" themeColor="accent" style={compact ? {fontSize:10,lineHeight:14} : undefined}>{label}</ThemedText><Ionicons name="chevron-down" color={theme.accent} size={compact ? 14 : 16} />
     </Pressable>
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -46,14 +47,15 @@ export function HomeMonthPicker({ disabled = false, compact = false, fullWidth =
                 {months.map((name, index) => {
                   const value = String(year) + '-' + String(index + 1).padStart(2, '0');
                   const selected = value === month;
-                  return <Pressable key={name} accessibilityRole="button" accessibilityLabel={name + ' ' + year} disabled={disabled} accessibilityState={{ selected, disabled }} onPress={() => select(value)}
-                    style={{ flexBasis: '30%', flexGrow: 1, minHeight: rowHeight, padding: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? theme.accent : theme.backgroundSelected }}>
-                    <ThemedText type="smallBold" style={{ color: selected ? theme.onAccent : theme.text }}>{name}</ThemedText>
+                  const current = value === currentMonth;
+                  return <Pressable key={name} accessibilityRole="button" accessibilityLabel={name + ' ' + year} accessibilityHint={current ? 'Current calendar month' : undefined} disabled={disabled} accessibilityState={{ selected, disabled }} onPress={() => select(value)}
+                    style={{ flexBasis: '30%', flexGrow: 1, minHeight: rowHeight, padding: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: selected ? theme.accent : 'transparent', backgroundColor: current ? theme.backgroundSelected : theme.backgroundElement }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><ThemedText type="smallBold" style={{ color: theme.text }}>{name}</ThemedText>{selected ? <Ionicons accessible={false} name="checkmark" size={14} color={theme.accent} /> : null}</View>
+                    {current ? <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 10 }}>Current</ThemedText> : null}
                   </Pressable>;
                 })}
               </View></ScrollView>}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              <ActionButton compact disabled={disabled} label="Current month" onPress={() => select(currentMonth)} />
               <ActionButton compact label="Cancel" onPress={() => setOpen(false)} />
             </View>
           </View>

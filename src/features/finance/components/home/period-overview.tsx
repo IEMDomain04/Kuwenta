@@ -171,7 +171,7 @@ export function PeriodOverview({
               minHeight: 44,
               paddingHorizontal: 8,
               borderRadius: 12,
-              backgroundColor: theme.backgroundElement,
+              backgroundColor: theme.backgroundSelected,
               flexDirection: "row",
               alignItems: "center",
               gap: 4,
@@ -182,7 +182,7 @@ export function PeriodOverview({
               themeColor="accent"
               style={{ fontSize: 11, lineHeight: 16 }}
             >
-              {selection === "custom" ? "Choose month" : range.label}
+              {selection === "custom" ? "Change period" : range.label}
             </ThemedText>
             <Ionicons name="chevron-down" size={14} color={theme.accent} />
           </Pressable>

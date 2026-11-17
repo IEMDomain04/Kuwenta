@@ -1,3 +1,4 @@
+import { InsightItem } from '../components/shared/insight-item';
 import { AmountVisibilityButton } from '../components/shared/amount-visibility-button';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { ThemedText } from "@/components/themed-text";
@@ -273,7 +274,7 @@ export default function HomeScreen() {
                         borderColor: theme.border,
                       }}
                     >
-                      <ThemedText type="small">{conceal(insight)}</ThemedText>
+                      <InsightItem message={insight} />
                     </View>
                   ),
                 )}
