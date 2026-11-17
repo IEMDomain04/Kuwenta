@@ -9,7 +9,7 @@ import { ActionButton } from '../shared/ui';
 
 const months = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en-PH', { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, i, 1))));
 const years = Array.from({ length: 8100 }, (_, i) => i + 1900);
-export function HomeMonthPicker({ disabled = false, compact = false, value, onChange, open: controlledOpen, onOpenChange }: { disabled?: boolean; compact?: boolean; value?: string; onChange?: (month: string) => void; open?: boolean; onOpenChange?: (open: boolean) => void } = {}) {
+export function HomeMonthPicker({ disabled = false, compact = false, fullWidth = false, value, onChange, open: controlledOpen, onOpenChange }: { disabled?: boolean; compact?: boolean; fullWidth?: boolean; value?: string; onChange?: (month: string) => void; open?: boolean; onOpenChange?: (open: boolean) => void } = {}) {
   const finance = useFinance();
   const month = value ?? finance.month, currentMonth = finance.currentMonth;
   const setMonth = onChange ?? finance.setMonth;
@@ -26,7 +26,7 @@ export function HomeMonthPicker({ disabled = false, compact = false, value, onCh
   function select(value: string) { if (disabled) return; setMonth(value); setOpen(false); }
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={'Choose reporting month, ' + label} accessibilityState={{ disabled }} disabled={disabled} onPress={() => { setYear(Number(month.slice(0, 4))); setChoosingYear(false); setOpen(true); }}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 4 : 6, minHeight: 44, paddingHorizontal: compact ? 8 : 10, borderRadius: 12, backgroundColor: theme.backgroundElement }}>
+      style={{ flexDirection: 'row', alignItems: 'center', ...(fullWidth ? { width: '100%', justifyContent: 'center' } as const : {}), gap: compact ? 4 : 6, minHeight: 44, paddingHorizontal: compact ? 8 : 10, borderRadius: 12, backgroundColor: theme.backgroundElement }}>
       <ThemedText type="smallBold" themeColor="accent" style={compact ? {fontSize:10,lineHeight:14} : undefined}>{label}</ThemedText><Ionicons name="chevron-down" color={theme.accent} size={compact ? 14 : 16} />
     </Pressable>
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>

@@ -505,6 +505,7 @@ export default function BudgetsScreen() {
         {!editor ? (
           <ActionButton
             compact
+            bordered
             label={showHistory ? "Current budgets" : "Budget history"}
             disabled={locked}
             onPress={() => setShowHistory(!showHistory)}

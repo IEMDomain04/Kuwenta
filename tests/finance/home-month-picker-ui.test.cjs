@@ -37,3 +37,9 @@ test('History keeps the original month picker behavior when no local callback is
  nodes.find(node=>node.props.accessibilityLabel==='Oct 2026').props.onPress();
  assert.deepEqual(h.changed,['2026-10']);assert.equal(h.render().find(node=>node.type==='Modal').props.visible,false);
 });
+
+test('full-width month picker centers its button without changing month selection',()=>{
+ const h=picker();const button=h.render({fullWidth:true}).find(node=>node.props.accessibilityLabel==='Choose reporting month, Nov 2026');
+ assert.equal(button.props.style.width,'100%');assert.equal(button.props.style.justifyContent,'center');
+ button.props.onPress();assert.equal(h.render({fullWidth:true}).find(node=>node.type==='Modal').props.visible,true);
+});
