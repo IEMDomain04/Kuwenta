@@ -15,7 +15,10 @@
       "package": "com.iemdomain04.Kuwenta",
       "icon": "./assets/images/kuwenta-app-icon.png",
       "softwareKeyboardLayoutMode": "resize",
-      "allowBackup": false
+      "allowBackup": false,
+      "runtimeVersion": {
+        "policy": "fingerprint"
+      }
     },
     "web": {
       "output": "static",
@@ -77,6 +80,11 @@
       "eas": {
         "projectId": "38bef72f-a088-42e4-b4e2-7de21a8d8e52"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/38bef72f-a088-42e4-b4e2-7de21a8d8e52",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }
