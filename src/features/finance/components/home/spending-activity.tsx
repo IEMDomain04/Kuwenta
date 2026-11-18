@@ -2,7 +2,6 @@ import { ThemedText } from "@/components/themed-text";
 import { useAmountVisibility } from "@/hooks/amount-visibility";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useTheme } from "@/hooks/use-theme";
-import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useMemo } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { readableTransactionDate } from "../../domain/dates";
@@ -18,11 +17,11 @@ type SpendingActivityProps = {
   range: ReturnType<typeof homeReportingPeriod>;
   selection: HomeReportingSelection;
   paired: boolean;
+  standalone: boolean;
   selectedDate: string;
   today: string;
   weekDifference?: number | null;
   onSelectDate: (date: string) => void;
-  onOpenDaily: () => void;
 };
 
 /** Weekly tiles and the compact six-row monthly calendar share one daily series. */
@@ -31,24 +30,23 @@ export function SpendingActivity({
   range,
   selection,
   paired,
+  standalone,
   selectedDate,
   today,
   weekDifference,
   onSelectDate,
-  onOpenDaily,
 }: SpendingActivityProps) {
   const theme = useTheme();
   const { formatAmount: formatMoney } = useAmountVisibility();
   const dark = useColorScheme() === "dark";
-  const { fontScale } = useWindowDimensions();
+  const { fontScale, width } = useWindowDimensions();
   const monthly = range.period === "month";
   const calendar = useMemo(
     () => monthly ? spendingCalendarRows(days) : [],
     [monthly, days],
   );
   // Leave room for comparison labels when system text is enlarged.
-  const calendarHeight = Math.ceil(124 * Math.max(1, fontScale / 1.15));
-  const selected = days.find((day) => day.date === selectedDate);
+  const calendarHeight = Math.ceil((!standalone ? 124 : 6 * Math.max(28, Math.min(40, (width - 66) / 7)) + 15) * Math.max(1, fontScale / 1.15));
   const hasExpenses = days.some((day) => day.expenses > 0);
   const spendingColors = dark
     ? [theme.background, "#14532D", "#15803D", "#22C55E", "#86EFAC"]
@@ -107,7 +105,9 @@ export function SpendingActivity({
       testID="spending-activity-card"
       style={{
         flexGrow: paired ? 58 : 0,
-        flexBasis: paired ? 0 : undefined,
+        flexBasis: paired ? 0 : 'auto',
+        flexShrink: paired ? 1 : 0,
+        width: paired ? 'auto' : '100%',
         minWidth: 0,
         padding: 8,
         borderRadius: 20,
@@ -129,14 +129,7 @@ export function SpendingActivity({
       </ThemedText>
       {monthly ? (
         <>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              "View daily spending for " + range.label
-            }
-            onPress={() => onOpenDaily()}
-            style={{ gap: 3 }}
-          >
+          <View style={{ gap: 3 }}>
             <View style={{ flexDirection: "row", gap: 3 }}>
               {["M", "T", "W", "T", "F", "S", "S"].map(
                 (label, index) => (
@@ -176,8 +169,13 @@ export function SpendingActivity({
                         ? "#FFFFFF"
                         : theme.text;
                     return (
-                      <View
+                      <Pressable
                         key={weekday}
+                        accessibilityRole={day ? 'button' : undefined}
+                        accessibilityLabel={day ? readableTransactionDate(day.date) + ', ' + (day.date > today ? 'Upcoming' : formatMoney(day.expenses) + ' spent') : undefined}
+                        accessibilityState={{ selected: day?.date === selectedDate, disabled: !day || day.date > today }}
+                        disabled={!day || day.date > today}
+                        onPress={() => { if (day) onSelectDate(day.date); }}
                         testID={
                           day ? "spending-calendar-day" : undefined
                         }
@@ -191,9 +189,7 @@ export function SpendingActivity({
                             ? spendingColors[level]
                             : "transparent",
                           borderWidth: day ? 1 : 0,
-                          borderColor: day?.isToday
-                            ? theme.accent
-                            : theme.border,
+                          borderColor: day?.date === selectedDate ? theme.text : day?.isToday ? theme.accent : theme.border,
                           opacity: day && day.date > today ? 0.5 : 1,
                         }}
                       >
@@ -212,40 +208,14 @@ export function SpendingActivity({
                             {Number(day.date.slice(8))}
                           </ThemedText>
                         ) : null}
-                      </View>
+                      </Pressable>
                     );
                   })}
                 </View>
               ))}
             </View>
-          </Pressable>
+          </View>
           {legend}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open daily spending"
-            onPress={() => onOpenDaily()}
-            style={{
-              minHeight: 20,
-              paddingVertical: 0,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 4,
-            }}
-          >
-            <ThemedText
-              type="smallBold"
-              themeColor="accent"
-              style={{ fontSize: 10, lineHeight: 14 }}
-            >
-              View daily spending
-            </ThemedText>
-            <Ionicons
-              name="chevron-forward"
-              size={14}
-              color={theme.accent}
-            />
-          </Pressable>
         </>
       ) : (
         <>
@@ -326,16 +296,6 @@ export function SpendingActivity({
                   " than previous week"
               : "Tap a tile for details"}
           </ThemedText> : null}
-          {selected ? (
-            <ThemedText
-              accessibilityLiveRegion="polite"
-              type="small"
-              style={{ fontSize: 11, lineHeight: 16 }}
-            >
-              {readableTransactionDate(selected.date)}:{" "}
-              {formatMoney(selected.expenses)}
-            </ThemedText>
-          ) : null}
         </>
       )}
     </View>

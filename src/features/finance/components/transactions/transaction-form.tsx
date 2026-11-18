@@ -1,3 +1,5 @@
+import 'expo-sqlite/localStorage/install';
+import { readCategoryFavorites, type FavoriteKind } from '../../domain/category-favorites';
 import { exchangeDraft, exchangeRecords, exchangeKind, exchangeLabel } from '../../domain/exchanges';
 import { PesoIcon } from '../shared/peso-icon';
 import { AccountIcon } from '../accounts/account-icon';
@@ -35,6 +37,28 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
   const { height, fontScale } = useWindowDimensions();
   const [amountWidth, setAmountWidth] = useState(0);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [editingFavorites, setEditingFavorites] = useState(false);
+  const [draftFavorites, setDraftFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState(() => {
+    const read = (kind: FavoriteKind) => { try { return readCategoryFavorites(localStorage.getItem('kuwenta.categoryFavorites.' + kind), kind); } catch { return []; } };
+    return { INCOME: read('INCOME'), EXPENSE: read('EXPENSE') };
+  });
+  function closeCategoryPicker() {
+    setCategoryOpen(false); setEditingFavorites(false); setDraftFavorites([]);
+  }
+  function toggleFavorite(value: string) {
+    if (type === 'TRANSFER') return;
+    if (!draftFavorites.includes(value) && draftFavorites.length >= 10) { showNotice('Unpin a category before adding another.', true); return; }
+    setDraftFavorites(draftFavorites.includes(value) ? draftFavorites.filter(item => item !== value) : [...draftFavorites, value]);
+  }
+  function saveFavorites() {
+    if (type === 'TRANSFER' || disabled) return;
+    try {
+      localStorage.setItem('kuwenta.categoryFavorites.' + type, JSON.stringify(draftFavorites));
+      setFavorites({ ...favorites, [type]: draftFavorites }); closeCategoryPicker(); showNotice('Favorites saved');
+    } catch { showNotice('Could not save favorite categories.', true); }
+  }
+
   const [defaults] = useState(() => philippineDateTime());
   const [type, setType] = useState<ManualTransactionType>(original?.exchange ? 'EXPENSE' : original?.type === 'TRANSFER' ? 'TRANSFER' : original?.type === 'INCOME' ? 'INCOME' : original ? 'EXPENSE' : initialDraft?.type ?? initialType);
   const [amount, setAmount] = useState(original ? formatEditableMoney(moneyInput(original.exchange?.paid ?? original.amount))! : initialDraft ? formatEditableMoney(moneyInput(initialDraft.amount))! : '');
@@ -116,6 +140,9 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
       onDateChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: undefined })); }}
       onTimeChange={(value) => { setTime(value); setErrors((current) => ({ ...current, time: undefined })); }} />
   </>;
+  const categoryChoices = type === 'TRANSFER' ? [] : [...(original?.exchange ? CATEGORIES.EXPENSE.filter(value => exchangeKind(value)) : CATEGORIES[type]), ...(original?.type === type && !(CATEGORIES[type] as readonly string[]).includes(type === 'INCOME' ? incomeCategory(original.category) : original.category) ? [original.category] : [])];
+  const pinned = type === 'TRANSFER' ? [] : (editingFavorites ? draftFavorites : favorites[type]).filter(value => categoryChoices.includes(value));
+  const categorySections = editingFavorites ? [{ title: 'Tap a category to pin or unpin it.', values: categoryChoices }] : [{ title: 'Favorites', values: pinned }, { title: 'All categories', values: categoryChoices.filter(value => !pinned.includes(value)) }];
   return <View style={{ flex: 1, gap: 12 }}>
     <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ gap: 10, padding: 12, paddingBottom: 32, backgroundColor: theme.backgroundElement, borderRadius: 20 }}>
 
@@ -240,24 +267,34 @@ export function TransactionForm({ transferOnly = false, initialDraft, original, 
         </SafeAreaView>
       </View>
     </Modal>
-    <Modal visible={categoryOpen} transparent animationType="fade" onRequestClose={() => setCategoryOpen(false)}>
+    <Modal visible={categoryOpen} transparent animationType="fade" onRequestClose={closeCategoryPicker}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close category picker" onPress={() => setCategoryOpen(false)} style={{ flex: 1 }} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Close category picker" onPress={closeCategoryPicker} style={{ flex: 1 }} />
         <SafeAreaView edges={['bottom', 'left', 'right']} style={{ maxHeight: height * 0.8, backgroundColor: theme.backgroundElement, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
           <View accessibilityViewIsModal style={{ padding: 16, gap: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <ThemedText type="smallBold" accessibilityRole="header">Choose category</ThemedText>
-              <Pressable accessibilityRole="button" accessibilityLabel="Close category picker" onPress={() => setCategoryOpen(false)} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={24} color={theme.text} /></Pressable>
+
+              <Pressable accessibilityRole="button" accessibilityLabel="Close category picker" onPress={closeCategoryPicker} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={24} color={theme.text} /></Pressable>
+            </View>
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              {editingFavorites ? <>
+                <ThemedText type="small" themeColor="textSecondary" accessibilityLiveRegion="polite">{draftFavorites.length} of 10 favorites pinned</ThemedText>
+                <ActionButton compact primary label="Save favorites" disabled={disabled} onPress={saveFavorites} />
+              </> : <ActionButton compact bordered label="Edit favorites" disabled={disabled} onPress={() => { if (type !== 'TRANSFER') { setDraftFavorites([...favorites[type]]); setEditingFavorites(true); } }} />}
             </View>
             <ScrollView style={{ maxHeight: height * 0.55 }} keyboardShouldPersistTaps="handled">
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {(type === 'TRANSFER' ? [] : [...(original?.exchange ? CATEGORIES.EXPENSE.filter(value=>exchangeKind(value)) : CATEGORIES[type]), ...(original?.type === type && !(CATEGORIES[type] as readonly string[]).includes(type === 'INCOME' ? incomeCategory(original.category) : original.category) ? [original.category] : [])]).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: value === category, disabled }} disabled={disabled}
-                  onPress={() => chooseCategory(value)} style={({ pressed }) => ({ width: '31%', minHeight: 80, padding: 8, borderRadius: 12, borderWidth: 1.5, borderColor: value === category ? theme.accent : theme.border, backgroundColor: value === category ? theme.backgroundSelected : theme.backgroundElement, alignItems: 'center', justifyContent: 'center', gap: 5, opacity: pressed || disabled ? 0.5 : 1 })}>
-                  <CategoryIcon category={value} income={type === 'INCOME'} />
-                  <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ width: '100%', fontSize: 12, lineHeight: 17, textAlign: 'center' }}>{value}</ThemedText>
-                  {value === category && <Ionicons name="checkmark-circle" size={14} color={theme.accent} />}
-                </Pressable>)}
-              </View>
+              {categorySections.filter(section => section.values.length).map(section => <View key={section.title} style={{ gap: 8, marginBottom: 12 }}>
+                <ThemedText type="smallBold" themeColor="textSecondary">{section.title}</ThemedText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {section.values.map(value => <Pressable key={value} accessibilityRole="button" accessibilityLabel={value} accessibilityHint={editingFavorites ? 'Pin or unpin this category' : undefined} accessibilityState={{ selected: editingFavorites ? pinned.includes(value) : value === category, disabled }} disabled={disabled}
+                    onPress={() => editingFavorites ? toggleFavorite(value) : chooseCategory(value)} style={({ pressed }) => ({ width: '31%', minHeight: 80, padding: 8, borderRadius: 12, borderWidth: 1.5, borderColor: (editingFavorites ? pinned.includes(value) : value === category) ? theme.accent : theme.border, backgroundColor: (editingFavorites ? pinned.includes(value) : value === category) ? theme.backgroundSelected : theme.backgroundElement, alignItems: 'center', justifyContent: 'center', gap: 5, opacity: pressed || disabled ? 0.5 : 1 })}>
+                    <CategoryIcon category={value} income={type === 'INCOME'} />
+                    <ThemedText type="small" numberOfLines={1} ellipsizeMode="tail" style={{ width: '100%', fontSize: 12, lineHeight: 17, textAlign: 'center' }}>{value}</ThemedText>
+                    {pinned.includes(value) ? <Ionicons name="star" size={14} color={theme.accent} /> : value === category && !editingFavorites ? <Ionicons name="checkmark-circle" size={14} color={theme.accent} /> : null}
+                  </Pressable>)}
+                </View>
+              </View>)}
             </ScrollView>
           </View>
         </SafeAreaView>

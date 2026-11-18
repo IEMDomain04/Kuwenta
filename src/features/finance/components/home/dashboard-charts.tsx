@@ -1,36 +1,32 @@
+import { SpendingDayDetails } from './spending-day-details';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
-import { router } from 'expo-router';
 import Svg, { Circle, Line, Polyline } from 'react-native-svg';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import type { dashboardSpending } from '../../reporting/dashboard';
-import { formatTransactionDateTime, philippineDateTime, readableTransactionDate } from '../../domain/dates';
+import { philippineDateTime, readableTransactionDate } from '../../domain/dates';
 import type { Transaction } from '../../domain/types';
 
 export function SpendingTrend({ days, period, transactions = [], now = new Date(), label }: { days: ReturnType<typeof dashboardSpending>; period: string; transactions?: readonly Transaction[]; now?: Date; label?: string }) {
   const theme = useTheme();
   const { height } = useWindowDimensions();
   const periodLabel = label ?? (period === 'day' ? 'Last 7 days' : period === 'week' ? 'This week' : 'This month');
-  const { formatAmount: formatMoney, conceal } = useAmountVisibility();
+  const { formatAmount: formatMoney } = useAmountVisibility();
   const [selectedDate, setSelectedDate] = useState('');
   const [previewDate, setPreviewDate] = useState<string | null>(null);
   const dragDate = useRef('');
   const plotLeft = useRef(0);
   const [dailyOpen, setDailyOpen] = useState(false);
-  const [recordLimit, setRecordLimit] = useState(10);
   const [plotWidth, setPlotWidth] = useState(0);
   const today = philippineDateTime(now).transactionDate;
   const elapsed = days.filter(day => day.date <= today);
   const maximum = Math.max(0, ...elapsed.map(day => day.expenses));
   const peak = elapsed.find(day => day.expenses === maximum);
   const selected = elapsed.find(day => day.date === (previewDate ?? selectedDate));
-  const committed = elapsed.find(day => day.date === selectedDate);
-  const records = useMemo(() => committed ? transactions.filter(row => row.type === 'EXPENSE' && row.transactionDate === committed.date)
-    .sort((a, b) => b.transactionTime.localeCompare(a.transactionTime)) : [], [transactions, committed]);
   function dateAt(x: number, scrubbing = false) {
     if (!plotWidth || !days.length || !elapsed.length) return;
     let index = Math.max(0, Math.min(days.length - 1, Math.round((x / plotWidth * 300 - 8) / 284 * (days.length - 1))));
@@ -50,14 +46,14 @@ export function SpendingTrend({ days, period, transactions = [], now = new Date(
     },
     onPanResponderRelease: () => {
       if (dragDate.current) setSelectedDate(dragDate.current);
-      setPreviewDate(null); setRecordLimit(10); dragDate.current = '';
+      setPreviewDate(null); dragDate.current = '';
     },
     onPanResponderTerminationRequest: () => false,
     onPanResponderTerminate: () => { setPreviewDate(null); dragDate.current = ''; },
   }), [days, plotWidth, today]);
   const dateLabel = (date?: string) => date ? new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z')) : '';
   const point = (index: number, amount: number) => ({ x: 8 + index / Math.max(1, days.length - 1) * 284, y: 110 - amount / Math.max(1, maximum) * 100 });
-  function choose(date: string) { setSelectedDate(value => value === date ? '' : date); setRecordLimit(10); }
+  function choose(date: string) { setSelectedDate(value => value === date ? '' : date); }
   return <View style={{ backgroundColor: theme.backgroundElement, borderRadius: 20, padding: 14, gap: 10 }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <ThemedText type="smallBold" accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={{ flex: 1 }}>Spending trend</ThemedText>
@@ -90,18 +86,9 @@ export function SpendingTrend({ days, period, transactions = [], now = new Date(
         </View>
       </View>
     </> : <ThemedText type="small" themeColor="textSecondary">No expenses recorded for this period.</ThemedText>}
-    {selected ? <View style={{ padding: 10, gap: 6, borderRadius: 12, backgroundColor: theme.background }}>
-      <ThemedText type="smallBold" accessibilityLiveRegion={previewDate === null ? "polite" : "none"}>{readableTransactionDate(selected.date)}: {formatMoney(selected.expenses, true)}</ThemedText>
-      {previewDate === null ? <>
-      {!records.length ? <ThemedText type="small" themeColor="textSecondary">No expenses recorded on this day.</ThemedText> : null}
-      {records.slice(0, recordLimit).map(record => <Pressable key={record.id} accessibilityRole="button" accessibilityLabel={'View ' + conceal(record.notes?.trim() || record.category) + ', ' + formatMoney(record.amount, true) + ', ' + formatTransactionDateTime(record.transactionDate, record.transactionTime)} onPress={() => router.push({ pathname: '/transaction', params: { id: record.exchangeParentId ?? record.id } })}
-        style={({ pressed }) => ({ minHeight: 44, paddingVertical: 8, gap: 2, opacity: pressed ? 0.7 : 1 })}>
-        <View style={{ flexDirection: 'row', gap: 8 }}><ThemedText type="smallBold" numberOfLines={2} style={{ flex: 1 }}>{conceal(record.notes?.trim() || record.category)}</ThemedText><ThemedText type="smallBold" style={{ flexShrink: 1, textAlign: 'right' }}>{formatMoney(record.amount, true)}</ThemedText></View>
-        <ThemedText type="small" themeColor="textSecondary">{formatTransactionDateTime(record.transactionDate, record.transactionTime)}</ThemedText>
-      </Pressable>)}
-      {records.length > recordLimit ? <Pressable accessibilityRole="button" onPress={() => setRecordLimit(value => value + 10)} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="smallBold" themeColor="accent">Show more transactions</ThemedText></Pressable> : null}
-      </> : null}
-    </View> : maximum ? <ThemedText type="small" themeColor="textSecondary">Tap or drag across the chart, or choose a day below.</ThemedText> : null}
+    {selected ? previewDate !== null ? <ThemedText type="smallBold" accessibilityLiveRegion="none">{readableTransactionDate(selected.date)}: {formatMoney(selected.expenses,true)}</ThemedText>
+      : <SpendingDayDetails key={'trend:' + selected.date} date={selected.date} spent={selected.expenses} transactions={transactions} compact />
+      : maximum ? <ThemedText type="small" themeColor="textSecondary">Tap or drag across the chart, or choose a day below.</ThemedText> : null}
     {days.length ? <Pressable accessibilityRole="button" accessibilityLabel="Daily spending" accessibilityState={{ expanded: dailyOpen }} onPress={() => setDailyOpen(true)} style={{ minHeight: 44, justifyContent: 'center' }}><ThemedText type="smallBold" themeColor="accent">View daily spending</ThemedText></Pressable> : null}
     {dailyOpen ? <Modal visible transparent animationType="fade" onRequestClose={() => setDailyOpen(false)}>
       <SafeAreaView style={{ flex: 1, padding: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.overlay }}>
@@ -113,7 +100,7 @@ export function SpendingTrend({ days, period, transactions = [], now = new Date(
           </View>
           <ThemedText type="small" themeColor="textSecondary">{periodLabel}: {dateLabel(days[0]?.date)} to {dateLabel(days.at(-1)?.date)}</ThemedText>
           <ScrollView style={{ maxHeight: height * 0.5 }} contentContainerStyle={{ gap: 4 }} keyboardShouldPersistTaps="handled">
-            {days.map(day => <Pressable key={day.date} accessibilityRole="button" accessibilityLabel={readableTransactionDate(day.date) + ', ' + (day.date > today ? 'Upcoming' : formatMoney(day.expenses, true) + ' spent')} accessibilityState={{ selected: selectedDate === day.date, disabled: day.date > today }} disabled={day.date > today} onPress={() => { setSelectedDate(day.date); setRecordLimit(10); setDailyOpen(false); }} style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: selectedDate === day.date ? theme.backgroundSelected : 'transparent', opacity: pressed ? 0.7 : 1 })}>
+            {days.map(day => <Pressable key={day.date} accessibilityRole="button" accessibilityLabel={readableTransactionDate(day.date) + ', ' + (day.date > today ? 'Upcoming' : formatMoney(day.expenses, true) + ' spent')} accessibilityState={{ selected: selectedDate === day.date, disabled: day.date > today }} disabled={day.date > today} onPress={() => { setSelectedDate(day.date); setDailyOpen(false); }} style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: selectedDate === day.date ? theme.backgroundSelected : 'transparent', opacity: pressed ? 0.7 : 1 })}>
               <ThemedText type="small" style={{ flex: 1 }}>{dateLabel(day.date)}</ThemedText><ThemedText type="small" themeColor={day.date > today ? 'textSecondary' : undefined}>{day.date > today ? 'Upcoming' : formatMoney(day.expenses, true)}</ThemedText>
             </Pressable>)}
           </ScrollView>

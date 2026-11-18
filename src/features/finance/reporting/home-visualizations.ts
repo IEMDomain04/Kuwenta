@@ -4,6 +4,7 @@ export const HOME_VISUALIZATIONS = [
   { id: "activity", label: "Spending activity tiles", description: "See which days had more spending." },
   { id: "summary", label: "Income and expense summary", description: "See income, expenses, and their difference for the selected period." },
   { id: "balances", label: "Where your money is", description: "See where your money is held across your accounts." },
+  { id: "income-sources", label: "Income by source", description: "See where recorded income comes from and view its transactions." },
   { id: "categories", label: "Spending by category chart", description: "Explore spending by category and view its transactions." },
   { id: "budgets", label: "Budget overview", description: "Track spending against your current budget limits." },
   { id: "daily-spending", label: "Daily spending bar chart", description: "Compare spending amounts by day." },

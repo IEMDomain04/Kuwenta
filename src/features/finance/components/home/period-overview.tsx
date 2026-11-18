@@ -1,3 +1,6 @@
+import { dailyCashFlow } from '../../reporting/daily-cash-flow';
+import { IncomeSources } from './income-sources';
+import { SpendingDayDetails } from './spending-day-details';
 import { ThemedText } from "@/components/themed-text";
 import { useTheme } from "@/hooks/use-theme";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
@@ -23,7 +26,6 @@ import { SelectionSheet } from "../shared/selection-sheet";
 
 import { SpendingActivity } from "./spending-activity";
 import { IncomeExpenseSummary } from "./income-expense-summary";
-import { DailySpendingSheet } from "./daily-spending-sheet";
 import { DailySpendingChart } from "./daily-spending-chart";
 
 /** Owns the shared reporting period and daily selection for all Home visuals. */
@@ -43,9 +45,7 @@ export function PeriodOverview({
   const [periodOpen, setPeriodOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
-  const [dailyOpen, setDailyOpen] = useState(false);
   const [barDate, setBarDate] = useState("");
-  const [recordLimit, setRecordLimit] = useState(10);
   const range = useMemo(
     () => homeReportingPeriod(selection, customMonth, now),
     [selection, customMonth, now],
@@ -59,7 +59,8 @@ export function PeriodOverview({
   const showBars = visible.includes("daily-spending");
   const showTrend = visible.includes("trend");
   const showComparison = visible.includes("comparison");
-  const needsReport = showSummary || showCategories || showComparison;
+  const showIncome = visible.includes("income-sources");
+  const needsReport = showIncome || showSummary || showCategories || showComparison;
   const needsHistory = needsReport || showActivity || showTrend || showBars;
   const records = useMemo(
     () =>
@@ -75,6 +76,7 @@ export function PeriodOverview({
         : null,
     [records, period, month, range.anchor, needsReport],
   );
+  const summaryDays = useMemo(() => showSummary && report ? dailyCashFlow(records, report.start, report.end) : [], [showSummary, records, report]);
   const week = useMemo(
     () =>
       showActivity && period === "week"
@@ -104,26 +106,13 @@ export function PeriodOverview({
     ],
   );
 
+  const selectedActivityDay = showActivity ? days.find(day => day.date === selectedDate) : undefined;
   const paired =
     showActivity && showSummary && width >= 350 && fontScale <= 1.3;
-  const selectedRecords = useMemo(
-    () =>
-      dailyOpen && selectedDate
-        ? records
-            .filter(
-              (row) =>
-                row.type === "EXPENSE" && row.transactionDate === selectedDate,
-            )
-            .sort((a, b) => b.transactionTime.localeCompare(a.transactionTime))
-        : [],
-    [records, dailyOpen, selectedDate],
-  );
-
   function choosePeriod(value: HomeReportingSelection) {
     setSelection(value);
     setSelectedDate("");
     setBarDate("");
-    setDailyOpen(false);
     if (value === "custom") setMonthOpen(true);
   }
 
@@ -159,7 +148,6 @@ export function PeriodOverview({
                 setCustomMonth(value);
                 setBarDate("");
                 setSelectedDate("");
-                setDailyOpen(false);
               }}
             />
           ) : null}
@@ -209,7 +197,8 @@ export function PeriodOverview({
     !showCategories &&
     !showBars &&
     !showTrend &&
-    !showComparison
+    !showComparison &&
+    !showIncome
   )
     return null;
   return (
@@ -217,6 +206,8 @@ export function PeriodOverview({
       {needsHistory ? periodPicker : null}
       {showActivity || showSummary ? (
         <View
+          key={paired ? 'paired' : 'stacked'}
+          testID="activity-summary-layout"
           style={{
             flexDirection: paired ? "row" : "column",
             alignItems: "stretch",
@@ -225,6 +216,7 @@ export function PeriodOverview({
         >
           {showActivity ? (
             <SpendingActivity
+              standalone={!showSummary}
               days={days}
               range={range}
               selection={selection}
@@ -232,14 +224,17 @@ export function PeriodOverview({
               selectedDate={selectedDate}
               today={today}
               weekDifference={week?.difference}
-              onSelectDate={(date) =>
-                setSelectedDate((current) => current === date ? "" : date)
-              }
-              onOpenDaily={() => setDailyOpen(true)}
+              onSelectDate={(date) => {
+                setSelectedDate((current) => current === date ? "" : date);
+              }}
             />
           ) : null}
           {showSummary && report ? (
             <IncomeExpenseSummary
+              showChart={!showActivity}
+              key={report.start + report.end}
+              days={summaryDays}
+              today={today}
               income={report.income}
               expenses={report.expenses}
               monthly={monthly}
@@ -249,23 +244,9 @@ export function PeriodOverview({
           ) : null}
         </View>
       ) : null}
-      {dailyOpen ? (
-        <DailySpendingSheet
-          days={days}
-          selectedRecords={selectedRecords}
-          selectedDate={selectedDate}
-          today={today}
-          label={range.label}
-          recordLimit={recordLimit}
-          onSelectDate={(date) => {
-            setSelectedDate((current) => current === date ? "" : date);
-            setRecordLimit(10);
-          }}
-          onShowMore={() => setRecordLimit((value) => value + 10)}
-          onClose={() => setDailyOpen(false)}
-        />
-      ) : null}
+      {selectedActivityDay ? <SpendingDayDetails key={'tiles:' + selectedDate} date={selectedDate} spent={selectedActivityDay.expenses} transactions={records} /> : null}
       {showBalances ? <AccountBalances /> : null}
+      {showIncome && report ? <IncomeSources key={report.start + report.end} transactions={records} start={report.start} end={report.end} label={range.label} /> : null}
       {showCategories && report ? (
         <CategorySpending
           key={period + report.start + report.end}
@@ -278,6 +259,7 @@ export function PeriodOverview({
       ) : null}
       {showBars ? (
         <DailySpendingChart
+          transactions={records}
           days={days}
           today={today}
           monthly={monthly}

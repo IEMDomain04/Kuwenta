@@ -14,6 +14,12 @@ function charts(hidden = false) {
   if(name==='react-native-safe-area-context')return{SafeAreaView:'SafeAreaView'};
   if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
   if(name==='expo-router')return{router:{push:route=>navigation.push(route)}};
+  if(name==='./spending-day-details'){
+    const child={...sandbox,exports:{}};
+    vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/home/spending-day-details.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,child);
+    return child.exports;
+  }
+  if(name==='../shared/ui')return{ActionButton:'ActionButton'};
   if(name==='react-native-svg')return{__esModule:true,default:'Svg',Circle:'Circle',Line:'Line',Polyline:'Polyline'};
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
   if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
@@ -23,7 +29,7 @@ function charts(hidden = false) {
  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/components/home/dashboard-charts.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,sandbox);
  const api=sandbox.exports;const render=api.SpendingTrend;api.SpendingTrend=props=>{cursor=0;return render(props);};api.navigation=navigation;return api;
 }
-function nodes(tree){const found=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;found.push(node);walk(node.props.children);}walk(tree);return found;}
+function nodes(tree){const found=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;if(typeof node.type==='function')return walk(node.type(node.props));found.push(node);walk(node.props.children);}walk(tree);return found;}
 test('optional charts handle empty, single-day and monthly data without invalid geometry',()=>{
  const api=charts();
  for(const count of [0,1,31]){
@@ -78,8 +84,10 @@ test('spending trend omits upcoming points, identifies the peak date, and select
  tree=nodes(api.SpendingTrend(props));
  tree.find(node=>node.props.onLayout).props.onPress({nativeEvent:{locationX:8}});
  tree=nodes(api.SpendingTrend(props));
+ assert.ok(!tree.some(node=>String(node.props.accessibilityLabel).startsWith('View Cash-in charge,')));
+ tree.find(node=>node.props.label==='View transactions').props.onPress();tree=nodes(api.SpendingTrend(props));
  const transaction=tree.find(node=>String(node.props.accessibilityLabel).startsWith('View Cash-in charge,'));
- assert.ok(transaction);transaction.props.onPress();assert.equal(api.navigation[0].params.id,'exchange');
+ assert.ok(transaction);assert.ok(tree.indexOf(transaction)<tree.findIndex(node=>node.props.label==='Hide transactions'));transaction.props.onPress();assert.equal(api.navigation[0].params.id,'exchange');
  assert.equal(tree.filter(node=>String(node.props.accessibilityLabel).startsWith('View ')).length,1);
  tree.find(node=>node.props.onLayout).props.onPress({nativeEvent:{locationX:292}});
  assert.ok(nodes(api.SpendingTrend(props)).some(node=>String(node.props.accessibilityLabel).startsWith('View Cash-in charge,')));
@@ -96,7 +104,7 @@ test('daily spending list offers large selected day controls and distinguishes z
  for(const button of buttons)assert.ok(button.props.style({pressed:false}).minHeight>=44);
  assert.equal(buttons[2].props.disabled,true);assert.ok(!buttons[2].props.accessibilityLabel.includes('spent'));
  buttons[0].props.onPress();tree=nodes(api.SpendingTrend(props));
- assert.ok(tree.some(node=>node.props.children==='No expenses recorded on this day.'));
+ assert.ok(tree.some(node=>node.props.accessibilityLiveRegion==='polite'));
  assert.ok(!tree.some(node=>node.type==='Modal'));
  tree.find(node=>node.props.accessibilityLabel==='Daily spending').props.onPress();
  tree=nodes(api.SpendingTrend(props));
@@ -104,7 +112,7 @@ test('daily spending list offers large selected day controls and distinguishes z
  assert.ok(selected.props.accessibilityLabel.includes('October 1'));selected.props.onPress();
  tree=nodes(api.SpendingTrend(props));
  assert.ok(!tree.some(node=>node.type==='Modal'));
- assert.ok(tree.some(node=>node.props.children==='No expenses recorded on this day.'));
+ assert.ok(tree.some(node=>node.props.accessibilityLiveRegion==='polite'));
 });
 
 test('trend privacy masking covers scale, peak, selected records, and the daily list', () => {
@@ -112,7 +120,8 @@ test('trend privacy masking covers scale, peak, selected records, and the daily 
  const props={period:'day',now:new Date('2026-10-02T04:00:00Z'),days:[{date:'2026-10-01',expenses:12345}],transactions:[record({transactionDate:'2026-10-01',amount:12345,notes:'Lunch'})]};
  let tree=nodes(api.SpendingTrend(props));tree.find(node=>node.props.accessibilityLabel==='Daily spending').props.onPress();
  tree=nodes(api.SpendingTrend(props));tree.find(node=>String(node.props.accessibilityLabel).endsWith('spent')).props.onPress();
- const rendered=nodes(api.SpendingTrend(props));
+ let rendered=nodes(api.SpendingTrend(props));
+ rendered.find(node=>node.props.label==='View transactions').props.onPress();rendered=nodes(api.SpendingTrend(props));
  for(const node of rendered){const text=JSON.stringify([node.props.accessibilityLabel,node.type==='Text'?node.props.children:null]);assert.ok(!text.includes('123.45'));assert.ok(!text.includes(String.fromCodePoint(8369)));}
  assert.ok(rendered.some(node=>String(node.props.accessibilityLabel).startsWith('View Lunch,')));
 });
@@ -141,6 +150,8 @@ test('horizontal scrubbing previews days without records until release, keeps ve
   pan().onPanResponderMove(null,{moveX:9999});
   pan().onPanResponderRelease();
   tree=nodes(api.SpendingTrend(props));
+  assert.ok(!tree.some(node=>String(node.props.accessibilityLabel).startsWith('View Second day,')));
+  tree.find(node=>node.props.label==='View transactions').props.onPress();tree=nodes(api.SpendingTrend(props));
   assert.ok(tree.some(node=>String(node.props.accessibilityLabel).startsWith('View Second day,')));
   assert.ok(tree.some(node=>node.props.accessibilityLiveRegion==='polite' && JSON.stringify(node.props.children).includes('October 2')));
   assert.ok(!JSON.stringify(api.SpendingTrend(props)).includes('Upcoming days are not plotted'));
@@ -178,5 +189,7 @@ test('trend header keeps the period in its row and monthly day selection stays i
  tree.find(node=>String(node.props.accessibilityLabel).startsWith('October 12,') && node.props.accessibilityRole==='button').props.onPress();
  tree=nodes(api.SpendingTrend(props));
  assert.ok(!tree.some(node=>node.type==='Modal'));
+ assert.ok(!tree.some(node=>String(node.props.accessibilityLabel).startsWith('View School lunch,')));
+ tree.find(node=>node.props.label==='View transactions').props.onPress();tree=nodes(api.SpendingTrend(props));
  assert.ok(tree.some(node=>String(node.props.accessibilityLabel).startsWith('View School lunch,')));
 });

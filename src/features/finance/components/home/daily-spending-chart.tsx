@@ -1,3 +1,5 @@
+import { SpendingDayDetails } from './spending-day-details';
+import type { Transaction } from '../../domain/types';
 import { ThemedText } from "@/components/themed-text";
 import { useAmountVisibility } from "@/hooks/amount-visibility";
 import { useTheme } from "@/hooks/use-theme";
@@ -9,6 +11,7 @@ import { readableTransactionDate } from "../../domain/dates";
 import type { dashboardSpending } from "../../reporting/dashboard";
 
 type DailySpendingChartProps = {
+  transactions?: readonly Transaction[];
   days: ReturnType<typeof dashboardSpending>;
   today: string;
   monthly: boolean;
@@ -22,6 +25,7 @@ const BAR_HEIGHT = 128;
 const BAR_GAP = 6;
 
 export function DailySpendingChart({
+  transactions = [],
   days,
   today,
   monthly,
@@ -44,7 +48,7 @@ export function DailySpendingChart({
     : 0;
   const maximum = Math.max(0, ...days.filter(day => day.date <= today).map(day => day.expenses));
   const selected = days.find(day => day.date === selectedDate && day.date <= today);
-  const chartWidth = monthly ? contentWidth : Math.max(plotWidth, days.length * 32 + Math.max(0, days.length - 1) * BAR_GAP);
+  const chartWidth = monthly ? contentWidth : plotWidth;
 
   return (
     <View testID="daily-spending-chart" style={{ padding: 14, gap: 10, borderRadius: 20, backgroundColor: theme.backgroundElement }}>
@@ -67,12 +71,13 @@ export function DailySpendingChart({
         <ScrollView
           key={periodKey}
           horizontal
-          style={{ flex: 1 }}
+          scrollEnabled={monthly}
+          style={{ flex: 1, minWidth: 0 }}
           showsHorizontalScrollIndicator={false}
           onLayout={event => setPlotWidth(event.nativeEvent.layout.width)}
           onScroll={monthly ? event => setScroll({ key: periodKey, offset: event.nativeEvent.contentOffset.x }) : undefined}
           scrollEventThrottle={32}
-          contentContainerStyle={{ flexGrow: 1, gap: BAR_GAP }}
+          contentContainerStyle={{ flexGrow: 1, width: monthly ? undefined : '100%', gap: monthly ? BAR_GAP : 4 }}
         >
           {plotWidth > 0 ? (
             <Svg testID="daily-spending-guides" pointerEvents="none" accessible={false} width={chartWidth} height={BAR_HEIGHT}
@@ -91,7 +96,7 @@ export function DailySpendingChart({
                 accessibilityState={{ selected: active, disabled: future }}
                 disabled={future}
                 onPress={() => onSelectDate(day.date)}
-                style={{ flex: monthly ? undefined : 1, width: monthly ? barWidth : undefined, minWidth: 32, gap: 5, alignItems: "center", opacity: future ? 0.4 : 1 }}
+                style={{ flex: monthly ? undefined : 1, flexBasis: monthly ? undefined : 0, width: monthly ? barWidth : undefined, minWidth: monthly ? 32 : 0, gap: 5, alignItems: "center", opacity: future ? 0.4 : 1 }}
               >
                 <View style={{ height: BAR_HEIGHT, width: "100%", justifyContent: "flex-end", alignItems: "center" }}>
                   <View
@@ -104,7 +109,7 @@ export function DailySpendingChart({
                     }}
                   />
                 </View>
-                <ThemedText type="small" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 10, lineHeight: 16, color: day.isToday ? theme.accent : theme.textSecondary }}>
+                <ThemedText type="small" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={{ fontSize: 10, lineHeight: 16, color: day.isToday ? theme.accent : theme.textSecondary }}>
                   {monthly ? Number(day.date.slice(8)) : WEEKDAYS[new Date(day.date + "T12:00:00Z").getUTCDay()]}
                 </ThemedText>
                 <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: day.isToday ? theme.accent : "transparent" }} />
@@ -119,9 +124,7 @@ export function DailySpendingChart({
         </View>
       ) : null}
       {selected ? (
-        <ThemedText type="smallBold" accessibilityLiveRegion="polite">
-          {readableTransactionDate(selected.date)}: {formatAmount(selected.expenses)} spent
-        </ThemedText>
+        <SpendingDayDetails key={'bars:' + selected.date} date={selected.date} spent={selected.expenses} transactions={transactions} compact />
       ) : (
         <ThemedText type="small" themeColor="textSecondary">
           {maximum ? "Tap a bar for details." : "No expenses recorded for this period."}

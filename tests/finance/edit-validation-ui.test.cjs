@@ -6,14 +6,17 @@ const vm = require('node:vm');
 const { cash, record } = require('./fixtures.cjs');
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness(file, { params = {}, accounts = [cash], transactions = [], goals = [], budgets = [], debts = [], debtPayments = [], debtAdditions = [], onSubmit = () => {}, deleteFailure = false, refreshRecords } = {}) {
+  const favoriteStore = new Map();
   const hooks = []; let cursor = 0; const saved = [], prompts = [], notices = [], removed = [], navigation = [], effects = [], refreshed = [];
   const finance = { currentDate: '2026-10-12', removeBudget: async (...args) => removed.push(args), removeGoal: async id => removed.push(id), debts, debtPayments, debtAdditions, addDebtAmount: async addition => saved.push(addition), correctDebtAmount: async (...args) => saved.push(args), removeDebtAddition: async id => removed.push(id), addDebt: async debt => saved.push(debt), payDebt: async payment => saved.push(payment), removeDebt: async (...args) => removed.push(args), saveExternal: async (...args) => saved.push(args), removeExternal: async id => { if (deleteFailure) throw new Error('Could not delete.'); removed.push(id); }, removeTransaction: async id => { if(deleteFailure)throw new Error('Could not delete.');removed.push(id); }, accounts, transactions, goals, budgets, month: '2026-10', busy: false, lastEntryAccount: 'cash', showNotice: message => notices.push(message), newSubmissionId: async () => 'new-id', saveTransaction: async (...args) => saved.push(args), saveAccount: async (...args) => saved.push(args), saveGoal: async (...args) => saved.push(args), saveBudget: async (...args) => saved.push(args) };
   finance.refresh = async () => { refreshed.push(true); refreshRecords?.(finance); };
   const state = initial => { const index = cursor++; if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial; return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }]; };
   const jsx = (type, props) => ({ type, props });
   const theme = { text: '#0A1129', border: '#73877A', accent: '#06633E', error: '#B4233C' };
-  const sandbox = { Error, exports: {}, require(name) {
+  const sandbox = { Error, localStorage: { getItem:key=>favoriteStore.get(key)??null, setItem:(key,value)=>favoriteStore.set(key,value) }, exports: {}, require(name) {
     name = name.replace(/^(?:\.\.\/)+/, '../');
+    if(name==='expo-sqlite/localStorage/install')return{};
+    if(name.endsWith('/domain/category-favorites'))return require('../../.expo/finance-tests/domain/category-favorites.js');
     if(name==='@/hooks/amount-visibility')return{useAmountVisibility:()=>({hidden:false,formatAmount:require('../../.expo/finance-tests/domain/money.js').formatMoney,conceal:text=>text})};
     if (name.endsWith('/peso-icon')) return { PesoIcon: 'PesoIcon' };
     if (name.endsWith('/account-icon')) return { AccountIcon: 'AccountIcon' };
@@ -50,7 +53,7 @@ function harness(file, { params = {}, accounts = [cash], transactions = [], goal
     effects.splice(0).forEach(callback => callback());
     return { nodes, find: type => nodes.find(node => node.type === type), button: label => nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label), input: label => nodes.find(node => node.props.accessibilityLabel === label) };
   }
-  return { render, saved, prompts, notices, theme, removed, navigation, refreshed };
+  return { render, saved, prompts, notices, theme, removed, navigation, refreshed, favoriteStore };
 }
 test('editing a transaction saves directly and repeated taps submit once', async () => {
   const original = record();
@@ -616,4 +619,44 @@ test('budget editor header deletes the saved budget, even when an unsaved period
   await settle();
   assert.deepEqual(h.removed, [['2026-10', 'Meals']]);
   assert.equal(harness('screens/budgets-screen.tsx').render().button('Delete Meals budget'), undefined);
+});
+
+test('category favorites pin in stable order, persist separately by type, and do not select a transaction category while editing',()=>{
+ const h=harness('components/transactions/transaction-form.tsx');
+ h.render().button('Edit favorites').props.onPress();
+ h.render().button('Transport').props.onPress();h.render().button('Meals').props.onPress();
+ assert.equal(h.favoriteStore.get('kuwenta.categoryFavorites.EXPENSE'),undefined);
+ h.render().button('Save favorites').props.onPress();
+ assert.equal(h.favoriteStore.get('kuwenta.categoryFavorites.EXPENSE'),'["Transport","Meals"]');
+ const categories=h.render().nodes.filter(node=>['Transport','Meals'].includes(node.props.accessibilityLabel));
+ assert.equal(categories[0].props.accessibilityLabel,'Transport');
+ h.render().button('Income').props.onPress();h.render().button('Edit favorites').props.onPress();h.render().button('Salary').props.onPress();h.render().button('Save favorites').props.onPress();
+ assert.equal(h.favoriteStore.get('kuwenta.categoryFavorites.INCOME'),'["Salary"]');
+ assert.equal(h.favoriteStore.get('kuwenta.categoryFavorites.EXPENSE'),'["Transport","Meals"]');
+});
+
+test('favorite edits enforce ten pins and closing the picker discards unsaved changes',()=>{
+ const h=harness('components/transactions/transaction-form.tsx');
+ const categories=require('../../.expo/finance-tests/domain/types.js').CATEGORIES.EXPENSE;
+ h.render().button('Edit favorites').props.onPress();
+ for(const category of categories.slice(0,10))h.render().button(category).props.onPress();
+ h.render().button(categories[10]).props.onPress();
+ assert.equal(h.notices.at(-1),'Unpin a category before adding another.');
+ assert.ok(h.render().nodes.some(node=>JSON.stringify(node.props.children)==='[10," of 10 favorites pinned"]'));
+ h.render().button('Save favorites').props.onPress();
+ assert.equal(JSON.parse(h.favoriteStore.get('kuwenta.categoryFavorites.EXPENSE')).length,10);
+ h.render().button('Edit favorites').props.onPress();h.render().button(categories[0]).props.onPress();
+ h.render().button('Close category picker').props.onPress();
+ assert.equal(JSON.parse(h.favoriteStore.get('kuwenta.categoryFavorites.EXPENSE')).length,10);
+ assert.ok(h.render().button('Edit favorites'));
+});
+
+test('saving favorites immediately persists and shows success without another confirmation',()=>{
+ const h=harness('components/transactions/transaction-form.tsx');
+ h.render().button('Edit favorites').props.onPress();h.render().button('Meals').props.onPress();
+ h.render().button('Save favorites').props.onPress();
+ assert.equal(h.favoriteStore.get('kuwenta.categoryFavorites.EXPENSE'),'["Meals"]');
+ assert.equal(h.notices.at(-1),'Favorites saved');
+ assert.ok(!h.render().nodes.some(node=>node.props.testID==='favorites-save-confirmation'));
+ assert.ok(h.render().button('Edit favorites'));
 });
