@@ -1,4 +1,4 @@
-import { InsightItem } from '../components/shared/insight-item';
+import { InsightsSheet } from '../components/shared/insights-sheet';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { useMemo, useState } from 'react';
 import { Image } from 'expo-image';
@@ -54,19 +54,20 @@ export default function AccountsScreen() {
         <Ionicons name="bulb-outline" size={18} color={theme.accent} /><ThemedText type="smallBold" style={{ flex: 1 }}>Account insight</ThemedText>
         <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
       </View>
-      <ThemedText type="small">{conceal(money.insights[0])}</ThemedText>
+      <ThemedText type="small">{conceal(money.insightDetails[0].title)}</ThemedText>
     </Pressable> : null}
-    <Modal visible={details !== null} transparent animationType="fade" onRequestClose={() => setDetails(null)}>
+    <InsightsSheet visible={details === 'insights'} insights={money?.insightDetails ?? []} title="Account insights" onClose={() => setDetails(null)} />
+    <Modal visible={details === 'money'} transparent animationType="fade" onRequestClose={() => setDetails(null)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.overlay }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close details" onPress={() => setDetails(null)} style={{ flex: 1 }} />
         <SafeAreaView edges={['bottom', 'left', 'right']} style={{ maxHeight: '80%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: theme.backgroundElement }}>
           <View accessibilityViewIsModal style={{ padding: 16, gap: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ThemedText type="smallBold" accessibilityRole="header" style={{ flex: 1 }}>{details === 'money' ? 'Your recorded money' : 'Account insights'}</ThemedText>
+              <ThemedText type="smallBold" accessibilityRole="header" style={{ flex: 1 }}>Your recorded money</ThemedText>
               <Pressable accessibilityRole="button" accessibilityLabel="Close details" onPress={() => setDetails(null)} style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}><Ionicons name="close" size={20} color={theme.text} /></Pressable>
             </View>
             <ScrollView style={{ maxHeight: height * 0.5 }} contentContainerStyle={{ gap: 12, paddingBottom: 12 }}>
-              {details === 'money' ? <>
+              <>
                 <ThemedText type="small">Total Money adds every account balance, including savings and archived accounts.</ThemedText>
                 <ThemedText type="small">Available Money adds the accounts marked below as included. Budgets and upcoming bills do not automatically reserve this money.</ThemedText>
                 {money?.balances.map(({ account, balance }) => <View key={account.id} style={{ gap: 3 }}>
@@ -81,7 +82,7 @@ export default function AccountsScreen() {
                   <ThemedText type="smallBold">Available Money: {formatMoney(money.availableMoney, true)}</ThemedText>
                 </> : null}
                 <ThemedText type="small" themeColor="textSecondary">Balances come from starting money and recorded activity. Kuwenta does not check your bank or actual cash.</ThemedText>
-              </> : money?.insights.map((insight,index) => <View key={insight} style={{paddingTop:index ? 12 : 0,borderTopWidth:index ? 1 : 0,borderTopColor:theme.border}}><InsightItem message={insight} /></View>)}
+              </>
             </ScrollView>
           </View>
         </SafeAreaView>

@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { CategoryIcon } from './category-visual';
 import { formatTransactionDateTime } from '../../domain/dates';
 import { useState } from 'react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
@@ -14,12 +14,12 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '../../domain/money';
 import type { Transaction } from '../../domain/types';
 
-export function FinanceScreen({ title, children, scroll = true, scrollEnabled = true, tabScreen = true, headerAccessory, headerLeading, floatingAction, centeredTitle = false }: { title: string; children: ReactNode; scroll?: boolean; scrollEnabled?: boolean; tabScreen?: boolean; headerAccessory?: ReactNode; headerLeading?: ReactNode; floatingAction?: ReactNode; centeredTitle?: boolean }) {
+export function FinanceScreen({ title, children, scroll = true, scrollEnabled = true, tabScreen = true, headerAccessory, headerLeading, floatingAction, centeredTitle = false, scrollRef, onContentSizeChange }: { scrollRef?: Ref<ScrollView>; onContentSizeChange?: (width: number, height: number) => void; title: string; children: ReactNode; scroll?: boolean; scrollEnabled?: boolean; tabScreen?: boolean; headerAccessory?: ReactNode; headerLeading?: ReactNode; floatingAction?: ReactNode; centeredTitle?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const content = <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: headerAccessory ? 'nowrap' : 'wrap', gap: 8, ...(centeredTitle ? { justifyContent: 'center' } : {}) }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0, ...(headerAccessory ? { flex: 1 } : {}) }}>{headerLeading ?? (!tabScreen ? <BackButton /> : null)}<ThemedText type="subtitle" style={!tabScreen || centeredTitle ? { fontSize: 20, lineHeight: 28, flexShrink: 1 } : undefined} accessibilityRole="header">{title}</ThemedText></View>{headerAccessory ? <View style={{ flexShrink: 0 }}>{headerAccessory}</View> : null}</View>{children}</>;
   return <SafeAreaView edges={tabScreen ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']} style={[styles.safe, { backgroundColor: theme.background }]}>
-    {scroll ? <ScrollView scrollEnabled={scrollEnabled} style={{ flex: 1 }} bounces={false} overScrollMode="never" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, !!floatingAction && { paddingBottom: 90 }, !tabScreen && { paddingBottom: 32 }]}>{content}</ScrollView>
+    {scroll ? <ScrollView ref={scrollRef} onContentSizeChange={onContentSizeChange} scrollEnabled={scrollEnabled} style={{ flex: 1 }} bounces={false} overScrollMode="never" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, !!floatingAction && { paddingBottom: 90 }, !tabScreen && { paddingBottom: 32 }]}>{content}</ScrollView>
       : <ThemedView style={[styles.content, styles.fill, !tabScreen && { paddingBottom: 16 }]}>{content}</ThemedView>}
     {floatingAction && <View style={{ position: 'absolute', right: Math.max(insets.right, 16), bottom: tabScreen ? 16 : Math.max(insets.bottom, 16) }}>{floatingAction}</View>}
   </SafeAreaView>;

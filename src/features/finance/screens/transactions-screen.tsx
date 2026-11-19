@@ -22,7 +22,7 @@ export default function TransactionsScreen() {
   const theme = useTheme();
   const dark = useColorScheme() === 'dark';
   const confirmation = useConfirmation();
-  const params = useLocalSearchParams<{ accountId?: string }>();
+  const params = useLocalSearchParams<{ accountId?: string; type?: string }>();
   function setError(message: string) { if (message) showNotice(message, true); }
   const [accountStripWidth, setAccountStripWidth] = useState(0);
   const [accountScroll, setAccountScroll] = useState(0);
@@ -35,8 +35,15 @@ export default function TransactionsScreen() {
   const [filter, setFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER'>('ALL');
   const [accountFilter, setAccountFilter] = useState<string | null>(typeof params.accountId === 'string' ? params.accountId : null);
   useEffect(() => {
-    if (typeof params.accountId === 'string') { setAccountFilter(params.accountId); setFilter('ALL'); router.setParams({ accountId: undefined }); }
-  }, [params.accountId]);
+    const hasAccount = typeof params.accountId === 'string';
+    const hasType = params.type === 'ALL' || params.type === 'INCOME' || params.type === 'EXPENSE' || params.type === 'TRANSFER';
+    if (hasAccount) setAccountFilter(params.accountId!);
+    if (hasType) {
+      setFilter(params.type as typeof filter);
+      if (!hasAccount) setAccountFilter(null);
+    } else if (hasAccount) setFilter('ALL');
+    if (hasAccount || hasType) router.setParams({ accountId: undefined, type: undefined });
+  }, [params.accountId, params.type]);
   const visible = groupExchangeTransactions(filterTransactions(transactions, month, filter).filter((row) => accountFilter === null || (row.accountId === accountFilter || row.destinationAccountId === accountFilter)), transactions);
   const groups = new Map<string, Transaction[]>();
   for (const transaction of visible) {

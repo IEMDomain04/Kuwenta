@@ -9,10 +9,10 @@ function harness(hidden=false, additions=[]){
  const jsx=(type,props)=>({type,props});
  const sandbox={exports:{},require(name){
   name=name.replace(/^(?:\.\.\/)+/, '../').replace('../components/', '../');
-  if(name==='react')return{useState:()=>[settled,update=>{settled=update(settled);} ]};
+  if(name==='react')return{useRef:value=>({current:value}),useEffect(){},useState:()=>[settled,update=>{settled=update(settled);} ]};
   if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
   if(name==='react-native')return{View:'View',Pressable:'Pressable'};
-  if(name==='expo-router')return{router:{push(){}}};
+  if(name==='expo-router')return{useLocalSearchParams:()=>({}),router:{push(){},setParams(){}}};
   if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
   if(name==='@/hooks/use-theme')return{useTheme:()=>({})};
@@ -44,7 +44,7 @@ test('debts are separated by direction with correct totals and settled records s
 });
 test('Plans keeps debts below Savings and Goals and privacy masks each group total',()=>{
  const h=harness(true);
- assert.deepEqual(Array.from(h.plans().props.children,node=>node.type),['Budgets','Savings','Debts']);
+ assert.deepEqual(Array.from(nodes(h.plans()).filter(node=>['Budgets','Savings','Debts'].includes(node.type)),node=>node.type),['Budgets','Savings','Debts']);
  const all=nodes(h.render());
  assert.ok(all.filter(node=>node.props.children==='hidden').length>=4);
  for(const node of all)if(typeof node.props.children==='string')assert.ok(!node.props.children.includes(String.fromCodePoint(8369)));

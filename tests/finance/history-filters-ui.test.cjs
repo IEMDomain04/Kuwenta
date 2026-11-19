@@ -4,17 +4,17 @@ const fs=require('node:fs');
 const ts=require('typescript');
 const vm=require('node:vm');
 const {cash,record}=require('./fixtures.cjs');
-function harness(dark=false){
- const hooks=[];let cursor=0;const jsx=(type,props)=>({type,props});
+function harness(dark=false,params={}){
+ const hooks=[],effects=[];let cursor=0;const jsx=(type,props)=>({type,props});
  const finance={accounts:[cash,{...cash,id:'bank',name:'Bank'}],transactions:[record({id:'cash-expense'}),record({id:'bank-income',type:'INCOME',category:'Salary',accountId:'bank'})],month:'2026-10',busy:false};
  const sandbox={exports:{},require(name){
-  if(name==='react')return{useState:initial=>{const i=cursor++;if(!(i in hooks))hooks[i]=initial;return[hooks[i],value=>hooks[i]=value];},useRef:value=>({current:value}),useEffect(){}};
+  if(name==='react')return{useState:initial=>{const i=cursor++;if(!(i in hooks))hooks[i]=initial;return[hooks[i],value=>hooks[i]=value];},useRef:value=>({current:value}),useEffect:(callback,deps)=>{const i=cursor++;if(!hooks[i]||deps.some((value,index)=>value!==hooks[i][index])){hooks[i]=deps;effects.push(callback);}}};
   if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
   if(name==='react-native')return{View:'View',Pressable:'Button',ScrollView:'ScrollView',SectionList:'SectionList'};
   if(name==='expo-linear-gradient')return{LinearGradient:'Gradient'};
   if(name==='@/hooks/use-color-scheme')return{useColorScheme:()=> dark?'dark':'light'};
   if(name.endsWith('/accounts/account-icon'))return{AccountIcon:'AccountIcon'};
-  if(name==='expo-router')return{router:{setParams(){},push(){}},useLocalSearchParams:()=>({})};
+  if(name==='expo-router')return{router:{setParams:value=>Object.assign(params,value),push(){}},useLocalSearchParams:()=>params};
   if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
   if(name==='@/hooks/use-theme')return{useTheme:()=>({accent:'green',accentPressed:'strong-green',onAccent:dark?'black':'white',backgroundSelected:'gray',text:dark?'white':'black',backgroundElement:dark?'black':'white'})};
@@ -26,7 +26,7 @@ function harness(dark=false){
   throw new Error(name);
  }};
  vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/features/finance/screens/transactions-screen.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,sandbox);
- function render(){cursor=0;const nodes=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;nodes.push(node);walk(node.props.children);}walk(sandbox.exports.default());return nodes;}
+ function render(){cursor=0;const nodes=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;nodes.push(node);walk(node.props.children);}walk(sandbox.exports.default());effects.splice(0).forEach(fn=>fn());return nodes;}
  return{render};
 }
 test('history accounts retain a half chip and scroll cue below type and month filters',()=>{
@@ -76,4 +76,14 @@ test('borderless account chips use tinted selection and solid check badges in bo
   assert.equal(nodes.find(node=>node.props.accessibilityLabel==='Bank').props.accessibilityState.selected,false);
   assert.equal(nodes.filter(node=>node.props.testID==='history-account-selected-badge').length,1);
  }
+});
+
+test('insight navigation applies both account and type filters and clears its route intent',()=>{
+ const params={accountId:'bank',type:'INCOME'};
+ const h=harness(false,params);h.render();let nodes=h.render();
+ const rows=nodes.find(node=>node.type==='SectionList').props.sections.flatMap(section=>section.data);
+ assert.deepEqual(Array.from(rows,row=>row.id),['bank-income']);
+ assert.equal(nodes.find(node=>node.props.accessibilityLabel==='Bank').props.accessibilityState.selected,true);
+ assert.equal(params.accountId,undefined);assert.equal(params.type,undefined);
+ nodes=h.render();assert.equal(nodes.find(node=>node.props.accessibilityLabel==='Bank').props.accessibilityState.selected,true);
 });

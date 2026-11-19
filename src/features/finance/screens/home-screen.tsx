@@ -1,4 +1,5 @@
-import { InsightItem } from '../components/shared/insight-item';
+import { InsightsSheet } from '../components/shared/insights-sheet';
+import { unavailableInsight, type FinancialInsight } from '../reporting/insight-details';
 import { AmountVisibilityButton } from '../components/shared/amount-visibility-button';
 import { useAmountVisibility } from '@/hooks/amount-visibility';
 import { ThemedText } from "@/components/themed-text";
@@ -10,14 +11,11 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   AppState,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { BudgetOverview } from "../components/budgets/budget-overview";
 import { CategoryIcon } from "../components/shared/category-visual";
 import { PeriodOverview } from "../components/home/period-overview";
@@ -52,7 +50,7 @@ export default function HomeScreen() {
   } = useFinance();
   const theme = useTheme();
   const { hidden: amountsHidden, formatAmount: formatMoney, conceal } = useAmountVisibility();
-  const { height, fontScale } = useWindowDimensions();
+  const { fontScale } = useWindowDimensions();
   const [draggingBudget, setDraggingBudget] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -115,21 +113,22 @@ export default function HomeScreen() {
   const insightDate = philippineDateTime(now).transactionDate;
   const insights = useMemo(() => {
     try {
-      return moneyInsights(
+      const details: FinancialInsight[] = [];
+      moneyInsights(
         accounts,
         transactions,
         budgets,
         goals,
         new Date(insightDate + "T00:00:00+08:00"),
         { debts, payments: debtPayments, additions: debtAdditions },
+        details,
       );
+      return details;
     } catch {
-      return [
-        "Insights are unavailable. Review your records in Accounts and History.",
-      ];
+      return [unavailableInsight];
     }
   }, [accounts, transactions, budgets, goals, debts, debtPayments, debtAdditions, insightDate]);
-  const insightMessage = insights[0] ?? message;
+  const insightMessage = insights[0]?.message ?? message;
   // Expressions describe the displayed insight; they never change financial records.
   const reaction = moneyInsightReaction(insightMessage);
   return (
@@ -209,80 +208,7 @@ export default function HomeScreen() {
           </ThemedText>
         </Pressable>
       </LinearGradient>
-      <Modal
-        visible={insightsOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setInsightsOpen(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "flex-end",
-            backgroundColor: theme.overlay,
-          }}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close insights"
-            onPress={() => setInsightsOpen(false)}
-            style={{ flex: 1 }}
-          />
-          <SafeAreaView
-            edges={["bottom", "left", "right"]}
-            style={{
-              maxHeight: height * 0.8,
-              backgroundColor: theme.backgroundElement,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-            }}
-          >
-            <View accessibilityViewIsModal style={{ padding: 16, gap: 8 }}>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <ThemedText
-                  type="smallBold"
-                  accessibilityRole="header"
-                  style={{ flex: 1 }}
-                >
-                  Your money, at a glance
-                </ThemedText>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Close insights"
-                  onPress={() => setInsightsOpen(false)}
-                  style={{
-                    width: 44,
-                    height: 44,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Ionicons name="close" size={20} color={theme.text} />
-                </Pressable>
-              </View>
-              <ScrollView
-                style={{ maxHeight: height * 0.55 }}
-                contentContainerStyle={{ gap: 12, paddingBottom: 8 }}
-              >
-                {(insights.length ? insights : [message]).map(
-                  (insight, index) => (
-                    <View
-                      key={insight}
-                      style={{
-                        paddingTop: index ? 12 : 0,
-                        borderTopWidth: index ? 1 : 0,
-                        borderColor: theme.border,
-                      }}
-                    >
-                      <InsightItem message={insight} />
-                    </View>
-                  ),
-                )}
-              </ScrollView>
-            </View>
-          </SafeAreaView>
-        </View>
-      </Modal>
+      <InsightsSheet visible={insightsOpen} insights={insights} onClose={() => setInsightsOpen(false)} />
       {homeVisualizations.includes("balances") || (hasActivity &&
       homeVisualizations.some(
         (value) => value !== "budgets" && value !== "balances",

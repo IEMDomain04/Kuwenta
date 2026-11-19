@@ -36,6 +36,7 @@ function harness(file, initial={}, params={}) {
     if(name.endsWith('/period-overview'))return{PeriodOverview:'PeriodOverview'};
     if(name.endsWith('/category-visual'))return{CategoryIcon:'CategoryIcon'};
     if(name.includes('/reporting/')||name.endsWith('/domain/dates')||name.endsWith('/domain/exchanges'))return require('../../.expo/finance-tests/'+name.replace(/^(?:\.\.?\/)+/,'')+'.js');
+    if(name.endsWith('/insights-sheet'))return{InsightsSheet:'InsightsSheet'};
     if(name.endsWith('/insight-item'))return{InsightItem:'InsightItem'};
     if(name.endsWith('/field-error'))return{FieldError:'Error'};
     if(name.endsWith('/money-field'))return{MoneyField:'MoneyField'};
