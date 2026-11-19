@@ -127,9 +127,10 @@ export function PeriodOverview({
           flexWrap: "wrap",
         }}
       >
-        <ThemedText type="smallBold" style={{ fontSize: 11 }}>
-          Reporting period
-        </ThemedText>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <ThemedText type="smallBold" accessibilityRole="header" style={{ fontSize: 13, lineHeight: 18 }}>Dashboard</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 10, lineHeight: 14 }}>{range.dates}</ThemedText>
+        </View>
         <View
           style={{
             flexDirection: "row",
@@ -176,9 +177,6 @@ export function PeriodOverview({
           </Pressable>
         </View>
       </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {range.dates}
-      </ThemedText>
       <SelectionSheet
         visible={periodOpen}
         title="Home reporting period"

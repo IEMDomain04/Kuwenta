@@ -193,7 +193,7 @@ test('daily spending bars compare actual expenses, toggle details, and leave fut
   const scale = h.nodes.find(node=>node.props.testID==='daily-spending-scale');
   assert.ok(scale);
   assert.ok(JSON.stringify(scale.props.children).includes('200'));
-  assert.ok(h.nodes.some(node=>JSON.stringify(node.props.children).includes('November 2, 2026')));
+  assert.ok(h.nodes.some(node=>JSON.stringify(node.props.children)?.includes('November 2, 2026')));
   assert.equal(bars().length, 7);
   h.nodes.find(node=>node.type==='ScrollView').props.onLayout({nativeEvent:{layout:{width:330}}}); h=h.rerender();
   const guides=h.nodes.find(node=>node.props.testID==='daily-spending-guides');
@@ -371,4 +371,11 @@ test('weekly daily bars fit all seven days in the viewport without horizontal sc
   assert.equal(h.nodes.find(node=>node.props.testID==='daily-spending-guides').props.width,plotWidth);
   assert.ok(!h.nodes.some(node=>node.props.testID==='daily-spending-scroll-track'));
  }
+});
+
+test('Dashboard places a smaller compact date range beneath its title',()=>{
+ const h=render(['activity']);const title=h.nodes.find(node=>node.props.children==='Dashboard');
+ const date=h.nodes.find(node=>node.props.children==='Nov 2\u20133, 2026');
+ assert.ok(title);assert.ok(date);assert.ok(date.props.style.fontSize<title.props.style.fontSize);
+ assert.ok(h.nodes.indexOf(title)<h.nodes.indexOf(date));
 });

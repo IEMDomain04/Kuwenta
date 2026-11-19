@@ -1,5 +1,5 @@
 import { dashboardReport, type DashboardPeriod, type dashboardSpending } from './dashboard';
-import { isValidMonth, philippineDateTime, readableReportingMonth, readableTransactionDate } from '../domain/dates';
+import { isValidDate, isValidMonth, philippineDateTime, readableReportingMonth } from '../domain/dates';
 import { adjacentMonth } from './reporting';
 
 export type HomeReportingSelection = 'week' | 'last-week' | 'month' | 'last-month' | 'custom';
@@ -8,6 +8,17 @@ export const HOME_REPORTING_OPTIONS = [
   {value:'month',label:'This month'}, {value:'last-month',label:'Last month'},
   {value:'custom',label:'Choose month'},
 ] as const;
+
+/** Compact dates for the Dashboard header, retaining both years only across years. */
+export function dashboardDateRange(start: string, end: string): string {
+  if (!isValidDate(start) || !isValidDate(end) || start > end) throw new Error('Choose a valid date range.');
+  const month = (date: string) => new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'));
+  const from = month(start) + ' ' + Number(start.slice(8));
+  const to = month(end) + ' ' + Number(end.slice(8));
+  if (start === end) return from + ', ' + start.slice(0,4);
+  if (start.slice(0,4) !== end.slice(0,4)) return from + ', ' + start.slice(0,4) + '\u2013' + to + ', ' + end.slice(0,4);
+  return from + '\u2013' + (start.slice(0,7) === end.slice(0,7) ? Number(end.slice(8)) : to) + ', ' + end.slice(0,4);
+}
 
 /** Resolve one Philippine calendar window without changing the app's active budgets or account totals. */
 export function homeReportingPeriod(selection: HomeReportingSelection, customMonth: string, now: Date) {
@@ -29,7 +40,7 @@ export function homeReportingPeriod(selection: HomeReportingSelection, customMon
   const range = dashboardReport([],period,month,anchor);
   const label = selection === 'custom' ? readableReportingMonth(month) : HOME_REPORTING_OPTIONS.find(option=>option.value===selection)!.label;
   return {period,month,anchor,start:range.start,end:range.end,label,
-    dates:readableTransactionDate(range.start)+(range.start===range.end?'':' - '+readableTransactionDate(range.end))};
+    dates:dashboardDateRange(range.start,range.end)};
 }
 
 /** Always six Monday-first calendar rows, with undated padding cells. */

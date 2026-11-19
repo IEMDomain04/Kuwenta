@@ -29,3 +29,11 @@ test('spending calendars keep Monday alignment and all dates in exactly six rows
  }
  assert.equal(spendingCalendarRows([]).flat().filter(Boolean).length,0);
 });
+
+test('Dashboard dates show one year within a year and both years across a year boundary',()=>{
+ const {dashboardDateRange}=require('../../.expo/finance-tests/reporting/home-reporting.js');
+ assert.equal(dashboardDateRange('2026-11-16','2026-11-22'),'Nov 16\u201322, 2026');
+ assert.equal(dashboardDateRange('2026-10-26','2026-11-01'),'Oct 26\u2013Nov 1, 2026');
+ assert.equal(dashboardDateRange('2026-12-28','2027-01-03'),'Dec 28, 2026\u2013Jan 3, 2027');
+ assert.equal(dashboardDateRange('2026-11-19','2026-11-19'),'Nov 19, 2026');
+});
