@@ -17,7 +17,7 @@ function harness(dark=false){
   if(name==='expo-router')return{router:{setParams(){},push(){}},useLocalSearchParams:()=>({})};
   if(name==='@react-native-vector-icons/ionicons')return{Ionicons:'Icon'};
   if(name==='@/components/themed-text')return{ThemedText:'Text'};
-  if(name==='@/hooks/use-theme')return{useTheme:()=>({accent:'green',backgroundSelected:'gray',text:dark?'white':'black',backgroundElement:dark?'black':'white'})};
+  if(name==='@/hooks/use-theme')return{useTheme:()=>({accent:'green',accentPressed:'strong-green',onAccent:dark?'black':'white',backgroundSelected:'gray',text:dark?'white':'black',backgroundElement:dark?'black':'white'})};
   if(name==='../provider')return{useFinance:()=>finance};
   if(name.endsWith('/confirmation'))return{useConfirmation:()=>({alert(){}})};
   if(name.endsWith('/shared/ui'))return{FinanceScreen:'Screen',TransactionRow:'Row',ActionButton:'Action',AddTransactionButton:'Add'};
@@ -29,7 +29,7 @@ function harness(dark=false){
  function render(){cursor=0;const nodes=[];function walk(node){if(Array.isArray(node))return node.forEach(walk);if(!node?.props)return;nodes.push(node);walk(node.props.children);}walk(sandbox.exports.default());return nodes;}
  return{render};
 }
-test('history accounts reveal a half chip and a moving scroll cue above the filters',()=>{
+test('history accounts retain a half chip and scroll cue below type and month filters',()=>{
  const h=harness();let nodes=h.render();
  nodes.find(node=>node.props.testID==='history-account-strip').props.onLayout({nativeEvent:{layout:{width:330}}});nodes=h.render();
  const chip=nodes.find(node=>node.props.accessibilityLabel==='All accounts');const width=chip.props.style.width;
@@ -39,12 +39,15 @@ test('history accounts reveal a half chip and a moving scroll cue above the filt
  nodes.find(node=>node.props.testID==='history-account-strip').props.onScroll({nativeEvent:{contentOffset:{x:50}}});nodes=h.render();
  assert.ok(thumb().props.style.transform[0].translateX>0);
  const filters=nodes.find(node=>node.type==='Button'&&Array.isArray(node.props.children)&&node.props.children.some(child=>child?.props?.children==='Income'));
- assert.ok(nodes.indexOf(nodes.find(node=>node.props.accessibilityLabel==='All accounts'))<nodes.indexOf(filters));
+ assert.ok(nodes.findIndex(node=>node.type==='MonthPicker')<nodes.findIndex(node=>node.props.accessibilityLabel==='All accounts'));
  assert.equal(nodes.find(node=>node.type==='MonthPicker').props.fullWidth,true);
  assert.equal(nodes.find(node=>node.props.testID==='history-type-filters').props.style.width,'100%');
  assert.ok(nodes.indexOf(filters)<nodes.findIndex(node=>node.type==='MonthPicker'));
  const bank=nodes.find(node=>node.props.accessibilityLabel==='Bank');
- assert.equal(bank.props.style.backgroundColor,require('../../.expo/finance-tests/domain/account-colors.js').accountCardColor({...cash,id:'bank'},false));
+ assert.equal(bank.props.style.backgroundColor,'white');
+ assert.equal(bank.props.style.minHeight,44);
+ assert.ok(!nodes.some(node=>node.type==='Gradient'));
+ assert.equal(bank.props.style.borderWidth,undefined);
  assert.equal(nodes.filter(node=>node.type==='AccountIcon').length,2);
 });
 test('rearranged history controls still combine account and transaction type filters',()=>{
@@ -52,21 +55,23 @@ test('rearranged history controls still combine account and transaction type fil
  nodes.find(node=>node.props.accessibilityLabel==='Bank').props.onPress();nodes=h.render();
  const income=nodes.find(node=>node.type==='Button'&&Array.isArray(node.props.children)&&node.props.children.some(child=>child?.props?.children==='Income'));
  income.props.onPress();nodes=h.render();
+ assert.ok(!nodes.some(node=>node.props.label==='Reset account'));
  const rows=nodes.find(node=>node.type==='SectionList').props.sections.flatMap(section=>section.data);
  assert.equal(rows.length,1);assert.equal(rows[0].id,'bank-income');
 });
 
-test('selected history accounts use contrasting outlines and solid check badges in both themes',()=>{
+test('borderless account chips use tinted selection and solid check badges in both themes',()=>{
  for(const dark of [false,true]){
   const h=harness(dark);let nodes=h.render();
   nodes.find(node=>node.props.accessibilityLabel==='Bank').props.onPress();nodes=h.render();
   const selected=nodes.find(node=>node.props.accessibilityLabel==='Bank');
   assert.equal(selected.props.accessibilityState.selected,true);
-  assert.equal(selected.props.style.borderColor,dark?'#082417':'#FFFFFF');
-  assert.equal(nodes.filter(node=>node.props.testID==='history-account-selection-ring').length,1);
+  assert.equal(selected.props.style.backgroundColor,'gray');
+  assert.equal(selected.props.style.borderWidth,undefined);
+  assert.equal(nodes.filter(node=>node.props.testID==='history-account-selection-ring').length,0);
   const badge=nodes.find(node=>node.props.testID==='history-account-selected-badge');
-  assert.equal(badge.props.style.backgroundColor,selected.props.style.borderColor);
-  assert.equal(badge.props.children.props.color,selected.props.style.backgroundColor);
+  assert.equal(badge.props.style.backgroundColor,'strong-green');
+  assert.equal(badge.props.children.props.color,dark?'black':'white');
   nodes.find(node=>node.props.accessibilityLabel==='All accounts').props.onPress();nodes=h.render();
   assert.equal(nodes.find(node=>node.props.accessibilityLabel==='Bank').props.accessibilityState.selected,false);
   assert.equal(nodes.filter(node=>node.props.testID==='history-account-selected-badge').length,1);

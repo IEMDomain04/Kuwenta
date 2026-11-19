@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { AccountIcon } from '../components/accounts/account-icon';
 import { accountCardColor } from '../domain/account-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -22,7 +21,6 @@ export default function TransactionsScreen() {
   const { accounts, transactions, month, refresh, busy, removeTransaction, showNotice } = useFinance();
   const theme = useTheme();
   const dark = useColorScheme() === 'dark';
-  const cardText = dark ? '#082417' : '#FFFFFF';
   const confirmation = useConfirmation();
   const params = useLocalSearchParams<{ accountId?: string }>();
   function setError(message: string) { if (message) showNotice(message, true); }
@@ -62,34 +60,7 @@ export default function TransactionsScreen() {
     ], { rows: [{ label: 'Category', value: transaction.category }, { label: 'Amount', value: formatMoney(transaction.amount) }, { label: 'Account', value: accountLabel }, { label: 'Date', value: formatTransactionDateTime(transaction.transactionDate, transaction.transactionTime) }] });
   }
   return <FinanceScreen title="Transaction history" centeredTitle scroll={false} floatingAction={<AddTransactionButton disabled={busy} />}>
-    <View style={{ gap: 6 }}>
-    <ScrollView testID="history-account-strip" horizontal showsHorizontalScrollIndicator={false}
-      onLayout={event => setAccountStripWidth(event.nativeEvent.layout.width)}
-      onScroll={event => setAccountScroll(event.nativeEvent.contentOffset.x)} scrollEventThrottle={32}
-      style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6 }}>
-      {[{ id: null, name: 'All accounts', archived: false }, ...accounts].map((account) => {
-        const savedAccount = account.id === null ? undefined : accounts.find(row => row.id === account.id);
-        const colored = savedAccount && !savedAccount.archived;
-        const color = savedAccount ? accountCardColor(savedAccount, dark) : theme.backgroundElement;
-        const foreground = colored ? cardText : theme.text;
-        const selected = accountFilter === account.id;
-        return <Pressable key={account.id ?? 'all-accounts'} accessibilityRole="button" accessibilityLabel={account.name + (account.archived ? ', archived' : '')} accessibilityState={{ selected }} onPress={() => setAccountFilter(account.id)}
-          style={{ minHeight: 78, width: accountWidth, padding: 10, borderRadius: 16, overflow: 'hidden', gap: 8, backgroundColor: colored ? color : theme.backgroundElement, borderWidth: 2, borderColor: selected ? foreground : colored ? color : theme.border }}>
-          {colored ? <LinearGradient pointerEvents="none" accessible={false} colors={['rgba(255,255,255,0.06)', dark ? 'rgba(0,0,0,0.04)' : 'rgba(0,0,0,0.12)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} /> : null}
-          {selected ? <View testID="history-account-selection-ring" pointerEvents="none" accessible={false} style={{ position: 'absolute', top: 3, left: 3, right: 3, bottom: 3, borderRadius: 11, borderWidth: 1, borderColor: foreground }} /> : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {savedAccount ? <AccountIcon account={savedAccount} size={20} color={foreground} /> : <Ionicons name="wallet-outline" size={20} color={theme.accent} />}
-            <ThemedText type="smallBold" numberOfLines={1} style={{ flex: 1, fontSize: 11, color: foreground }}>{account.name}</ThemedText>
-            {selected ? <View testID="history-account-selected-badge" accessible={false} style={{ width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: foreground }}><Ionicons name="checkmark" size={13} color={colored ? color : theme.backgroundElement} /></View> : null}
-          </View>
-          <ThemedText type="small" style={{ color: foreground, fontSize: 10 }}>{savedAccount ? savedAccount.archived ? 'Archived / PHP' : savedAccount.purpose === 'savings' ? 'Savings / PHP' : 'Spending / PHP' : 'View all accounts'}</ThemedText>
-        </Pressable>;
-      })}
-    </ScrollView>
-    {accountCount > 1 && accountStripWidth > 0 ? <View testID="history-account-scroll-track" accessible={false} pointerEvents="none" style={{ height: 3, borderRadius: 2, backgroundColor: theme.backgroundSelected, overflow: 'hidden' }}>
-      <View testID="history-account-scroll-thumb" style={{ height: 3, borderRadius: 2, width: accountThumbWidth, backgroundColor: theme.accent, transform: [{ translateX: accountScrollProgress * (accountStripWidth - accountThumbWidth) }] }} />
-    </View> : null}
-    </View>
+    <View style={{ gap: 8 }}>
     <View style={{ width: '100%', gap: 8 }}>
       <View testID="history-type-filters" style={{ flexDirection: 'row', width: '100%', gap: 4 }}>
         {(['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(value)}
@@ -100,12 +71,29 @@ export default function TransactionsScreen() {
       </View>
       <HomeMonthPicker fullWidth />
     </View>
-
-
-    {accountFilter !== null && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-      <ThemedText type="small" style={{ flex: 1 }}>Account: {accounts.find((account) => account.id === accountFilter)?.name ?? 'Unavailable account'}</ThemedText>
-      <ActionButton compact label="Reset account" onPress={() => setAccountFilter(null)} />
-    </View>}
+    <View style={{ gap: 6 }}>
+    <ScrollView testID="history-account-strip" horizontal showsHorizontalScrollIndicator={false}
+      onLayout={event => setAccountStripWidth(event.nativeEvent.layout.width)}
+      onScroll={event => setAccountScroll(event.nativeEvent.contentOffset.x)} scrollEventThrottle={32}
+      style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 6 }}>
+      {[{ id: null, name: 'All accounts', archived: false }, ...accounts].map((account) => {
+        const savedAccount = account.id === null ? undefined : accounts.find(row => row.id === account.id);
+        const color = savedAccount ? accountCardColor(savedAccount, dark) : theme.accent;
+        const selected = accountFilter === account.id;
+        return <Pressable key={account.id ?? 'all-accounts'} accessibilityRole="button" accessibilityLabel={account.name + (account.archived ? ', archived' : '')} accessibilityState={{ selected }} onPress={() => setAccountFilter(account.id)}
+          style={{ minHeight: 44, width: accountWidth, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement }}>
+          {savedAccount ? <AccountIcon account={savedAccount} size={20} color={color} /> : <Ionicons name="wallet-outline" size={20} color={theme.accent} />}
+          <ThemedText type={selected ? 'smallBold' : 'small'} numberOfLines={1} ellipsizeMode="tail" style={{ flex: 1, fontSize: 11, color: theme.text }}>{account.name}{account.archived ? ' (archived)' : ''}</ThemedText>
+          {selected ? <View testID="history-account-selected-badge" accessible={false} style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accentPressed }}><Ionicons name="checkmark" size={12} color={theme.onAccent} /></View> : null}
+        </Pressable>;
+      })}
+    </ScrollView>
+    {accountCount > 1 && accountStripWidth > 0 ? <View testID="history-account-scroll-track" accessible={false} pointerEvents="none" style={{ height: 3, borderRadius: 2, backgroundColor: theme.backgroundSelected, overflow: 'hidden' }}>
+      <View testID="history-account-scroll-thumb" style={{ height: 3, borderRadius: 2, width: accountThumbWidth, backgroundColor: theme.accent, transform: [{ translateX: accountScrollProgress * (accountStripWidth - accountThumbWidth) }] }} />
+    </View> : null}
+    {accountFilter !== null && <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, lineHeight: 16 }}>Account: {accounts.find((account) => account.id === accountFilter)?.name ?? 'Unavailable account'}</ThemedText>}
+    </View>
+    </View>
     <SectionList style={{ flex: 1 }} overScrollMode="never" sections={sections} keyExtractor={(item) => item.id} stickySectionHeadersEnabled={false}
       refreshing={busy} onRefresh={() => { void refresh(); }}
       renderSectionHeader={({ section }) => <View style={{ backgroundColor: theme.backgroundElement, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 4, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6 }}>
